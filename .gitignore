@@ -34,7 +34,7 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 .DS_Store
 
 # User-specific data (downloaded WaniKani subjects, study materials, etc.)
-# data/userdata
+data/userdata
 
 # AI coding agent assets
 docs/plans
