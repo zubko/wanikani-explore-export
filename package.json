@@ -1,0 +1,63 @@
+{
+  "name": "making-anki-cards",
+  "module": "src/index.ts",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "//dev": "Using node+vite instead of bunx --bun: Bun runtime swallows console.log from Vite SSR-loaded server modules, hiding all Hono server logs",
+    "dev": "node node_modules/.bin/vite",
+    "download-subjects": "bun --env-file=scripts/.env run scripts/download-subjects.ts",
+    "download-study-materials": "bun --env-file=scripts/.env run scripts/download-study-materials.ts",
+    "generate-verb-conjugations": "bun --env-file=scripts/.env run scripts/generate-verb-conjugations.ts",
+    "generate-sentence-readings": "bun --env-file=scripts/.env run scripts/generate-sentence-readings.ts",
+    "sync-anki-templates": "bun run scripts/sync-anki-templates.ts",
+    "sync-anki-notes": "bun run scripts/sync-anki-notes.ts",
+    "build": "vite build && bun build src/server/index.ts --outdir dist/server --target bun",
+    "preview": "NODE_ENV=production bun run dist/server/index.js",
+    "tsc": "bunx tsc --noEmit",
+    "lint": "eslint src",
+    "lint:fix": "eslint src --fix",
+    "format": "prettier --write src",
+    "format:check": "prettier --check src",
+    "test": "bun test",
+    "test:watch": "bun test --watch"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.2",
+    "@hono/vite-dev-server": "^0.24.0",
+    "@tailwindcss/vite": "^4.1.18",
+    "@types/bun": "latest",
+    "@types/dompurify": "^3.2.0",
+    "@types/react": "^19.2.8",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.1.2",
+    "eslint": "^9.39.2",
+    "eslint-config-prettier": "^10.1.8",
+    "happy-dom": "^20.6.1",
+    "lint-staged": "^16.2.7",
+    "prettier": "^3.7.4",
+    "simple-git-hooks": "^2.13.1",
+    "tailwindcss": "^4.1.18",
+    "typescript-eslint": "^8.52.0",
+    "vite": "^7.3.1"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "simple-git-hooks": {
+    "pre-commit": "bunx lint-staged"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,json,md}": "prettier --write"
+  },
+  "dependencies": {
+    "@hugeicons/core-free-icons": "^3.1.1",
+    "@hugeicons/react": "^1.1.4",
+    "dompurify": "^3.3.1",
+    "hono": "^4.11.3",
+    "openai": "^6.16.0",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3",
+    "react-hot-toast": "^2.6.0"
+  }
+}

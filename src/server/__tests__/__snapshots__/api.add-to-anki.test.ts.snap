@@ -1,0 +1,393 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`add-to-anki API add radical (一, id=1) 1`] = `
+[
+  "modelFieldNames",
+  "findNotes",
+  "addNote",
+  "sync",
+]
+`;
+
+exports[`add-to-anki API add kanji (校, id=658) with radicals 1`] = `
+[
+  "modelFieldNames",
+  "findNotes",
+  "addNote",
+  "modelFieldNames",
+  "findNotes",
+  "addNote",
+  "modelFieldNames",
+  "findNotes",
+  "addNote",
+  "modelFieldNames",
+  "deckNamesAndIds",
+  "findNotes",
+  "addNote",
+  "sync",
+]
+`;
+
+exports[`add-to-anki API add vocabulary (毎晩, id=3766) full AnkiConnect sequence 1`] = `
+[
+  {
+    "action": "modelFieldNames",
+    "params": {
+      "modelName": "Japanese Radicals",
+    },
+  },
+  {
+    "action": "findNotes",
+    "params": {
+      "query": "deck:"Japanese Radicals" "primary_name:Gun"",
+    },
+  },
+  {
+    "action": "addNote",
+    "params": {
+      "note": {
+        "deckName": "Japanese Radicals",
+        "fields": {
+          "character": "𠂉",
+          "extra_names": "",
+          "mnemonic_image": "",
+          "mnemonic_text": "This looks a lot like a <span style="background-color: #00aaff; color: white; padding: 0 4px; border-radius: 3px;">gun</span> pointing to the right. You have a handle on the left, and the barrel pointing to the right. Imagine it hanging in a case on the wall in a museum.",
+          "note": "",
+          "primary_name": "Gun",
+          "user_synonyms": "",
+        },
+        "modelName": "Japanese Radicals",
+        "tags": [
+          "wanikani",
+        ],
+      },
+    },
+  },
+  {
+    "action": "modelFieldNames",
+    "params": {
+      "modelName": "Japanese Radicals",
+    },
+  },
+  {
+    "action": "findNotes",
+    "params": {
+      "query": "deck:"Japanese Radicals" "primary_name:Window"",
+    },
+  },
+  {
+    "action": "addNote",
+    "params": {
+      "note": {
+        "deckName": "Japanese Radicals",
+        "fields": {
+          "character": "毋",
+          "extra_names": "",
+          "mnemonic_image": "",
+          "mnemonic_text": "See the criss-cross in the almost-square shape? That's the frames of a big <span style="background-color: #00aaff; color: white; padding: 0 4px; border-radius: 3px;">window</span> you can look out of. It's not perfectly shaped like a rice field, it's more artistic. That's why this is a window and 田 is not.",
+          "note": "",
+          "primary_name": "Window",
+          "user_synonyms": "",
+        },
+        "modelName": "Japanese Radicals",
+        "tags": [
+          "wanikani",
+        ],
+      },
+    },
+  },
+  {
+    "action": "modelFieldNames",
+    "params": {
+      "modelName": "Japanese Radicals",
+    },
+  },
+  {
+    "action": "findNotes",
+    "params": {
+      "query": "deck:"Japanese Radicals" "primary_name:Sun"",
+    },
+  },
+  {
+    "action": "addNote",
+    "params": {
+      "note": {
+        "deckName": "Japanese Radicals",
+        "fields": {
+          "character": "日",
+          "extra_names": "",
+          "mnemonic_image": "",
+          "mnemonic_text": "Since there are no circles in Japanese characters, sometimes rectangles or squares have to make do. In this case, this big rectangle is the <span style="background-color: #00aaff; color: white; padding: 0 4px; border-radius: 3px;">sun</span>. The middle line is a cloud, moving across the sun. Picture it, but don't actually look at the sun and burn your eyes!",
+          "note": "",
+          "primary_name": "Sun",
+          "user_synonyms": "",
+        },
+        "modelName": "Japanese Radicals",
+        "tags": [
+          "wanikani",
+        ],
+      },
+    },
+  },
+  {
+    "action": "modelFieldNames",
+    "params": {
+      "modelName": "Japanese Radicals",
+    },
+  },
+  {
+    "action": "findNotes",
+    "params": {
+      "query": "deck:"Japanese Radicals" "primary_name:Excuse"",
+    },
+  },
+  {
+    "action": "addNote",
+    "params": {
+      "note": {
+        "deckName": "Japanese Radicals",
+        "fields": {
+          "character": "免",
+          "extra_names": "",
+          "mnemonic_image": "",
+          "mnemonic_text": "This radical consists of some legs carrying the sun out of prison. Those legs are yours. When the police stop you, though, what's your <span style="background-color: #00aaff; color: white; padding: 0 4px; border-radius: 3px;">excuse</span>? Come up with one and say it out loud, starting with, "My excuse is..."",
+          "note": "",
+          "primary_name": "Excuse",
+          "user_synonyms": "",
+        },
+        "modelName": "Japanese Radicals",
+        "tags": [
+          "wanikani",
+        ],
+      },
+    },
+  },
+  {
+    "action": "modelFieldNames",
+    "params": {
+      "modelName": "Japanese Kanji",
+    },
+  },
+  {
+    "action": "deckNamesAndIds",
+    "params": {},
+  },
+  {
+    "action": "findNotes",
+    "params": {
+      "query": "deck:"Japanese Kanji" "character:毎"",
+    },
+  },
+  {
+    "action": "addNote",
+    "params": {
+      "note": {
+        "deckName": "Japanese Kanji",
+        "fields": {
+          "character": "毎",
+          "extra_meanings": "Each",
+          "meaning_hint": "Make sure you get every one, and don't miss any of them. Actually search around in your imagination for any more windows, because you want to stress it's important you hit each and every window with your gun.",
+          "meaning_mnemonic": "You have a <span style="background-color: #00aaff; color: white; padding: 0 4px; border-radius: 3px;">gun</span> and you see some <span style="background-color: #00aaff; color: white; padding: 0 4px; border-radius: 3px;">windows</span>. What do you think you're going to do with this gun? Of course, you're going to shoot the windows... <span style="background-color: #ff00aa; color: white; padding: 0 4px; border-radius: 3px;">every</span> single one of them. <span style="background-color: #ff00aa; color: white; padding: 0 4px; border-radius: 3px;">Each</span> and every one.",
+          "meaning_note": "",
+          "primary_meaning": "Every",
+          "primary_reading": "まい",
+          "radicals": "<span class="radical-item"><span class="radical-badge">𠂉</span> Gun</span> + <span class="radical-item"><span class="radical-badge">毋</span> Window</span>",
+          "reading_hint": "Now you need to shoot every one of the mice that came through those broken windows. You can't let any survive. You have to get every last one out of here!!",
+          "reading_mnemonic": "Now that <span style="background-color: #ff00aa; color: white; padding: 0 4px; border-radius: 3px;">every</span> window is broken, you feel pretty stupid because <span style="background-color: #555; color: white; padding: 0 4px; border-radius: 3px;">mi</span>ce (まい) are pouring in through <span style="background-color: #ff00aa; color: white; padding: 0 4px; border-radius: 3px;">each</span> one. You've made a way for mice to get into your house. That wasn't smart.",
+          "reading_note": "",
+          "readings_kunyomi": "ごと",
+          "readings_nanori": "",
+          "readings_onyomi": "<b>まい</b>",
+        },
+        "modelName": "Japanese Kanji",
+        "tags": [
+          "wanikani",
+        ],
+      },
+    },
+  },
+  {
+    "action": "modelFieldNames",
+    "params": {
+      "modelName": "Japanese Kanji",
+    },
+  },
+  {
+    "action": "deckNamesAndIds",
+    "params": {},
+  },
+  {
+    "action": "findNotes",
+    "params": {
+      "query": "deck:"Japanese Kanji" "character:晩"",
+    },
+  },
+  {
+    "action": "addNote",
+    "params": {
+      "note": {
+        "deckName": "Japanese Kanji",
+        "fields": {
+          "character": "晩",
+          "extra_meanings": "Evening",
+          "meaning_hint": "Imagine you’re the sun, working all day. Of course you get tired. This is a good excuse to go to bed at night and get some rest. Feel how sore and hot and sweaty and exhausted you are after a hard day’s work of being the sun.",
+          "meaning_mnemonic": "The <span style="background-color: #00aaff; color: white; padding: 0 4px; border-radius: 3px;">sun</span> has an <span style="background-color: #00aaff; color: white; padding: 0 4px; border-radius: 3px;">excuse</span> for disappearing at <span style="background-color: #ff00aa; color: white; padding: 0 4px; border-radius: 3px;">night</span>. The sun gets really tired, same as anyone else – so when night rolls around the sun excuses itself and goes to sleep. It’s a valid excuse.",
+          "meaning_note": "",
+          "primary_meaning": "Night",
+          "primary_reading": "ばん",
+          "radicals": "<span class="radical-item"><span class="radical-badge">日</span> Sun</span> + <span class="radical-item"><span class="radical-badge">免</span> Excuse</span>",
+          "reading_hint": "Stop working so much! Humans need some rest too, so it can't always be bright. Maybe you should try some therapy. We all just want to see you get better, sun. Anyway, you're banned for now. Cya.",
+          "reading_mnemonic": "Unfortunately, you also have a history of overworking yourself, so you've been outright <span style="background-color: #555; color: white; padding: 0 4px; border-radius: 3px;">ban</span>ned (ばん) from showing up at <span style="background-color: #ff00aa; color: white; padding: 0 4px; border-radius: 3px;">night</span>.",
+          "reading_note": "",
+          "readings_kunyomi": "",
+          "readings_nanori": "",
+          "readings_onyomi": "<b>ばん</b>",
+        },
+        "modelName": "Japanese Kanji",
+        "tags": [
+          "wanikani",
+        ],
+      },
+    },
+  },
+  {
+    "action": "modelFieldNames",
+    "params": {
+      "modelName": "Japanese Vocabulary",
+    },
+  },
+  {
+    "action": "deckNamesAndIds",
+    "params": {},
+  },
+  {
+    "action": "storeMediaFile",
+    "params": {
+      "data": "PHN2Zz48L3N2Zz4=",
+      "filename": "1003_毎晩_male.mp3",
+    },
+  },
+  {
+    "action": "storeMediaFile",
+    "params": {
+      "data": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+      "filename": "1003_毎晩_sentence.mp3",
+    },
+  },
+  {
+    "action": "findNotes",
+    "params": {
+      "query": "deck:"Japanese Vocabulary" "characters:毎晩"",
+    },
+  },
+  {
+    "action": "addNote",
+    "params": {
+      "note": {
+        "deckName": "Japanese Vocabulary",
+        "fields": {
+          "characters": "毎晩",
+          "conjugations": "",
+          "extra_meanings": "Nightly",
+          "kanji_composition": "<span class="kanji-item"><span class="kanji-badge">毎</span> Every</span> + <span class="kanji-item"><span class="kanji-badge">晩</span> Night</span>",
+          "meaning_explanation": "<span style="background-color: #ff00aa; color: white; padding: 0 4px; border-radius: 3px;">Every</span> <span style="background-color: #ff00aa; color: white; padding: 0 4px; border-radius: 3px;">night</span> is simply <span style="background-color: #aa00ff; color: white; padding: 0 4px; border-radius: 3px;">every night</span>. What do you do every night?",
+          "meaning_note": "",
+          "primary_meaning": "Every Night",
+          "reading": "まいばん",
+          "reading_audio_female": "",
+          "reading_audio_male": "1003_毎晩_male.mp3",
+          "reading_explanation": "This is a jukugo word, which usually means on'yomi readings from the kanji. If you know the readings of your kanji you'll know how to read this as well.",
+          "reading_note": "",
+          "sentence_eng": "He goes jogging every evening before dinner.",
+          "sentence_eng_audio": "",
+          "sentence_jap": "彼は毎晩ジョギングをしてから夕食を食べます。",
+          "sentence_jap_audio": "1003_毎晩_sentence.mp3",
+          "sentence_jap_furigana": "かれはまいばんジョギングをしてからゆうしょくをたべます。",
+          "user_synonyms": "",
+          "word_type": "noun",
+        },
+        "modelName": "Japanese Vocabulary",
+        "tags": [
+          "wanikani",
+        ],
+      },
+    },
+  },
+  {
+    "action": "sync",
+    "params": {},
+  },
+]
+`;
+
+exports[`add-to-anki API add kana vocabulary (ここ, id=9209) 1`] = `
+[
+  {
+    "action": "modelFieldNames",
+    "params": {
+      "modelName": "Japanese Vocabulary",
+    },
+  },
+  {
+    "action": "deckNamesAndIds",
+    "params": {},
+  },
+  {
+    "action": "storeMediaFile",
+    "params": {
+      "data": "PHN2Zz48L3N2Zz4=",
+      "filename": "1003_ここ_male.mp3",
+    },
+  },
+  {
+    "action": "storeMediaFile",
+    "params": {
+      "data": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+      "filename": "1003_ここ_sentence.mp3",
+    },
+  },
+  {
+    "action": "findNotes",
+    "params": {
+      "query": "deck:"Japanese Vocabulary" "characters:ここ"",
+    },
+  },
+  {
+    "action": "addNote",
+    "params": {
+      "note": {
+        "deckName": "Japanese Vocabulary",
+        "fields": {
+          "characters": "ここ",
+          "conjugations": "",
+          "extra_meanings": "",
+          "kanji_composition": "",
+          "meaning_explanation": "Remember how words beginning with こ are close to you? It ends with こ too, which is a clue that we’re talking about a place. So ここ means <span style="background-color: #aa00ff; color: white; padding: 0 4px; border-radius: 3px;">here</span>.",
+          "meaning_note": "",
+          "primary_meaning": "Here",
+          "reading": "",
+          "reading_audio_female": "",
+          "reading_audio_male": "1003_ここ_male.mp3",
+          "reading_explanation": "",
+          "reading_note": "",
+          "sentence_eng": "Let's eat here!",
+          "sentence_eng_audio": "",
+          "sentence_jap": "ここで食べよう！",
+          "sentence_jap_audio": "1003_ここ_sentence.mp3",
+          "sentence_jap_furigana": "ここでたべよう！",
+          "user_synonyms": "",
+          "word_type": "noun, pronoun, こそあど word",
+        },
+        "modelName": "Japanese Vocabulary",
+        "tags": [
+          "wanikani",
+        ],
+      },
+    },
+  },
+  {
+    "action": "sync",
+    "params": {},
+  },
+]
+`;
