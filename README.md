@@ -7,7 +7,7 @@ A web app for creating Anki flashcards from WaniKani data. Search for radicals, 
 - Search WaniKani radicals, kanji, and vocabulary
 - Rich card display with mnemonics, readings, audio, context sentences, and related items
 - One-click add to Anki — automatically creates component cards (radicals for kanji, kanji for vocabulary)
-- Verb conjugations for vocabulary cards
+- Verb conjugations for vocabulary cards, with the masu form on the answer side
 - TTS audio for context sentences (optional, via Azure TTS)
 - Dark mode support in Anki cards
 
@@ -90,6 +90,16 @@ bun run download-subjects
 bun run download-study-materials
 ```
 
+Create the three Anki note types and decks by hand in Anki. Nothing in this repo creates them, so a fresh install has nothing to sync to. See `docs/anki-decks-fields.md` for the three names — `Japanese Radicals`, `Japanese Kanji`, `Japanese Vocabulary`, each used for both a deck and a note type — and the fields each note type needs.
+
+Sync the card templates to Anki once before the first add:
+
+```bash
+bun run sync-anki-templates
+```
+
+It first checks that every note type has exactly the fields its template lists. If it reports a missing field, run `bun run sync-anki-fields` in a real terminal to add it, then run `sync-anki-templates` again. If it reports an extra field, remove that field in Anki by hand.
+
 ## Usage
 
 Start the dev server:
@@ -114,14 +124,15 @@ curl -X POST "http://localhost:5173/api/add-to-anki" \
 
 ## Data Scripts
 
-| Command                              | Description                                                                 |
-| ------------------------------------ | --------------------------------------------------------------------------- |
-| `bun run download-subjects`          | Download WaniKani subjects                                                  |
-| `bun run download-study-materials`   | Download study materials                                                    |
-| `bun run generate-verb-conjugations` | Generate verb conjugations via LLM                                          |
-| `bun run generate-sentence-readings` | Generate kana readings for context sentences via LLM                        |
-| `bun run sync-anki-templates`        | Sync card templates to Anki via AnkiConnect                                 |
-| `bun run sync-anki-notes`            | Re-generate all Anki notes from current data and code (requires dev server) |
+| Command                              | Description                                                                                                                                                                   |
+| ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bun run download-subjects`          | Download WaniKani subjects                                                                                                                                                    |
+| `bun run download-study-materials`   | Download study materials                                                                                                                                                      |
+| `bun run generate-verb-conjugations` | Generate verb conjugations via LLM                                                                                                                                            |
+| `bun run generate-sentence-readings` | Generate kana readings for context sentences via LLM                                                                                                                          |
+| `bun run sync-anki-fields`           | Add note-type fields a template lists and Anki lacks. Interactive, needs a real terminal. Changes the collection schema, so Anki then asks for a one-way sync (choose upload) |
+| `bun run sync-anki-templates`        | Sync card templates to Anki. Refuses to sync when a note type has a missing or extra field                                                                                    |
+| `bun run sync-anki-notes`            | Re-generate all Anki notes from current data and code (requires dev server)                                                                                                   |
 
 ## Tech Stack
 

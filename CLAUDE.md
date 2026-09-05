@@ -35,8 +35,9 @@ src/
     services/           # Server services (AnkiConnect integration, Azure TTS)
   config/               # Shared configuration (theme colors)
   utils/                # Shared utility functions (mnemonic-utils)
-  model/                # Shared TypeScript types and utilities
+  model/                # Shared TypeScript types and utilities (server, client and scripts)
     wanikani.ts         # Wanikani data types
+    anki-models.ts      # Anki deck / note type names
     subject-utils.ts    # Shared utilities (getPrimaryMeaning, findByIds, buildSubjectReferences, etc.)
     radical-utils.ts    # Radical-specific utilities
     kanji-utils.ts      # Kanji-specific utilities
@@ -52,7 +53,12 @@ scripts/                # Utility scripts
   download-study-materials.ts
   generate-verb-conjugations.ts  # LLM-powered verb conjugation generator
   generate-sentence-readings.ts  # LLM-powered kana readings for context sentences
+  anki-templates.ts              # Shared by the two sync scripts: template table, ankiInvoke, field diff
+  anki-template-fields.ts        # Pure markdown parsing of the template files (unit-tested)
+  format-error.ts                # formatError(err) shared by all scripts
+  sync-anki-fields.ts            # Add missing note-type fields to Anki (interactive, needs a TTY)
   sync-anki-templates.ts         # Sync Anki templates to Anki via AnkiConnect
+  __tests__/                     # Unit tests for the pure script helpers
   .env                  # Script-specific env vars (WANIKANI_API_TOKEN, LLM_BASE_URL, LLM_API_KEY)
                         # Loaded via --env-file in package.json scripts
 
@@ -84,6 +90,7 @@ bun run download-subjects              # Download Wanikani subjects
 bun run download-study-materials       # Download study materials
 bun run generate-verb-conjugations     # Generate verb conjugations via LLM
 bun run generate-sentence-readings     # Generate kana readings for context sentences via LLM
+bun run sync-anki-fields               # Add missing note-type fields to Anki (interactive, needs a TTY)
 bun run sync-anki-templates            # Sync Anki templates to Anki
 bun run sync-anki-notes                # Sync all Anki vocabulary notes (requires dev server running)
 ```
@@ -105,6 +112,29 @@ bun run sync-anki-templates
 to sync changes to Anki via AnkiConnect. Requires Anki to be running with AnkiConnect plugin.
 
 **Important:** Always sync templates immediately after modifying them - do not wait for the user to ask.
+
+Before it syncs anything, the script compares the `## Fields` list of each template file with the fields of the Anki note type. It writes nothing in this step, and a missing or extra field on any note type blocks the whole sync.
+
+- Fields must exist before the templates are pushed. Anki rejects a template that references a field the note type does not have.
+- A missing field is added only by `bun run sync-anki-fields`. That script is interactive and needs a real terminal, so an agent must ask the user to run it, then run `sync-anki-templates` again.
+- An extra field is removed by nobody. `validateModelFields` in `src/server/services/anki-connect.ts` checks one note type at a time. It throws on an extra field, so every `add-to-anki` call that writes that note type fails. A vocabulary add also writes its kanji and radicals, so an extra radical field breaks all three types, while an extra vocabulary field breaks only vocabulary. The user must remove the field in Anki by hand.
+
+### Anki Field Migration
+
+```bash
+bun run sync-anki-fields
+```
+
+The only script that changes note type fields, which are part of the collection schema. It adds missing fields at the position the template lists them. `sync-anki-templates` also writes these note types, but only their templates and styling, never their fields. `sync-anki-fields` never calls the AnkiConnect `sync` action - the user handles AnkiWeb syncing.
+
+- Adding a field changes the collection schema, so the script warns first and asks the user to type `yes`. Any other answer, or Ctrl+D, stops the run with no change.
+- The warning spells out the sync order: sync every other device to AnkiWeb, then sync this machine so it pulls those changes down, then add the fields, then choose upload on the one-way sync. The prompt asks the user to confirm the first two steps. Without them the upload wipes the other devices' changes.
+- Step 2 of that order changes the note types while the prompt waits. So the script reads the fields again after the `yes` and acts on the fresh read. It exits with no change when the fresh state differs from the one the user approved, and exits 0 when nothing is missing any more.
+- An extra field on any note type stops the whole run. The insert position comes from the template list, so a stray field would push the new field to the wrong place. The user removes the extra field in Anki, then runs the script again.
+- Existing fields in another order than the template stop the run too, for the same reason: the insert index would land the new field in the wrong place. The script never moves a field, it only adds. The user repositions the fields in Anki, then runs the script again.
+- It needs a real terminal. Without a TTY it exits without any change, so an agent can never run it. Ask the user to.
+
+Both scripts share `scripts/anki-templates.ts` (template table, `ankiInvoke`, template loading, reading the fields from Anki) and `scripts/anki-template-fields.ts` (pure markdown parsing, field diff, template-order check, problem formatting, covered by `scripts/__tests__/`).
 
 ### Anki Note Generation
 
@@ -131,6 +161,7 @@ Get your WaniKani token from: https://www.wanikani.com/settings/personal_access_
 - `docs/wanikani-api.md` - Wanikani API reference (endpoints, auth, pagination, data structures)
 - `docs/anki-connect-typescript-api.md` - AnkiConnect API for Anki deck operations
 - `docs/anki-decks-fields.md` - Anki deck field definitions for each subject type
+- `docs/backlog.md` - To-dos stashed for the future. Pick from it when choosing what to work on next
 
 ## Anki Integration
 
@@ -143,6 +174,9 @@ AnkiConnect client is in `src/server/services/anki-connect.ts`. Card templates a
 - Anki templates support JavaScript for dynamic behavior (e.g., font scaling, keyboard shortcuts)
 - Variable-length data (like radical lists) should be pre-rendered as styled HTML for consistency
 - Anki CSS supports `@media (prefers-color-scheme: dark)` for dark mode styling
+- A note field is listed in three places: `*_EXPECTED_FIELDS` plus the matching note fields type in `anki-connect.ts`, the `## Fields` list of the template file, and `docs/anki-decks-fields.md`. A test in `scripts/__tests__/anki-template-fields.test.ts` checks that the first two match in exact order, so change them in the same commit. The docs file is not tested, keep it in sync by hand. Test code must not repeat the list: `src/test/fetch-interceptor.ts` imports `*_EXPECTED_FIELDS`
+- The same test also checks that every `{{...}}` reference in the Front and Back templates is a declared field, so a typo in a template fails the suite instead of failing later in Anki
+- The deck / note type names live in `src/model/anki-models.ts`. Never repeat the literal strings; `anki-connect.ts`, `src/test/fetch-interceptor.ts` and `scripts/anki-templates.ts` all import them
 
 ## Path Aliases
 
@@ -176,6 +210,9 @@ AnkiConnect client is in `src/server/services/anki-connect.ts`. Card templates a
 
 - Service modules (e.g., `anki-connect.ts`) expose business-domain functions, not raw protocol wrappers — keep low-level APIs like `ankiInvoke` private, export functions like `getDeckNotes(type)` or `addOrUpdateRadical(radical)`
 - Scripts communicate with services through the backend HTTP API (`/api/*`), not by directly importing service or repository modules
+  - Exception: a script may import shared types and constants from `src/model/` with a relative path. A script must still not import services or repositories
+- Code used only by `scripts/` lives in `scripts/`, with its unit tests in `scripts/__tests__/`. `tsconfig.json`, `eslint` and `prettier` all cover `scripts/`, so a scripts-only helper is still type-checked, linted and tested
+- A script module starts with `main()`, puts its helpers below it, and ends with `main().catch(...)`
 - New API endpoints follow the same parameter conventions as existing ones (e.g., `?type=` for subject type filtering)
 - API responses return flat, complete data — let consumers filter or transform as needed
 
@@ -310,6 +347,7 @@ gh issue close <number>          # Close an issue
 - Tests live next to source in `__tests__/` directories (e.g., `src/server/repository/__tests__/`)
 - Run: `bun test` or `bun test --watch`
 - For inline snapshots: use empty `toMatchInlineSnapshot()` then run `bun test --update-snapshots` — never write snapshot content manually
+- Always scope a snapshot update to one file: `bun test src/server/__tests__/api.add-to-anki.test.ts --update-snapshots`. A bare `bun test --update-snapshots` also rewrites stale snapshots of unrelated tests
 - When a test has many `expect()` calls verifying an object's shape, snapshot the whole object instead
 - When a snapshot exceeds 50 lines, use file-based `toMatchSnapshot()` instead of inline
 - Repository tests use real data files but mock `globalThis.fetch` and `writeFile` to avoid side effects
@@ -319,8 +357,10 @@ gh issue close <number>          # Close an issue
 - `bunfig.toml` configures `src/test/preload.ts` as a shared preload for all tests
 - Preload handles `mock.module("fs/promises")` (real readFile, mock writeFile) and lazy repository init — Bun's `mock.module()` is process-global, so it must live in one place
 - **Repository tests** (`src/server/repository/__tests__/`): test repository functions directly, use a simple fetch mock from `setup.ts`
+- **Script unit tests** (`scripts/__tests__/`): test the pure script helpers directly, no mock needed
 - **API E2E tests** (`src/server/__tests__/`): test full API through `api.request()` (Hono handles directly, no HTTP server), use `src/test/fetch-interceptor.ts` which routes by URL pattern (AnkiConnect, WaniKani SVGs/audio/pages)
 - Each test type installs its own fetch mock at file top level — no conflict between them
+- The preload also replaces `Math.random` with one seeded generator shared by the whole run, and exports `resetRandom()`. Each vocabulary add consumes two or three values (voice gender, audio pick, sentence voice), so a test file that snapshots audio fields must call `resetRandom()` in `beforeEach`. Then test order does not matter and a single test can run alone
 
 ### Manual Testing
 

@@ -50,3 +50,12 @@
 
 - Verify "Enter a search term to find items" message appears before searching
 - Verify "No [type] found for [query]" message appears for searches with no results
+
+## Anki Cards
+
+Checked in Anki after `bun run sync-anki-templates`.
+
+- Answer side of a verb card (`入る`, `食べる`): the masu form sits right under the purple badge, gray, 50% of the badge size
+- Same card in light mode and in dark mode: the masu form stays readable in both
+- Answer side of a non-verb card (`毎晩`) and a kana card (`ここ`): no extra line under the badge
+- Answer side of a long verb (`生まれる`): the badge and the masu form still fit on one line after the font scaling runs
