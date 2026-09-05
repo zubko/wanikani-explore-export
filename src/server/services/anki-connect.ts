@@ -12,13 +12,19 @@ import { getRadicalSvgUrl } from "@/model/radical-utils.ts";
 import { getReadingsByType } from "@/model/kanji-utils.ts";
 import { selectRandomAudio, getShortestSentence } from "@/model/vocabulary-utils.ts";
 import { styleMnemonicHtml } from "@/utils/mnemonic-utils.ts";
+import {
+  RADICAL_DECK_NAME,
+  RADICAL_MODEL_NAME,
+  KANJI_DECK_NAME,
+  KANJI_MODEL_NAME,
+  VOCABULARY_DECK_NAME,
+  VOCABULARY_MODEL_NAME,
+} from "@/model/anki-models.ts";
 import { generateSentenceAudio } from "@/server/services/azure-tts.ts";
 
 const ANKI_CONNECT_URL = "http://127.0.0.1:8765";
 
-const RADICAL_DECK_NAME = "Japanese Radicals";
-const RADICAL_MODEL_NAME = "Japanese Radicals";
-const RADICAL_EXPECTED_FIELDS = [
+export const RADICAL_EXPECTED_FIELDS = [
   "character",
   "primary_name",
   "extra_names",
@@ -28,9 +34,7 @@ const RADICAL_EXPECTED_FIELDS = [
   "note",
 ];
 
-const KANJI_DECK_NAME = "Japanese Kanji";
-const KANJI_MODEL_NAME = "Japanese Kanji";
-const KANJI_EXPECTED_FIELDS = [
+export const KANJI_EXPECTED_FIELDS = [
   "character",
   "radicals",
   "primary_meaning",
@@ -47,9 +51,7 @@ const KANJI_EXPECTED_FIELDS = [
   "reading_note",
 ];
 
-const VOCABULARY_DECK_NAME = "Japanese Vocabulary";
-const VOCABULARY_MODEL_NAME = "Japanese Vocabulary";
-const VOCABULARY_EXPECTED_FIELDS = [
+export const VOCABULARY_EXPECTED_FIELDS = [
   "characters",
   "kanji_composition",
   "primary_meaning",
@@ -57,6 +59,7 @@ const VOCABULARY_EXPECTED_FIELDS = [
   "user_synonyms",
   "word_type",
   "conjugations",
+  "masu_form",
   "meaning_explanation",
   "meaning_note",
   "reading",
@@ -116,6 +119,7 @@ type VocabularyNoteFields = {
   user_synonyms: string;
   word_type: string;
   conjugations: string;
+  masu_form: string;
   meaning_explanation: string;
   meaning_note: string;
   reading: string;
@@ -533,6 +537,7 @@ function buildVocabularyNoteFields(params: {
     user_synonyms: vocabulary.studyMaterial?.data.meaning_synonyms?.join(", ") ?? "",
     word_type: vocabulary.partsOfSpeech.join(", "),
     conjugations: conjugationsStr,
+    masu_form: conjugations?.masu ?? "",
     meaning_explanation: styleMnemonicHtml(vocabulary.meaningMnemonic),
     meaning_note: vocabulary.studyMaterial?.data.meaning_note ?? "",
     reading: vocabData ? getPrimaryReading(vocabData.readings) : "",

@@ -1,4 +1,17 @@
 import { createFetchMock, resolveUrl } from "@/test/fetch-utils.ts";
+import {
+  RADICAL_EXPECTED_FIELDS,
+  KANJI_EXPECTED_FIELDS,
+  VOCABULARY_EXPECTED_FIELDS,
+} from "@server/services/anki-connect.ts";
+import {
+  RADICAL_DECK_NAME,
+  RADICAL_MODEL_NAME,
+  KANJI_DECK_NAME,
+  KANJI_MODEL_NAME,
+  VOCABULARY_DECK_NAME,
+  VOCABULARY_MODEL_NAME,
+} from "@/model/anki-models.ts";
 
 type AnkiCall = {
   action: string;
@@ -8,6 +21,7 @@ type AnkiCall = {
 export const ankiCalls: AnkiCall[] = [];
 
 const responseOverrides = new Map<string, unknown>();
+const modelFieldOverrides = new Map<string, string[]>();
 let mediaStatus = 200;
 
 let nextNoteId = 1000000;
@@ -15,58 +29,15 @@ let nextNoteId = 1000000;
 const ANKI_CONNECT_URL = "http://127.0.0.1:8765";
 
 const DECK_IDS: Record<string, number> = {
-  "Japanese Radicals": 1001,
-  "Japanese Kanji": 1002,
-  "Japanese Vocabulary": 1003,
+  [RADICAL_DECK_NAME]: 1001,
+  [KANJI_DECK_NAME]: 1002,
+  [VOCABULARY_DECK_NAME]: 1003,
 };
 
 const MODEL_FIELDS: Record<string, string[]> = {
-  "Japanese Radicals": [
-    "character",
-    "primary_name",
-    "extra_names",
-    "user_synonyms",
-    "mnemonic_text",
-    "mnemonic_image",
-    "note",
-  ],
-  "Japanese Kanji": [
-    "character",
-    "radicals",
-    "primary_meaning",
-    "primary_reading",
-    "extra_meanings",
-    "meaning_mnemonic",
-    "meaning_hint",
-    "meaning_note",
-    "readings_onyomi",
-    "readings_kunyomi",
-    "readings_nanori",
-    "reading_mnemonic",
-    "reading_hint",
-    "reading_note",
-  ],
-  "Japanese Vocabulary": [
-    "characters",
-    "kanji_composition",
-    "primary_meaning",
-    "extra_meanings",
-    "user_synonyms",
-    "word_type",
-    "conjugations",
-    "meaning_explanation",
-    "meaning_note",
-    "reading",
-    "reading_audio_female",
-    "reading_audio_male",
-    "reading_explanation",
-    "reading_note",
-    "sentence_jap",
-    "sentence_jap_furigana",
-    "sentence_jap_audio",
-    "sentence_eng",
-    "sentence_eng_audio",
-  ],
+  [RADICAL_MODEL_NAME]: RADICAL_EXPECTED_FIELDS,
+  [KANJI_MODEL_NAME]: KANJI_EXPECTED_FIELDS,
+  [VOCABULARY_MODEL_NAME]: VOCABULARY_EXPECTED_FIELDS,
 };
 
 export function installFetchInterceptor() {
@@ -112,6 +83,10 @@ export function setAnkiResponse(action: string, result: unknown) {
   responseOverrides.set(action, result);
 }
 
+export function setModelFields(modelName: string, fields: string[]) {
+  modelFieldOverrides.set(modelName, fields);
+}
+
 export function setMediaStatus(status: number) {
   mediaStatus = status;
 }
@@ -119,6 +94,7 @@ export function setMediaStatus(status: number) {
 export function resetFetchInterceptor() {
   ankiCalls.length = 0;
   responseOverrides.clear();
+  modelFieldOverrides.clear();
   mediaStatus = 200;
   nextNoteId = 1000000;
 }
@@ -130,8 +106,10 @@ function handleAnkiRequest(action: string, params: Record<string, unknown>): unk
   switch (action) {
     case "deckNamesAndIds":
       return DECK_IDS;
-    case "modelFieldNames":
-      return MODEL_FIELDS[params["modelName"] as string] ?? [];
+    case "modelFieldNames": {
+      const modelName = params["modelName"] as string;
+      return modelFieldOverrides.get(modelName) ?? MODEL_FIELDS[modelName] ?? [];
+    }
     case "findNotes":
       return [];
     case "notesInfo":

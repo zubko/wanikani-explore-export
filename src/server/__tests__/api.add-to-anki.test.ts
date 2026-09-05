@@ -5,8 +5,11 @@ import {
   ankiCalls,
   setAnkiResponse,
   setMediaStatus,
+  setModelFields,
 } from "@/test/fetch-interceptor.ts";
-import { ensureRepositoryInitialized } from "@/test/preload.ts";
+import { ensureRepositoryInitialized, resetRandom } from "@/test/preload.ts";
+import { VOCABULARY_EXPECTED_FIELDS } from "@server/services/anki-connect.ts";
+import { VOCABULARY_MODEL_NAME } from "@/model/anki-models.ts";
 import { api } from "../api.ts";
 
 process.env.AZURE_TTS_KEY = "test-key";
@@ -15,7 +18,10 @@ process.env.AZURE_TTS_VOICES = "ja-JP-TestNeural";
 
 installFetchInterceptor();
 beforeAll(() => ensureRepositoryInitialized());
-beforeEach(resetFetchInterceptor);
+beforeEach(() => {
+  resetFetchInterceptor();
+  resetRandom();
+});
 
 async function addToAnki(body: { id: number; type: string }) {
   return api.request("/add-to-anki", {
@@ -27,6 +33,16 @@ async function addToAnki(body: { id: number; type: string }) {
 
 async function addToAnkiJson(body: { id: number; type: string }) {
   return (await addToAnki(body)).json();
+}
+
+function findVocabularyFields(action: string, characters: string): Record<string, string> {
+  const call = ankiCalls.find((c) => {
+    if (c.action !== action) return false;
+    const note = c.params.note as { fields?: Record<string, string> } | undefined;
+    return note?.fields?.characters === characters;
+  });
+  if (!call) throw new Error(`No ${action} call for ${characters}`);
+  return (call.params.note as { fields: Record<string, string> }).fields;
 }
 
 describe("add-to-anki API", () => {
@@ -79,6 +95,7 @@ describe("add-to-anki API", () => {
     expect(result.ok).toBe(true);
     expect(result.data.subject.characters).toBe("毎晩");
 
+    expect(findVocabularyFields("addNote", "毎晩").masu_form).toBe("");
     expect(ankiCalls).toMatchSnapshot();
   });
 
@@ -89,6 +106,7 @@ describe("add-to-anki API", () => {
     expect(result.data.kanji).toEqual([]);
     expect(result.data.radicals).toEqual([]);
 
+    expect(findVocabularyFields("addNote", "ここ").masu_form).toBe("");
     expect(ankiCalls).toMatchSnapshot();
   });
 
@@ -120,5 +138,38 @@ describe("add-to-anki API", () => {
     const result = await addToAnkiJson({ id: 8766, type: "radical" });
     expect(result.ok).toBe(false);
     expect(result.error).toContain("Failed to download SVG (500)");
+  });
+
+  test("add verb vocabulary (入る, id=2480) fills masu_form", async () => {
+    const result = await addToAnkiJson({ id: 2480, type: "vocabulary" });
+    expect(result.ok).toBe(true);
+    expect(result.data.subject.characters).toBe("入る");
+
+    const fields = findVocabularyFields("addNote", "入る");
+    expect(fields.masu_form).toBe("入ります");
+    expect(fields.conjugations).toBe("入る, 入ります, 入って, 入らない");
+  });
+
+  test("update existing verb vocabulary (入る) fills masu_form", async () => {
+    setAnkiResponse("findNotes", [1]);
+
+    const result = await addToAnkiJson({ id: 2480, type: "vocabulary" });
+    expect(result.ok).toBe(true);
+    expect(result.data.subject.created).toBe(false);
+
+    const fields = findVocabularyFields("updateNoteFields", "入る");
+    expect(fields.masu_form).toBe("入ります");
+    expect(fields.conjugations).toBe("入る, 入ります, 入って, 入らない");
+  });
+
+  test("note type without masu_form returns an error", async () => {
+    setModelFields(
+      VOCABULARY_MODEL_NAME,
+      VOCABULARY_EXPECTED_FIELDS.filter((f) => f !== "masu_form")
+    );
+
+    const result = await addToAnkiJson({ id: 2480, type: "vocabulary" });
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain("masu_form");
   });
 });

@@ -11,6 +11,7 @@ Configure these templates in Anki: Tools → Manage Note Types → Japanese Voca
 - `user_synonyms` - User synonyms (comma-separated)
 - `word_type` - Parts of speech (comma-separated)
 - `conjugations` - Verb conjugations: dictionary, masu, te, nai (or empty)
+- `masu_form` - Polite (masu) form for verbs, empty otherwise
 - `meaning_explanation` - Styled HTML mnemonic with colored tags
 - `meaning_note` - User note for meaning
 - `reading` - Primary reading in hiragana (empty for kana vocabulary)
@@ -53,6 +54,9 @@ Configure these templates in Anki: Tools → Manage Note Types → Japanese Voca
 <div id="back-short" class="back-short">
   <div class="header-scaled" id="header-scaled">
     <div class="badge">{{characters}}</div>
+    {{#masu_form}}
+    <div class="masu-form">{{masu_form}}</div>
+    {{/masu_form}}
     <div class="header-text">
       <h1>{{primary_meaning}}</h1>
       {{#reading}}
@@ -217,6 +221,14 @@ Configure these templates in Anki: Tools → Manage Note Types → Japanese Voca
 .header-scaled .badge {
   font-size: 2em;
   padding: 0.25em 0.5em;
+}
+
+.header-scaled .masu-form {
+  font-size: 1em;
+  color: #888;
+  /* The flex column gap is 0.75em of the parent above and below this element.
+     -0.5em leaves 0.25em above, tight under the badge. */
+  margin-top: -0.5em;
 }
 
 .header-scaled h1 {
@@ -405,6 +417,10 @@ h2 {
   }
 
   .reading-top {
+    color: #aaa;
+  }
+
+  .header-scaled .masu-form {
     color: #aaa;
   }
 

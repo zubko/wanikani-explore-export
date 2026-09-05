@@ -22,14 +22,16 @@ mock.module("fs/promises", () => ({
   },
 }));
 
-installDeterministicRandom();
+const RANDOM_SEED = 0.42;
+let randomSeed = RANDOM_SEED;
 
-function installDeterministicRandom() {
-  let seed = 0.42;
-  Math.random = () => {
-    seed = (seed * 16807) % 2147483647;
-    return (seed - 1) / 2147483646;
-  };
+Math.random = () => {
+  randomSeed = (randomSeed * 16807) % 2147483647;
+  return (randomSeed - 1) / 2147483646;
+};
+
+export function resetRandom() {
+  randomSeed = RANDOM_SEED;
 }
 
 let initialized = false;
