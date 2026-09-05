@@ -1,5 +1,7 @@
 import { parseArgs } from "util";
 
+import { formatError } from "./format-error.ts";
+
 type CliArgs = {
   baseUrl: string;
   dryRun: boolean;
@@ -146,8 +148,7 @@ async function main(): Promise<void> {
   console.log(`\n${args.dryRun ? "Would update" : "Updating"} ${processable.length} items...\n`);
 
   if (args.dryRun) {
-    for (let i = 0; i < processable.length; i++) {
-      const item = processable[i];
+    for (const [i, item] of processable.entries()) {
       console.log(
         `[${padIndex(i + 1, processable.length)}/${processable.length}] ${item.characters} (${item.meaning})`
       );
@@ -161,8 +162,7 @@ async function main(): Promise<void> {
   let errors = 0;
   const startTime = Date.now();
 
-  for (let i = 0; i < processable.length; i++) {
-    const item = processable[i];
+  for (const [i, item] of processable.entries()) {
     const prefix = `[${padIndex(i + 1, processable.length)}/${processable.length}]`;
 
     spinner.start(`${prefix} `);
@@ -177,8 +177,7 @@ async function main(): Promise<void> {
         errors++;
       }
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      spinner.stop(`${prefix} ❌ ${item.characters} (${item.meaning}) - ${message}`);
+      spinner.stop(`${prefix} ❌ ${item.characters} (${item.meaning}) - ${formatError(err)}`);
       errors++;
     }
   }

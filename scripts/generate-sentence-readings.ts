@@ -1,6 +1,7 @@
 import { readFile, writeFile } from "fs/promises";
 import { parseArgs } from "util";
 import OpenAI from "openai";
+import { formatError } from "./format-error.ts";
 
 // === TYPES ===
 
@@ -85,10 +86,6 @@ Options:
 function log(message: string): void {
   const timestamp = new Date().toISOString();
   console.log(`[${timestamp}] ${message}`);
-}
-
-function formatError(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }
 
 function sleep(ms: number): Promise<void> {
@@ -258,7 +255,7 @@ async function main(): Promise<void> {
   }
 
   if (args.showPrompt) {
-    const item = itemsToProcess[0];
+    const item = itemsToProcess[0]!;
     const sentence = getShortestSentence(item.data.context_sentences)!;
     const reading = getPrimaryReading(item);
     const prompt = buildPrompt(item.data.characters, reading, sentence.ja);
@@ -277,8 +274,7 @@ async function main(): Promise<void> {
   log("Processing...");
   log("-".repeat(60));
 
-  for (let i = 0; i < itemsToProcess.length; i++) {
-    const item = itemsToProcess[i];
+  for (const [i, item] of itemsToProcess.entries()) {
     const sentence = getShortestSentence(item.data.context_sentences)!;
     const reading = getPrimaryReading(item);
 

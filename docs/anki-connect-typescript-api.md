@@ -312,6 +312,12 @@ Example:
 **Params:** `{ modelName: string }`
 **Result:** `string[]`
 
+#### `modelFieldAdd`
+
+**Purpose:** Add a new field to a note type. Without `index` the field is appended at the end. This is a schema change, so Anki needs a one-way sync afterwards.
+**Params:** `{ modelName: string; fieldName: string; index?: number }`
+**Result:** `null`
+
 #### `modelFieldsOnTemplates`
 
 **Purpose:** For a note type, list which fields appear on the question/answer side per card template.

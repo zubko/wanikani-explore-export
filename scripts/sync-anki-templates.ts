@@ -1,20 +1,11 @@
-import { readFile } from "fs/promises";
-import { existsSync } from "fs";
-
-const ANKI_CONNECT_URL = "http://127.0.0.1:8765";
-
-type TemplateConfig = {
-  file: string;
-  modelName: string;
-};
-
-const TEMPLATES_DIR = "src/anki-templates";
-
-const TEMPLATES: TemplateConfig[] = [
-  { file: "radicals.md", modelName: "Japanese Radicals" },
-  { file: "kanji.md", modelName: "Japanese Kanji" },
-  { file: "vocabulary.md", modelName: "Japanese Vocabulary" },
-];
+import { extractSection, formatFieldProblems } from "./anki-template-fields.ts";
+import {
+  ankiInvoke,
+  collectFieldProblems,
+  loadTemplates,
+  type LoadedTemplate,
+} from "./anki-templates.ts";
+import { formatError } from "./format-error.ts";
 
 type ParsedTemplate = {
   front: string;
@@ -22,66 +13,54 @@ type ParsedTemplate = {
   css: string;
 };
 
-async function ankiInvoke<T>(action: string, params: Record<string, unknown> = {}): Promise<T> {
-  let response: Response;
-  try {
-    response = await fetch(ANKI_CONNECT_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action, version: 6, params }),
-    });
-  } catch {
-    throw new Error("Failed to connect to Anki. Is Anki running with AnkiConnect?");
+async function main(): Promise<void> {
+  console.log("Syncing Anki Templates\n");
+  console.log("=".repeat(40));
+
+  const templates = await loadTemplates();
+
+  await checkModelFields(templates);
+
+  let failedCount = 0;
+
+  for (const config of templates) {
+    process.stdout.write(`\n${config.modelName}... `);
+    try {
+      await syncTemplate(config);
+      console.log("OK");
+    } catch (err) {
+      failedCount++;
+      console.log("FAILED");
+      console.error(`  Error: ${formatError(err)}`);
+    }
   }
 
-  const data = await response.json();
+  console.log("\n" + "=".repeat(40));
+  console.log(`\nSummary: ${templates.length - failedCount} synced, ${failedCount} failed`);
 
-  if (data.error) {
-    throw new Error(`AnkiConnect error (${action}): ${data.error}`);
+  if (failedCount > 0) {
+    process.exit(1);
   }
 
-  return data.result as T;
+  await syncToAnkiWeb();
 }
 
-function extractCodeBlock(content: string, sectionHeader: string, lang: string): string {
-  const headerPattern = new RegExp(`## ${sectionHeader}\\s*\\n`);
-  const headerMatch = content.match(headerPattern);
-  if (!headerMatch || headerMatch.index === undefined) {
-    throw new Error(`Section "${sectionHeader}" not found`);
+async function checkModelFields(templates: LoadedTemplate[]): Promise<void> {
+  const problems = await collectFieldProblems(templates);
+  if (problems.length === 0) return;
+
+  console.error("");
+  for (const line of formatFieldProblems(problems)) {
+    console.error(line);
   }
-
-  const sectionStart = headerMatch.index + headerMatch[0].length;
-  const nextSectionMatch = content.slice(sectionStart).match(/\n## /);
-  const sectionEnd = nextSectionMatch?.index
-    ? sectionStart + nextSectionMatch.index
-    : content.length;
-
-  const sectionContent = content.slice(sectionStart, sectionEnd);
-
-  const codeBlockPattern = new RegExp(`\`\`\`${lang}\\n([\\s\\S]*?)\`\`\``, "m");
-  const codeMatch = sectionContent.match(codeBlockPattern);
-  if (!codeMatch) {
-    throw new Error(`No ${lang} code block found in "${sectionHeader}" section`);
-  }
-
-  return codeMatch[1].trim();
+  console.error("\nRun `bun run sync-anki-fields` to add missing fields.");
+  console.error("Remove extra fields in Anki by hand.");
+  console.error("\nNothing was synced.");
+  process.exit(1);
 }
 
-function parseTemplateFile(content: string): ParsedTemplate {
-  return {
-    front: extractCodeBlock(content, "Front Template", "html"),
-    back: extractCodeBlock(content, "Back Template", "html"),
-    css: extractCodeBlock(content, "Styling \\(CSS\\)", "css"),
-  };
-}
-
-function getTemplatePath(file: string): string {
-  return `${TEMPLATES_DIR}/${file}`;
-}
-
-async function syncTemplate(config: TemplateConfig): Promise<void> {
-  const content = await readFile(getTemplatePath(config.file), "utf-8");
-  const template = parseTemplateFile(content);
+async function syncTemplate(config: LoadedTemplate): Promise<void> {
+  const template = parseTemplateFile(config.content);
 
   await ankiInvoke("updateModelTemplates", {
     model: {
@@ -100,59 +79,39 @@ async function syncTemplate(config: TemplateConfig): Promise<void> {
   });
 }
 
-function validateTemplateFilesExist(): void {
-  const missingFiles = TEMPLATES.filter((t) => !existsSync(getTemplatePath(t.file)));
-  if (missingFiles.length === 0) return;
-
-  console.error("Missing template files:");
-  for (const t of missingFiles) {
-    console.error(`  - ${getTemplatePath(t.file)}`);
-  }
-  process.exit(1);
-}
-
-function getErrorMessage(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
-}
-
-async function main(): Promise<void> {
-  console.log("Syncing Anki Templates\n");
-  console.log("=".repeat(40));
-
-  validateTemplateFilesExist();
-
-  let failedCount = 0;
-
-  for (const config of TEMPLATES) {
-    process.stdout.write(`\n${config.modelName}... `);
-    try {
-      await syncTemplate(config);
-      console.log("OK");
-    } catch (err) {
-      failedCount++;
-      console.log("FAILED");
-      console.error(`  Error: ${getErrorMessage(err)}`);
-    }
-  }
-
-  console.log("\n" + "=".repeat(40));
-
-  const successCount = TEMPLATES.length - failedCount;
-
-  if (failedCount === 0) {
-    console.log("\nSyncing to AnkiWeb...");
+// A collection with no AnkiWeb account cannot sync, and that must not fail the push
+async function syncToAnkiWeb(): Promise<void> {
+  console.log("\nSyncing to AnkiWeb...");
+  try {
     await ankiInvoke("sync");
     console.log("Done!");
+  } catch (err) {
+    console.error(`Warning: AnkiWeb sync failed: ${formatError(err)}`);
+    console.error("The templates are in Anki. Sync from Anki when you can.");
+  }
+}
+
+function parseTemplateFile(content: string): ParsedTemplate {
+  return {
+    front: extractCodeBlock(content, "Front Template", "html"),
+    back: extractCodeBlock(content, "Back Template", "html"),
+    css: extractCodeBlock(content, "Styling (CSS)", "css"),
+  };
+}
+
+function extractCodeBlock(content: string, sectionHeader: string, lang: string): string {
+  const section = extractSection(content, sectionHeader);
+
+  const codeBlockPattern = new RegExp(`\`\`\`${lang}\\n([\\s\\S]*?)\`\`\``, "m");
+  const code = section.match(codeBlockPattern)?.[1];
+  if (code === undefined) {
+    throw new Error(`No ${lang} code block found in "${sectionHeader}" section`);
   }
 
-  console.log(`\nSummary: ${successCount} synced, ${failedCount} failed`);
-
-  if (failedCount > 0) {
-    process.exit(1);
-  }
+  return code.trim();
 }
 
 main().catch((err) => {
-  console.error("\nFatal error:", getErrorMessage(err));
+  console.error("\nFatal error:", formatError(err));
   process.exit(1);
 });
