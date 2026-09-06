@@ -1,7 +1,7 @@
 import { readFile, writeFile } from "fs/promises";
 import { parseArgs } from "util";
 import OpenAI from "openai";
-import { formatError } from "./format-error.ts";
+import { formatError } from "./lib/format-error.ts";
 
 // === TYPES ===
 

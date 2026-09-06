@@ -1,6 +1,6 @@
 import { parseArgs } from "util";
 
-import { formatError } from "./format-error.ts";
+import { formatError } from "./lib/format-error.ts";
 
 type CliArgs = {
   baseUrl: string;

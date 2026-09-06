@@ -1,14 +1,14 @@
 import { createInterface } from "readline/promises";
 
-import { formatFieldProblems, isInTemplateOrder } from "./anki-template-fields.ts";
+import { formatFieldProblems, isInTemplateOrder } from "./lib/anki-template-fields.ts";
 import {
   ankiInvoke,
   collectFieldProblems,
   getTemplatePath,
   loadTemplates,
   type TemplateFieldProblem,
-} from "./anki-templates.ts";
-import { formatError } from "./format-error.ts";
+} from "./lib/anki-templates.ts";
+import { formatError } from "./lib/format-error.ts";
 
 async function main(): Promise<void> {
   console.log("Checking Anki note type fields\n");

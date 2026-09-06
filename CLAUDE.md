@@ -48,17 +48,19 @@ src/
     fetch-interceptor.ts  # Fetch mock for API E2E tests (AnkiConnect, WaniKani media/pages)
     fetch-utils.ts        # Shared fetch mock utilities
 
-scripts/                # Utility scripts
+scripts/                # Utility scripts. Top level holds only entry points, shared code goes to lib/
   download-subjects.ts
   download-study-materials.ts
   generate-verb-conjugations.ts  # LLM-powered verb conjugation generator
   generate-sentence-readings.ts  # LLM-powered kana readings for context sentences
-  anki-templates.ts              # Shared by the two sync scripts: template table, ankiInvoke, field diff
-  anki-template-fields.ts        # Pure markdown parsing of the template files (unit-tested)
-  format-error.ts                # formatError(err) shared by all scripts
   sync-anki-fields.ts            # Add missing note-type fields to Anki (interactive, needs a TTY)
   sync-anki-templates.ts         # Sync Anki templates to Anki via AnkiConnect
-  __tests__/                     # Unit tests for the pure script helpers
+  sync-anki-notes.ts             # Re-generate all Anki notes through the dev server API
+  lib/                           # Modules shared by the scripts, never run directly
+    anki-templates.ts            # Shared by the two sync scripts: template table, ankiInvoke, field diff
+    anki-template-fields.ts      # Pure markdown parsing of the template files (unit-tested)
+    format-error.ts              # formatError(err) shared by all scripts
+    __tests__/                   # Unit tests for the pure script helpers
   .env                  # Script-specific env vars (WANIKANI_API_TOKEN, LLM_BASE_URL, LLM_API_KEY)
                         # Loaded via --env-file in package.json scripts
 
@@ -134,7 +136,7 @@ The only script that changes note type fields, which are part of the collection 
 - Existing fields in another order than the template stop the run too, for the same reason: the insert index would land the new field in the wrong place. The script never moves a field, it only adds. The user repositions the fields in Anki, then runs the script again.
 - It needs a real terminal. Without a TTY it exits without any change, so an agent can never run it. Ask the user to.
 
-Both scripts share `scripts/anki-templates.ts` (template table, `ankiInvoke`, template loading, reading the fields from Anki) and `scripts/anki-template-fields.ts` (pure markdown parsing, field diff, template-order check, problem formatting, covered by `scripts/__tests__/`).
+Both scripts share `scripts/lib/anki-templates.ts` (template table, `ankiInvoke`, template loading, reading the fields from Anki) and `scripts/lib/anki-template-fields.ts` (pure markdown parsing, field diff, template-order check, problem formatting, covered by `scripts/lib/__tests__/`).
 
 ### Anki Note Generation
 
@@ -174,7 +176,7 @@ AnkiConnect client is in `src/server/services/anki-connect.ts`. Card templates a
 - Anki templates support JavaScript for dynamic behavior (e.g., font scaling, keyboard shortcuts)
 - Variable-length data (like radical lists) should be pre-rendered as styled HTML for consistency
 - Anki CSS supports `@media (prefers-color-scheme: dark)` for dark mode styling
-- A note field is listed in three places: `*_EXPECTED_FIELDS` in `src/model/anki-models.ts`, the matching note fields type in `anki-connect.ts`, and the `## Fields` list of the template file. `docs/anki-decks-fields.md` lists them too. A test in `scripts/__tests__/anki-template-fields.test.ts` checks that `*_EXPECTED_FIELDS` and the template list match in exact order, so change them in the same commit. The docs file is not tested, keep it in sync by hand. Test code must not repeat the list: `src/test/fetch-interceptor.ts` imports `*_EXPECTED_FIELDS`
+- A note field is listed in three places: `*_EXPECTED_FIELDS` in `src/model/anki-models.ts`, the matching note fields type in `anki-connect.ts`, and the `## Fields` list of the template file. `docs/anki-decks-fields.md` lists them too. A test in `scripts/lib/__tests__/anki-template-fields.test.ts` checks that `*_EXPECTED_FIELDS` and the template list match in exact order, so change them in the same commit. The docs file is not tested, keep it in sync by hand. Test code must not repeat the list: `src/test/fetch-interceptor.ts` imports `*_EXPECTED_FIELDS`
 - The same test also checks that every `{{...}}` reference in the Front and Back templates is a declared field, so a typo in a template fails the suite instead of failing later in Anki
 - The deck / note type names and the `*_EXPECTED_FIELDS` lists live in `src/model/anki-models.ts`. Never repeat them; `anki-connect.ts`, `src/test/fetch-interceptor.ts` and the two test files all import them. They sit in `src/model/` and not in the service so `scripts/` can import them without reaching into a service
 
@@ -211,7 +213,7 @@ AnkiConnect client is in `src/server/services/anki-connect.ts`. Card templates a
 - Service modules (e.g., `anki-connect.ts`) expose business-domain functions, not raw protocol wrappers — keep low-level APIs like `ankiInvoke` private, export functions like `getDeckNotes(type)` or `addOrUpdateRadical(radical)`
 - Scripts communicate with services through the backend HTTP API (`/api/*`), not by directly importing service or repository modules
   - Exception: a script may import shared types and constants from `src/model/` with a relative path. A script must still not import services or repositories
-- Code used only by `scripts/` lives in `scripts/`, with its unit tests in `scripts/__tests__/`. `tsconfig.json`, `eslint` and `prettier` all cover `scripts/`, so a scripts-only helper is still type-checked, linted and tested
+- The top level of `scripts/` holds only entry points, one per `package.json` script. Code shared by several scripts lives in `scripts/lib/`, with its unit tests in `scripts/lib/__tests__/`. `tsconfig.json`, `eslint` and `prettier` all cover `scripts/`, so a scripts-only helper is still type-checked, linted and tested
 - A script module starts with `main()`, puts its helpers below it, and ends with `main().catch(...)`
 - New API endpoints follow the same parameter conventions as existing ones (e.g., `?type=` for subject type filtering)
 - API responses return flat, complete data — let consumers filter or transform as needed
@@ -357,7 +359,7 @@ gh issue close <number>          # Close an issue
 - `bunfig.toml` configures `src/test/preload.ts` as a shared preload for all tests
 - Preload handles `mock.module("fs/promises")` (real readFile, mock writeFile) and lazy repository init — Bun's `mock.module()` is process-global, so it must live in one place
 - **Repository tests** (`src/server/repository/__tests__/`): test repository functions directly, use a simple fetch mock from `setup.ts`
-- **Script unit tests** (`scripts/__tests__/`): test the pure script helpers directly, no mock needed
+- **Script unit tests** (`scripts/lib/__tests__/`): test the pure script helpers directly, no mock needed
 - **API E2E tests** (`src/server/__tests__/`): test full API through `api.request()` (Hono handles directly, no HTTP server), use `src/test/fetch-interceptor.ts` which routes by URL pattern (AnkiConnect, WaniKani SVGs/audio/pages)
 - Each test type installs its own fetch mock at file top level — no conflict between them
 - The preload also replaces `Math.random` with one seeded generator shared by the whole run, and exports `resetRandom()`. Each vocabulary add consumes two or three values (voice gender, audio pick, sentence voice), so a test file that snapshots audio fields must call `resetRandom()` in `beforeEach`. Then test order does not matter and a single test can run alone

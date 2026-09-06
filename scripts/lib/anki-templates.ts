@@ -4,7 +4,7 @@ import {
   KANJI_MODEL_NAME,
   RADICAL_MODEL_NAME,
   VOCABULARY_MODEL_NAME,
-} from "../src/model/anki-models.ts";
+} from "../../src/model/anki-models.ts";
 import {
   diffTemplateFields,
   parseTemplateFields,

@@ -1,11 +1,11 @@
-import { extractSection, formatFieldProblems } from "./anki-template-fields.ts";
+import { extractSection, formatFieldProblems } from "./lib/anki-template-fields.ts";
 import {
   ankiInvoke,
   collectFieldProblems,
   loadTemplates,
   type LoadedTemplate,
-} from "./anki-templates.ts";
-import { formatError } from "./format-error.ts";
+} from "./lib/anki-templates.ts";
+import { formatError } from "./lib/format-error.ts";
 
 type ParsedTemplate = {
   front: string;

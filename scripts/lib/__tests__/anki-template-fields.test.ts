@@ -14,7 +14,7 @@ import {
   VOCABULARY_EXPECTED_FIELDS,
 } from "@/model/anki-models.ts";
 
-const TEMPLATES_DIR = join(import.meta.dir, "../../src/anki-templates");
+const TEMPLATES_DIR = join(import.meta.dir, "../../../src/anki-templates");
 
 const TEMPLATES = [
   { file: "radicals.md", expectedFields: RADICAL_EXPECTED_FIELDS },
