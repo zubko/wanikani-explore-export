@@ -19,6 +19,8 @@ type AnkiNotesResponse = { ok: true; data: AnkiNoteItem[] } | { ok: false; error
 
 type AddToAnkiResponse = { ok: true; data: unknown } | { ok: false; error: string };
 
+type AnkiSyncResponse = { ok: true } | { ok: false; error: string };
+
 // === CLI ===
 
 function parseCliArgs(): CliArgs {
@@ -91,9 +93,14 @@ async function addToAnki(baseUrl: string, id: number, type: string): Promise<Add
   const response = await fetch(`${baseUrl}/api/add-to-anki`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ id, type }),
+    body: JSON.stringify({ id, type, sync: false }),
   });
   return (await response.json()) as AddToAnkiResponse;
+}
+
+async function syncAnkiWeb(baseUrl: string): Promise<AnkiSyncResponse> {
+  const response = await fetch(`${baseUrl}/api/anki-sync`, { method: "POST" });
+  return (await response.json()) as AnkiSyncResponse;
 }
 
 // === Main ===
@@ -182,6 +189,18 @@ async function main(): Promise<void> {
     }
   }
 
+  let synced = false;
+  if (updated > 0) {
+    process.stdout.write("\nSyncing to AnkiWeb... ");
+    try {
+      const result = await syncAnkiWeb(args.baseUrl);
+      synced = result.ok;
+      console.log(result.ok ? "OK" : `FAILED: ${result.error}`);
+    } catch (err) {
+      console.log(`FAILED: ${formatError(err)}`);
+    }
+  }
+
   const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
 
   console.log();
@@ -191,8 +210,11 @@ async function main(): Promise<void> {
   console.log(`Total:   ${processable.length}`);
   console.log(`Updated: ${updated}`);
   console.log(`Errors:  ${errors}`);
+  console.log(`Synced:  ${updated > 0 ? (synced ? "yes" : "no") : "nothing to sync"}`);
   console.log(`Time:    ${elapsed}s`);
   console.log("=".repeat(50));
+
+  if (updated > 0 && !synced) process.exit(1);
 }
 
 main().catch((error) => {

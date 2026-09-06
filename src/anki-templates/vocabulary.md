@@ -15,8 +15,8 @@ Configure these templates in Anki: Tools → Manage Note Types → Japanese Voca
 - `meaning_explanation` - Styled HTML mnemonic with colored tags
 - `meaning_note` - User note for meaning
 - `reading` - Primary reading in hiragana (empty for kana vocabulary)
-- `reading_audio_female` - Audio filename for female voice (only one gender is filled per card)
-- `reading_audio_male` - Audio filename for male voice (only one gender is filled per card)
+- `reading_audio_female` - `[sound:]` tags for the female voice, one per reading, primary reading first (only one gender is filled per card)
+- `reading_audio_male` - `[sound:]` tags for the male voice, one per reading, primary reading first (only one gender is filled per card)
 - `reading_explanation` - Styled HTML mnemonic for reading (empty for kana vocabulary)
 - `reading_note` - User note for reading
 - `sentence_jap` - Japanese context sentence (shortest)
@@ -120,11 +120,8 @@ Configure these templates in Anki: Tools → Manage Note Types → Japanese Voca
       {{#reading}}
       <div class="reading-large">{{reading}}</div>
       {{/reading}}
-      <!-- Only one gender is populated per card to prevent Anki from auto-playing both -->
-      <div class="audio-row">
-        {{#reading_audio_female}}[sound:{{reading_audio_female}}]{{/reading_audio_female}}
-        {{#reading_audio_male}}[sound:{{reading_audio_male}}]{{/reading_audio_male}}
-      </div>
+      <!-- Only one gender is filled per card so Anki does not auto-play both voices -->
+      <div class="audio-row">{{reading_audio_female}}{{reading_audio_male}}</div>
       {{#reading_explanation}}
       <div class="mnemonic">{{reading_explanation}}</div>
       {{/reading_explanation}} {{#reading_note}}

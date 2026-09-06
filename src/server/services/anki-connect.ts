@@ -5,12 +5,13 @@ import type {
   Vocabulary,
   KanaVocabulary,
   ContextSentence,
+  PronunciationAudio,
   AnkiAddResult,
 } from "@/model/wanikani.ts";
 import { getPrimaryMeaning, getPrimaryReading, getExtraMeanings } from "@/model/subject-utils.ts";
 import { getRadicalSvgUrl } from "@/model/radical-utils.ts";
 import { getReadingsByType } from "@/model/kanji-utils.ts";
-import { selectRandomAudio, getShortestSentence } from "@/model/vocabulary-utils.ts";
+import { selectReadingAudios, getShortestSentence } from "@/model/vocabulary-utils.ts";
 import { styleMnemonicHtml } from "@/utils/mnemonic-utils.ts";
 import {
   RADICAL_DECK_NAME,
@@ -24,6 +25,7 @@ import {
   VOCABULARY_EXPECTED_FIELDS,
 } from "@/model/anki-models.ts";
 import { generateSentenceAudio } from "@/server/services/azure-tts.ts";
+import { createHash } from "crypto";
 
 const ANKI_CONNECT_URL = "http://127.0.0.1:8765";
 
@@ -265,6 +267,13 @@ export async function getDeckNotes(type: AnkiDeckType): Promise<DeckNoteInfo[]> 
   }));
 }
 
+// === Sync ===
+
+export async function syncAnkiWeb(): Promise<void> {
+  console.log("[Anki] Syncing with AnkiWeb...");
+  await ankiInvoke("sync");
+}
+
 // === Radical ===
 
 function buildRadicalNoteFields(radical: Radical, storedSvgFilename?: string): RadicalNoteFields {
@@ -315,8 +324,6 @@ async function addOrUpdateRadicalCore(
 
 export async function addOrUpdateRadical(radical: Radical): Promise<AnkiAddResult> {
   const result = await addOrUpdateRadicalCore(radical);
-  console.log("[Anki] Syncing with AnkiConnect...");
-  await ankiInvoke("sync");
   return {
     subject: { name: result.name, characters: radical.characters, created: result.created },
     kanji: [],
@@ -412,9 +419,6 @@ export async function addKanjiWithRadicals(kanji: Kanji): Promise<AnkiAddResult>
 
   const kanjiResult = await addOrUpdateKanjiCore(kanji);
 
-  console.log("[Anki] Syncing with AnkiConnect...");
-  await ankiInvoke("sync");
-
   return {
     subject: {
       name: getPrimaryMeaning(kanji.meanings),
@@ -446,6 +450,10 @@ async function fetchAndStoreAudio(url: string, filename: string): Promise<void> 
   await storeAudioData(filename, audio);
 }
 
+function shortHash(text: string): string {
+  return createHash("sha1").update(text).digest("hex").slice(0, 8);
+}
+
 function buildKanjiCompositionHtml(componentKanji: Kanji[]): string {
   if (componentKanji.length === 0) return "";
 
@@ -462,14 +470,35 @@ function getComponentKanji(vocabulary: Vocabulary | KanaVocabulary): Kanji[] {
   return vocabulary.object === "vocabulary" ? (vocabulary as Vocabulary).componentKanji : [];
 }
 
+function pickReadingAudios(
+  vocabulary: Vocabulary | KanaVocabulary,
+  preferredGender: "male" | "female"
+): { gender: "male" | "female"; readingAudios: PronunciationAudio[] } {
+  const readings =
+    vocabulary.object === "vocabulary" ? vocabulary.readings.map((r) => r.reading) : [];
+  const genders: Array<"male" | "female"> = [
+    preferredGender,
+    preferredGender === "male" ? "female" : "male",
+  ];
+  for (const gender of genders) {
+    const readingAudios = selectReadingAudios({
+      audios: vocabulary.pronunciationAudios,
+      readings,
+      gender,
+    });
+    if (readingAudios.length > 0) return { gender, readingAudios };
+  }
+  return { gender: preferredGender, readingAudios: [] };
+}
+
 function buildVocabularyNoteFields(params: {
   vocabulary: Vocabulary | KanaVocabulary;
   componentKanji: Kanji[];
-  audioFilenames: { female: string; male: string };
+  readingAudioTags: { female: string; male: string };
   shortestSentence: ContextSentence | null;
   sentenceAudioFilename: string;
 }): VocabularyNoteFields {
-  const { vocabulary, componentKanji, audioFilenames, shortestSentence, sentenceAudioFilename } =
+  const { vocabulary, componentKanji, readingAudioTags, shortestSentence, sentenceAudioFilename } =
     params;
 
   const isRegularVocab = vocabulary.object === "vocabulary";
@@ -494,8 +523,8 @@ function buildVocabularyNoteFields(params: {
     meaning_explanation: styleMnemonicHtml(vocabulary.meaningMnemonic),
     meaning_note: vocabulary.studyMaterial?.data.meaning_note ?? "",
     reading: vocabData ? getPrimaryReading(vocabData.readings) : "",
-    reading_audio_female: audioFilenames.female,
-    reading_audio_male: audioFilenames.male,
+    reading_audio_female: readingAudioTags.female,
+    reading_audio_male: readingAudioTags.male,
     reading_explanation: vocabData ? styleMnemonicHtml(vocabData.readingMnemonic) : "",
     reading_note: vocabulary.studyMaterial?.data.reading_note ?? "",
     sentence_jap: shortestSentence?.ja ?? "",
@@ -516,29 +545,30 @@ async function addOrUpdateVocabularyCore(
 
   const deckId = await getDeckId(VOCABULARY_DECK_NAME);
   const slug = vocabulary.slug;
-  const audios = vocabulary.pronunciationAudios;
+  // Anki auto-plays every [sound:] tag on the card back, so only one gender is
+  // filled. All readings of it are kept: 平壌 needs both ぴょんやん and へいじょう.
+  const preferredGender = Math.random() < 0.5 ? "male" : "female";
+  const { gender, readingAudios } = pickReadingAudios(vocabulary, preferredGender);
 
-  // Only store one gender's audio per card. Anki auto-plays all [sound:] fields
-  // on the card back, so filling both reading_audio_female and reading_audio_male
-  // would cause two audio files to play back-to-back.
-  const primaryGender = Math.random() < 0.5 ? "male" : "female";
-  const primaryAudio = selectRandomAudio(audios, primaryGender);
+  const readingAudioTags = { female: "", male: "" };
 
-  const audioFilenames = { female: "", male: "" };
-
-  if (primaryAudio) {
-    const filename = `${deckId}_${slug}_${primaryGender}.mp3`;
-    await fetchAndStoreAudio(primaryAudio.url, filename);
-    audioFilenames[primaryGender] = filename;
-  } else {
+  if (readingAudios.length === 0) {
     console.log(`[Anki] No audio available for ${characters}`);
   }
+  const soundTags: string[] = [];
+  for (const audio of readingAudios) {
+    const filename = `${deckId}_${slug}_${gender}_${shortHash(audio.metadata.pronunciation)}.mp3`;
+    await fetchAndStoreAudio(audio.url, filename);
+    soundTags.push(`[sound:${filename}]`);
+  }
+  readingAudioTags[gender] = soundTags.join(" ");
 
   let sentenceAudioFilename = "";
   const shortestSentence = getShortestSentence(vocabulary.contextSentences);
   if (shortestSentence) {
-    const ttsText = shortestSentence.reading ?? shortestSentence.ja;
-    const sentenceAudio = await generateSentenceAudio(ttsText);
+    // The Dragon HD voice is on trial to read the kanji itself. The generated
+    // kana reading only fills the furigana field.
+    const sentenceAudio = await generateSentenceAudio(shortestSentence.ja);
     if (sentenceAudio) {
       sentenceAudioFilename = `${deckId}_${slug}_sentence.mp3`;
       await storeAudioData(sentenceAudioFilename, sentenceAudio);
@@ -548,7 +578,7 @@ async function addOrUpdateVocabularyCore(
   const fields = buildVocabularyNoteFields({
     vocabulary,
     componentKanji: getComponentKanji(vocabulary),
-    audioFilenames,
+    readingAudioTags,
     shortestSentence,
     sentenceAudioFilename,
   });
@@ -586,9 +616,6 @@ export async function addVocabularyWithKanjiAndRadicals(
   }
 
   const vocabResult = await addOrUpdateVocabularyCore(vocabulary);
-
-  console.log("[Anki] Syncing with AnkiConnect...");
-  await ankiInvoke("sync");
 
   return {
     subject: {

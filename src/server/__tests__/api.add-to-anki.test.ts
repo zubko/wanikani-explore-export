@@ -22,7 +22,9 @@ beforeEach(() => {
   resetRandom();
 });
 
-async function addToAnki(body: { id: number; type: string }) {
+type AddBody = { id: number; type: string; sync?: boolean };
+
+async function addToAnki(body: AddBody) {
   return api.request("/add-to-anki", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -30,7 +32,7 @@ async function addToAnki(body: { id: number; type: string }) {
   });
 }
 
-async function addToAnkiJson(body: { id: number; type: string }) {
+async function addToAnkiJson(body: AddBody) {
   return (await addToAnki(body)).json();
 }
 
@@ -42,6 +44,13 @@ function findVocabularyFields(action: string, characters: string): Record<string
   });
   if (!call) throw new Error(`No ${action} call for ${characters}`);
   return (call.params.note as { fields: Record<string, string> }).fields;
+}
+
+function storedAudioFilenames(): string[] {
+  return ankiCalls
+    .filter((c) => c.action === "storeMediaFile")
+    .map((c) => String(c.params.filename))
+    .filter((name) => name.endsWith(".mp3"));
 }
 
 describe("add-to-anki API", () => {
@@ -125,6 +134,37 @@ describe("add-to-anki API", () => {
     `);
   });
 
+  test("add vocabulary with two readings (平壌, id=7973) stores one audio per reading", async () => {
+    const result = await addToAnkiJson({ id: 7973, type: "vocabulary" });
+    expect(result.ok).toBe(true);
+
+    const fields = findVocabularyFields("addNote", "平壌");
+    expect([fields.reading_audio_female, fields.reading_audio_male]).toMatchInlineSnapshot(`
+      [
+        "",
+        "[sound:1003_平壌_male_3af1ead2.mp3] [sound:1003_平壌_male_d10a9de1.mp3]",
+      ]
+    `);
+    expect(storedAudioFilenames()).toMatchInlineSnapshot(`
+      [
+        "1003_平壌_male_3af1ead2.mp3",
+        "1003_平壌_male_d10a9de1.mp3",
+        "1003_平壌_sentence.mp3",
+      ]
+    `);
+  });
+
+  test("add vocabulary with audio for one gender only (実る, id=9348) uses that gender", async () => {
+    const result = await addToAnkiJson({ id: 9348, type: "vocabulary" });
+    expect(result.ok).toBe(true);
+
+    const fields = findVocabularyFields("addNote", "実る");
+    expect(fields.reading_audio_male).toBe("");
+    expect(fields.reading_audio_female).toMatchInlineSnapshot(
+      `"[sound:1003_実る_female_ccee5ce3.mp3]"`
+    );
+  });
+
   test("failed audio download returns error", async () => {
     setMediaStatus(404);
     const result = await addToAnkiJson({ id: 3766, type: "vocabulary" });
@@ -171,5 +211,23 @@ describe("add-to-anki API", () => {
     const result = await addToAnkiJson({ id: 2480, type: "vocabulary" });
     expect(result.ok).toBe(false);
     expect(result.error).toContain("masu_form");
+  });
+
+  test("add with a non-boolean sync returns 400", async () => {
+    const response = await addToAnki({ id: 1, type: "radical", sync: "false" as never });
+    expect(response.status).toBe(400);
+    expect(ankiCalls).toEqual([]);
+  });
+
+  test("add with sync:false skips the AnkiWeb sync", async () => {
+    const result = await addToAnkiJson({ id: 1, type: "radical", sync: false });
+    expect(result.ok).toBe(true);
+    expect(ankiCalls.map((c) => c.action)).not.toContain("sync");
+  });
+
+  test("anki-sync syncs to AnkiWeb once", async () => {
+    const response = await api.request("/anki-sync", { method: "POST" });
+    expect(await response.json()).toEqual({ ok: true });
+    expect(ankiCalls.map((c) => c.action)).toEqual(["sync"]);
   });
 });

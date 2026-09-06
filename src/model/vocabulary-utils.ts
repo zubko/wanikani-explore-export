@@ -1,14 +1,22 @@
 import type { PronunciationAudio, ContextSentence } from "./wanikani.ts";
 
-export function selectRandomAudio(
-  audios: PronunciationAudio[],
-  gender: "male" | "female"
-): PronunciationAudio | null {
-  const filtered = audios.filter(
-    (a) => a.metadata.gender === gender && a.content_type === "audio/mpeg"
+export type VoiceActor = PronunciationAudio["metadata"];
+
+export function selectReadingAudios(params: {
+  audios: PronunciationAudio[];
+  readings: string[];
+  gender: "male" | "female";
+}): PronunciationAudio[] {
+  const { audios, readings, gender } = params;
+  const firstPerReading = new Map<string, PronunciationAudio>();
+  for (const audio of audios) {
+    if (audio.metadata.gender !== gender || audio.content_type !== "audio/mpeg") continue;
+    const reading = audio.metadata.pronunciation;
+    if (!firstPerReading.has(reading)) firstPerReading.set(reading, audio);
+  }
+  return [...firstPerReading.values()].sort(
+    (a, b) => readingRank(readings, a) - readingRank(readings, b)
   );
-  if (filtered.length === 0) return null;
-  return filtered[Math.floor(Math.random() * filtered.length)] ?? null;
 }
 
 export function getShortestSentence(sentences: ContextSentence[]): ContextSentence | null {
@@ -17,8 +25,6 @@ export function getShortestSentence(sentences: ContextSentence[]): ContextSenten
     current.ja.length < shortest.ja.length ? current : shortest
   );
 }
-
-export type VoiceActor = PronunciationAudio["metadata"];
 
 export function getUniqueVoiceActors(audios: PronunciationAudio[]): VoiceActor[] {
   const seen = new Set<number>();
@@ -29,4 +35,9 @@ export function getUniqueVoiceActors(audios: PronunciationAudio[]): VoiceActor[]
       return true;
     })
     .map((audio) => audio.metadata);
+}
+
+function readingRank(readings: string[], audio: PronunciationAudio): number {
+  const index = readings.indexOf(audio.metadata.pronunciation);
+  return index === -1 ? readings.length : index;
 }

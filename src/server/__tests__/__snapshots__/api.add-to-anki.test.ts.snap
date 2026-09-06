@@ -264,7 +264,7 @@ exports[`add-to-anki API add vocabulary (毎晩, id=3766) full AnkiConnect seque
     "action": "storeMediaFile",
     "params": {
       "data": "PHN2Zz48L3N2Zz4=",
-      "filename": "1003_毎晩_male.mp3",
+      "filename": "1003_毎晩_male_a03eecb8.mp3",
     },
   },
   {
@@ -296,7 +296,7 @@ exports[`add-to-anki API add vocabulary (毎晩, id=3766) full AnkiConnect seque
           "primary_meaning": "Every Night",
           "reading": "まいばん",
           "reading_audio_female": "",
-          "reading_audio_male": "1003_毎晩_male.mp3",
+          "reading_audio_male": "[sound:1003_毎晩_male_a03eecb8.mp3]",
           "reading_explanation": "This is a jukugo word, which usually means on'yomi readings from the kanji. If you know the readings of your kanji you'll know how to read this as well.",
           "reading_note": "",
           "sentence_eng": "He goes jogging every evening before dinner.",
@@ -337,7 +337,7 @@ exports[`add-to-anki API add kana vocabulary (ここ, id=9209) 1`] = `
     "action": "storeMediaFile",
     "params": {
       "data": "PHN2Zz48L3N2Zz4=",
-      "filename": "1003_ここ_male.mp3",
+      "filename": "1003_ここ_male_c92a9d33.mp3",
     },
   },
   {
@@ -369,7 +369,7 @@ exports[`add-to-anki API add kana vocabulary (ここ, id=9209) 1`] = `
           "primary_meaning": "Here",
           "reading": "",
           "reading_audio_female": "",
-          "reading_audio_male": "1003_ここ_male.mp3",
+          "reading_audio_male": "[sound:1003_ここ_male_c92a9d33.mp3]",
           "reading_explanation": "",
           "reading_note": "",
           "sentence_eng": "Let's eat here!",
@@ -406,7 +406,7 @@ exports[`add-to-anki API add verb vocabulary (入る, id=2480) fills masu_form 1
   "primary_meaning": "To Enter",
   "reading": "はいる",
   "reading_audio_female": "",
-  "reading_audio_male": "1003_入る_male.mp3",
+  "reading_audio_male": "[sound:1003_入る_male_78b67aa6.mp3]",
   "reading_explanation": 
 "When a vocab is a single kanji with okurigana, chances are it's going to be the kun'yomi reading, which you don't usually learn in the kanji (you usually learn the on'yomi reading). So, let's learn the kun'yomi reading for this word using its meaning.
 

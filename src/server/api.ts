@@ -32,6 +32,7 @@ import {
   addKanjiWithRadicals,
   addVocabularyWithKanjiAndRadicals,
   getDeckNotes,
+  syncAnkiWeb,
 } from "./services/anki-connect.ts";
 
 const ANKI_DECK_TYPES: AnkiDeckType[] = ["radical", "kanji", "vocabulary"];
@@ -182,11 +183,15 @@ const app = new Hono()
     }
   })
   .post("/add-to-anki", async (c) => {
-    const body = await c.req.json<{ id: number; type: string }>();
-    const { id, type } = body;
+    const body = await c.req.json<{ id: number; type: string; sync?: boolean }>();
+    const { id, type, sync = true } = body;
 
     if (id == null || !type) {
       return c.json({ ok: false as const, error: "Missing required parameters: id and type" }, 400);
+    }
+
+    if (typeof sync !== "boolean") {
+      return c.json({ ok: false as const, error: "Invalid sync: must be a boolean" }, 400);
     }
 
     if (!isSubjectType(type)) {
@@ -202,11 +207,23 @@ const app = new Hono()
         return c.json({ ok: false as const, error: "Subject not found" }, 404);
       }
       await saveCache();
+      if (sync) await syncAnkiWeb();
       console.log(`[API] Add to Anki: ${type} id=${id} — done`);
       return c.json({ ok: true as const, data: result });
     } catch (err) {
       const message = getErrorMessage(err);
       console.error(`[API] Add to Anki: ${type} id=${id} — error: ${message}`);
+      return c.json({ ok: false as const, error: message });
+    }
+  })
+  .post("/anki-sync", async (c) => {
+    console.log("[API] Sync to AnkiWeb");
+    try {
+      await syncAnkiWeb();
+      return c.json({ ok: true as const });
+    } catch (err) {
+      const message = getErrorMessage(err);
+      console.error(`[API] Sync to AnkiWeb — error: ${message}`);
       return c.json({ ok: false as const, error: message });
     }
   });
