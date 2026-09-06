@@ -42,6 +42,7 @@ src/
     radical-utils.ts    # Radical-specific utilities
     kanji-utils.ts      # Kanji-specific utilities
     vocabulary-utils.ts # Vocabulary-specific utilities
+    __tests__/          # Unit tests for the pure model helpers
 
   test/                   # Shared test infrastructure
     preload.ts            # Shared mock.module + repository init (configured in bunfig.toml)
@@ -60,8 +61,12 @@ scripts/                # Utility scripts. Top level holds only entry points, sh
     anki-templates.ts            # Shared by the two sync scripts: template table, ankiInvoke, field diff
     anki-template-fields.ts      # Pure markdown parsing of the template files (unit-tested)
     format-error.ts              # formatError(err) shared by all scripts
-    __tests__/                   # Unit tests for the pure script helpers
-  .env                  # Script-specific env vars (WANIKANI_API_TOKEN, LLM_BASE_URL, LLM_API_KEY)
+    generator-cli.ts             # Shared by the two LLM scripts: flags, log, summary, stop rule
+    llm-utils.ts                 # Shared by the two LLM scripts: chunk, JSON answers, atomic save
+    vocabulary-data.ts           # Shared by the two LLM scripts: load vocabulary, primary reading
+    sentence-reading-check.ts    # Order check of a kana reading against its sentence (unit-tested)
+    __tests__/                   # Unit tests for the pure script helpers, fixtures in fixtures/
+  .env                  # Script-specific env vars (WANIKANI_API_TOKEN, LLM_BASE_URL, LLM_API_KEY, LLM_MODEL)
                         # Loaded via --env-file in package.json scripts
 
 data/                   # Data files
@@ -97,9 +102,11 @@ bun run sync-anki-templates            # Sync Anki templates to Anki
 bun run sync-anki-notes                # Sync all Anki vocabulary notes (requires dev server running)
 ```
 
-The verb conjugation script has CLI options: `--limit <n>`, `--dry-run`, `--show-prompt`, `--help`
+The verb conjugation script has CLI options: `--limit <n>`, `--batch-size <n>` (default 20), `--dry-run`, `--show-prompt`, `--help`
 
-The sentence readings script has CLI options: `--limit <n>`, `--dry-run`, `--show-prompt`, `--help`
+The sentence readings script has CLI options: `--limit <n>`, `--batch-size <n>` (default 20), `--dry-run`, `--show-prompt`, `--help`
+
+Both LLM scripts only fill ids that are missing in their data file, so a rerun continues where the last run stopped. They send one JSON array of items per request, check every answer item, save after every batch, and stop after 3 batches in a row without a usable answer. An item that fails a check is logged and skipped, a rerun picks it up. `--batch-size 1` helps with the last stubborn items. The model is `LLM_MODEL` from `scripts/.env`
 
 The sync Anki notes script has CLI options: `--base-url <url>`, `--limit <n>`, `--dry-run`, `--help`
 
@@ -149,12 +156,14 @@ bun run sync-anki-notes    # Re-generate all Anki notes
 
 Requires Anki to be running with AnkiConnect plugin.
 
+Adding or re-syncing a word always creates or refreshes its component kanji and radicals too. This is intended: every word in Anki must have its kanji and radicals there. The script adds every note with `sync: false` and syncs to AnkiWeb once at the end, so a full run is one AnkiWeb sync, not one per word.
+
 ## Environment
 
 Two `.env` files, each with a `.env.example` to copy from:
 
-- **`.env`** (project root) — Azure TTS credentials for context sentence audio. Optional — if missing, sentence audio is silently skipped.
-- **`scripts/.env`** — WaniKani API token (required for download scripts) and LLM credentials (for verb conjugation / sentence reading generation).
+- **`.env`** (project root) — Azure TTS credentials for context sentence audio. Optional — if missing, sentence audio is silently skipped. `AZURE_TTS_VOICES` holds the Dragon HD voices `ja-JP-Nanami:DragonHDLatestNeural,ja-JP-Masaru:DragonHDLatestNeural`, the region must support them (`westeurope` does). Output is MP3 at 24 kHz, 160 kbit/s.
+- **`scripts/.env`** — WaniKani API token (required for download scripts) and the LLM settings `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL` (for verb conjugation / sentence reading generation). `LLM_MODEL` must be a model the endpoint offers, the scripts fail at the first request otherwise.
 
 Get your WaniKani token from: https://www.wanikani.com/settings/personal_access_tokens
 
@@ -172,6 +181,8 @@ AnkiConnect client is in `src/server/services/anki-connect.ts`. Card templates a
 - AnkiConnect endpoint: `http://127.0.0.1:8765`
 - Use `toast.promise()` from `react-hot-toast` for async operations with loading/success/error feedback
 - Store media files with deck ID prefix to avoid filename collisions: `{deckId}_{slug}.svg`
+- Reading audio: one gender per card, picked at random, the other gender when the first has no MP3. All readings of it go into the one `reading_audio_*` field as `[sound:]` tags separated by a space, primary reading first, so Anki plays them in a row. The file name is `{deckId}_{slug}_{gender}_{hash}.mp3`, the hash is the first 8 hex chars of the SHA-1 of the reading
+- Sentence audio: Azure TTS gets the plain kanji sentence, not the kana reading. The generated kana readings in `data/sentence_readings.json` only fill the furigana field. The HD voices read most sentences right but not rare readings, 外面 came out as がいめん. The planned fix is `docs/plans/tts-with-ssml.md`: one `<sub alias>` per kanji block from the reviewed readings
 - Mnemonic HTML tags (`<radical>`, `<kanji>`, etc.) must be pre-styled using `styleMnemonicHtml()` before storing
 - Anki templates support JavaScript for dynamic behavior (e.g., font scaling, keyboard shortcuts)
 - Variable-length data (like radical lists) should be pre-rendered as styled HTML for consistency
@@ -233,11 +244,12 @@ AnkiConnect client is in `src/server/services/anki-connect.ts`. Card templates a
 
 All routes are prefixed with `/api`.
 
-| Method | Path                | Description                                                                                                                                                                                                                                                                                                                                                   |
-| ------ | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| GET    | `/search?type=&q=`  | Search by type (`radical`, `kanji`, `vocabulary`) and query string. Falls back to name/meaning search if character search fails. 400 if params missing, 404 if not found, 200 with `{ found: true, data }` on success                                                                                                                                         |
-| GET    | `/anki-notes?type=` | List all Anki notes for a subject type (`radical`, `kanji`, `vocabulary`). Returns `{ ok: true, data: AnkiNoteItem[] }`. 400 if type missing/invalid.                                                                                                                                                                                                         |
-| POST   | `/add-to-anki`      | Add subject to Anki. Body: `{ id: number, type: SubjectType }`. Looks up enriched subject, creates/updates Anki notes for the subject and its components (radicals, kanji), downloads media. 400 if params missing, 404 if subject not found, 200 with `{ ok: true, data: AnkiAddResult }` on success, 200 with `{ ok: false, error }` on AnkiConnect failure |
+| Method | Path                | Description                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| ------ | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/search?type=&q=`  | Search by type (`radical`, `kanji`, `vocabulary`) and query string. Falls back to name/meaning search if character search fails. 400 if params missing, 404 if not found, 200 with `{ found: true, data }` on success                                                                                                                                                                                                         |
+| GET    | `/anki-notes?type=` | List all Anki notes for a subject type (`radical`, `kanji`, `vocabulary`). Returns `{ ok: true, data: AnkiNoteItem[] }`. 400 if type missing/invalid.                                                                                                                                                                                                                                                                         |
+| POST   | `/add-to-anki`      | Add subject to Anki. Body: `{ id: number, type: SubjectType, sync?: boolean }`. Looks up enriched subject, creates/updates Anki notes for the subject and its components (radicals, kanji), downloads media, then syncs to AnkiWeb unless `sync` is `false`. 400 if params missing, 404 if subject not found, 200 with `{ ok: true, data: AnkiAddResult }` on success, 200 with `{ ok: false, error }` on AnkiConnect failure |
+| POST   | `/anki-sync`        | Sync the Anki collection to AnkiWeb once. No body. 200 with `{ ok: true }`, 200 with `{ ok: false, error }` on AnkiConnect failure. `sync-anki-notes` adds every note with `sync: false` and calls this once at the end                                                                                                                                                                                                       |
 
 Use proper HTTP status codes: 400 for missing/invalid parameters, 404 for "not found" results. Don't return 200 with error-shaped JSON for input errors or missing resources.
 
@@ -362,7 +374,7 @@ gh issue close <number>          # Close an issue
 - **Script unit tests** (`scripts/lib/__tests__/`): test the pure script helpers directly, no mock needed
 - **API E2E tests** (`src/server/__tests__/`): test full API through `api.request()` (Hono handles directly, no HTTP server), use `src/test/fetch-interceptor.ts` which routes by URL pattern (AnkiConnect, WaniKani SVGs/audio/pages)
 - Each test type installs its own fetch mock at file top level — no conflict between them
-- The preload also replaces `Math.random` with one seeded generator shared by the whole run, and exports `resetRandom()`. Each vocabulary add consumes two or three values (voice gender, audio pick, sentence voice), so a test file that snapshots audio fields must call `resetRandom()` in `beforeEach`. Then test order does not matter and a single test can run alone
+- The preload also replaces `Math.random` with one seeded generator shared by the whole run, and exports `resetRandom()`. Each vocabulary add consumes two values (voice gender, sentence voice), so a test file that snapshots audio fields must call `resetRandom()` in `beforeEach`. Then test order does not matter and a single test can run alone
 
 ### Manual Testing
 

@@ -67,6 +67,7 @@ Search for a vocabulary word to see its full breakdown — kanji composition, ra
 - [Anki](https://apps.ankiweb.net/) desktop with the [AnkiConnect](https://ankiweb.net/shared/info/2055492159) plugin
 - A [WaniKani](https://www.wanikani.com/) account and API token
 - (Optional) [Azure TTS](https://docs.microsoft.com/en-us/azure/cognitive-services/speech-service/overview) credentials for context sentence audio
+- (Optional) An OpenAI-compatible LLM endpoint for the two generate scripts (`LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL` in `scripts/.env`)
 
 ## Setup
 
@@ -79,7 +80,7 @@ bun install
 Copy the example env files and fill in your values:
 
 ```bash
-cp scripts/.env.example scripts/.env   # WaniKani API token (required)
+cp scripts/.env.example scripts/.env   # WaniKani API token (required), LLM settings (optional)
 cp .env.example .env                   # Azure TTS for sentence audio (optional)
 ```
 
@@ -128,11 +129,11 @@ curl -X POST "http://localhost:5173/api/add-to-anki" \
 | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `bun run download-subjects`          | Download WaniKani subjects                                                                                                                                                    |
 | `bun run download-study-materials`   | Download study materials                                                                                                                                                      |
-| `bun run generate-verb-conjugations` | Generate verb conjugations via LLM                                                                                                                                            |
-| `bun run generate-sentence-readings` | Generate kana readings for context sentences via LLM                                                                                                                          |
+| `bun run generate-verb-conjugations` | Generate verb conjugations via LLM. Only fills missing verbs, in batches of 20                                                                                                |
+| `bun run generate-sentence-readings` | Generate kana readings for context sentences via LLM. Only fills missing items, in batches of 20                                                                              |
 | `bun run sync-anki-fields`           | Add note-type fields a template lists and Anki lacks. Interactive, needs a real terminal. Changes the collection schema, so Anki then asks for a one-way sync (choose upload) |
 | `bun run sync-anki-templates`        | Sync card templates to Anki. Refuses to sync when a note type has a missing or extra field                                                                                    |
-| `bun run sync-anki-notes`            | Re-generate all Anki notes from current data and code (requires dev server)                                                                                                   |
+| `bun run sync-anki-notes`            | Re-generate all Anki notes from current data and code, then sync to AnkiWeb once (requires dev server)                                                                        |
 
 ## Tech Stack
 
