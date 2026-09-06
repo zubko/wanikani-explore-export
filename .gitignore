@@ -36,8 +36,5 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 # User-specific data (downloaded WaniKani subjects, study materials, etc.)
 data/userdata
 
-# AI coding agent assets
-docs/plans
-
 # ralphex progress logs
 .ralphex/progress/
