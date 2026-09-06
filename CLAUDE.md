@@ -174,9 +174,9 @@ AnkiConnect client is in `src/server/services/anki-connect.ts`. Card templates a
 - Anki templates support JavaScript for dynamic behavior (e.g., font scaling, keyboard shortcuts)
 - Variable-length data (like radical lists) should be pre-rendered as styled HTML for consistency
 - Anki CSS supports `@media (prefers-color-scheme: dark)` for dark mode styling
-- A note field is listed in three places: `*_EXPECTED_FIELDS` plus the matching note fields type in `anki-connect.ts`, the `## Fields` list of the template file, and `docs/anki-decks-fields.md`. A test in `scripts/__tests__/anki-template-fields.test.ts` checks that the first two match in exact order, so change them in the same commit. The docs file is not tested, keep it in sync by hand. Test code must not repeat the list: `src/test/fetch-interceptor.ts` imports `*_EXPECTED_FIELDS`
+- A note field is listed in three places: `*_EXPECTED_FIELDS` in `src/model/anki-models.ts`, the matching note fields type in `anki-connect.ts`, and the `## Fields` list of the template file. `docs/anki-decks-fields.md` lists them too. A test in `scripts/__tests__/anki-template-fields.test.ts` checks that `*_EXPECTED_FIELDS` and the template list match in exact order, so change them in the same commit. The docs file is not tested, keep it in sync by hand. Test code must not repeat the list: `src/test/fetch-interceptor.ts` imports `*_EXPECTED_FIELDS`
 - The same test also checks that every `{{...}}` reference in the Front and Back templates is a declared field, so a typo in a template fails the suite instead of failing later in Anki
-- The deck / note type names live in `src/model/anki-models.ts`. Never repeat the literal strings; `anki-connect.ts`, `src/test/fetch-interceptor.ts` and `scripts/anki-templates.ts` all import them
+- The deck / note type names and the `*_EXPECTED_FIELDS` lists live in `src/model/anki-models.ts`. Never repeat them; `anki-connect.ts`, `src/test/fetch-interceptor.ts` and the two test files all import them. They sit in `src/model/` and not in the service so `scripts/` can import them without reaching into a service
 
 ## Path Aliases
 

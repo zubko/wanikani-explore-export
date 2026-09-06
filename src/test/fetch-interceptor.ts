@@ -1,16 +1,14 @@
 import { createFetchMock, resolveUrl } from "@/test/fetch-utils.ts";
 import {
-  RADICAL_EXPECTED_FIELDS,
-  KANJI_EXPECTED_FIELDS,
-  VOCABULARY_EXPECTED_FIELDS,
-} from "@server/services/anki-connect.ts";
-import {
   RADICAL_DECK_NAME,
   RADICAL_MODEL_NAME,
+  RADICAL_EXPECTED_FIELDS,
   KANJI_DECK_NAME,
   KANJI_MODEL_NAME,
+  KANJI_EXPECTED_FIELDS,
   VOCABULARY_DECK_NAME,
   VOCABULARY_MODEL_NAME,
+  VOCABULARY_EXPECTED_FIELDS,
 } from "@/model/anki-models.ts";
 
 type AnkiCall = {

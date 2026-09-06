@@ -8,8 +8,7 @@ import {
   setModelFields,
 } from "@/test/fetch-interceptor.ts";
 import { ensureRepositoryInitialized, resetRandom } from "@/test/preload.ts";
-import { VOCABULARY_EXPECTED_FIELDS } from "@server/services/anki-connect.ts";
-import { VOCABULARY_MODEL_NAME } from "@/model/anki-models.ts";
+import { VOCABULARY_MODEL_NAME, VOCABULARY_EXPECTED_FIELDS } from "@/model/anki-models.ts";
 import { api } from "../api.ts";
 
 process.env.AZURE_TTS_KEY = "test-key";
@@ -148,6 +147,7 @@ describe("add-to-anki API", () => {
     const fields = findVocabularyFields("addNote", "入る");
     expect(fields.masu_form).toBe("入ります");
     expect(fields.conjugations).toBe("入る, 入ります, 入って, 入らない");
+    expect(fields).toMatchSnapshot();
   });
 
   test("update existing verb vocabulary (入る) fills masu_form", async () => {

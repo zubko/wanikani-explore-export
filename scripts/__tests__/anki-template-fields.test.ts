@@ -12,7 +12,7 @@ import {
   RADICAL_EXPECTED_FIELDS,
   KANJI_EXPECTED_FIELDS,
   VOCABULARY_EXPECTED_FIELDS,
-} from "@server/services/anki-connect.ts";
+} from "@/model/anki-models.ts";
 
 const TEMPLATES_DIR = join(import.meta.dir, "../../src/anki-templates");
 

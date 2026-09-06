@@ -393,3 +393,32 @@ exports[`add-to-anki API add kana vocabulary (ここ, id=9209) 1`] = `
   },
 ]
 `;
+
+exports[`add-to-anki API add verb vocabulary (入る, id=2480) fills masu_form 1`] = `
+{
+  "characters": "入る",
+  "conjugations": "入る, 入ります, 入って, 入らない",
+  "extra_meanings": "To Go In",
+  "kanji_composition": "<span class="kanji-item"><span class="kanji-badge">入</span> Enter</span>",
+  "masu_form": "入ります",
+  "meaning_explanation": "This vocab word has okurigana, which is the hiragana part that comes after the kanji. When a vocab's okurigana makes an "う/oo" sound (in this case, we have a る), it's often going to be a verb. So in this case, the kanji 入 is <span style="background-color: #ff00aa; color: white; padding: 0 4px; border-radius: 3px;">enter</span>. The vocab 入る is <span style="background-color: #aa00ff; color: white; padding: 0 4px; border-radius: 3px;">to enter</span>. We're just taking the kanji and using it in a verb! ",
+  "meaning_note": "",
+  "primary_meaning": "To Enter",
+  "reading": "はいる",
+  "reading_audio_female": "",
+  "reading_audio_male": "1003_入る_male.mp3",
+  "reading_explanation": 
+"When a vocab is a single kanji with okurigana, chances are it's going to be the kun'yomi reading, which you don't usually learn in the kanji (you usually learn the on'yomi reading). So, let's learn the kun'yomi reading for this word using its meaning.
+
+When you <span style="background-color: #aa00ff; color: white; padding: 0 4px; border-radius: 3px;">enter</span> the room, what do you do? You say "<span style="background-color: #555; color: white; padding: 0 4px; border-radius: 3px;">Hi</span>" (はい) to everyone to the point of absurdity. "Hi there. Oh hi Frank. Oh hi there Susan. Oh hi there lamp.""
+,
+  "reading_note": "",
+  "sentence_eng": "I joined the ski club.",
+  "sentence_eng_audio": "",
+  "sentence_jap": "スキーのクラブに入ったんです。",
+  "sentence_jap_audio": "1003_入る_sentence.mp3",
+  "sentence_jap_furigana": "スキーのクラブにはいったんです。",
+  "user_synonyms": "",
+  "word_type": "intransitive verb, godan verb",
+}
+`;

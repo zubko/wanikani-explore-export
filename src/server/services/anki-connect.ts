@@ -15,64 +15,17 @@ import { styleMnemonicHtml } from "@/utils/mnemonic-utils.ts";
 import {
   RADICAL_DECK_NAME,
   RADICAL_MODEL_NAME,
+  RADICAL_EXPECTED_FIELDS,
   KANJI_DECK_NAME,
   KANJI_MODEL_NAME,
+  KANJI_EXPECTED_FIELDS,
   VOCABULARY_DECK_NAME,
   VOCABULARY_MODEL_NAME,
+  VOCABULARY_EXPECTED_FIELDS,
 } from "@/model/anki-models.ts";
 import { generateSentenceAudio } from "@/server/services/azure-tts.ts";
 
 const ANKI_CONNECT_URL = "http://127.0.0.1:8765";
-
-export const RADICAL_EXPECTED_FIELDS = [
-  "character",
-  "primary_name",
-  "extra_names",
-  "user_synonyms",
-  "mnemonic_text",
-  "mnemonic_image",
-  "note",
-];
-
-export const KANJI_EXPECTED_FIELDS = [
-  "character",
-  "radicals",
-  "primary_meaning",
-  "primary_reading",
-  "extra_meanings",
-  "meaning_mnemonic",
-  "meaning_hint",
-  "meaning_note",
-  "readings_onyomi",
-  "readings_kunyomi",
-  "readings_nanori",
-  "reading_mnemonic",
-  "reading_hint",
-  "reading_note",
-];
-
-export const VOCABULARY_EXPECTED_FIELDS = [
-  "characters",
-  "kanji_composition",
-  "primary_meaning",
-  "extra_meanings",
-  "user_synonyms",
-  "word_type",
-  "conjugations",
-  "masu_form",
-  "meaning_explanation",
-  "meaning_note",
-  "reading",
-  "reading_audio_female",
-  "reading_audio_male",
-  "reading_explanation",
-  "reading_note",
-  "sentence_jap",
-  "sentence_jap_furigana",
-  "sentence_jap_audio",
-  "sentence_eng",
-  "sentence_eng_audio",
-];
 
 type AnkiConnectError = {
   message: string;
