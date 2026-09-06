@@ -402,7 +402,7 @@ exports[`getKanji returns enriched kanji for known id (校, id=658) 1`] = `
         {
           "characters": "歴",
           "id": 1069,
-          "meaning": "Continuation",
+          "meaning": "History",
           "reading": "れき",
         },
         {
@@ -576,7 +576,7 @@ exports[`getKanji returns enriched kanji for known id (校, id=658) 1`] = `
         {
           "characters": "棋",
           "id": 1716,
-          "meaning": "Chess Piece",
+          "meaning": "Japanese Chess",
           "reading": "き",
         },
         {

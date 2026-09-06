@@ -402,7 +402,7 @@ exports[`search API find kanji by character (校) 1`] = `
         {
           "characters": "歴",
           "id": 1069,
-          "meaning": "Continuation",
+          "meaning": "History",
           "reading": "れき",
         },
         {
@@ -576,7 +576,7 @@ exports[`search API find kanji by character (校) 1`] = `
         {
           "characters": "棋",
           "id": 1716,
-          "meaning": "Chess Piece",
+          "meaning": "Japanese Chess",
           "reading": "き",
         },
         {
@@ -1453,15 +1453,12 @@ exports[`search API find radical by character (一) 1`] = `
     1463,
     1491,
     1521,
-    1547,
     1559,
     1591,
     1655,
     1769,
     1851,
-    1852,
     1855,
-    1868,
     1869,
     1888,
     2085,
@@ -1826,12 +1823,6 @@ exports[`search API find radical by character (一) 1`] = `
       "reading": "せん",
     },
     {
-      "characters": "貴",
-      "id": 1547,
-      "meaning": "Valuable",
-      "reading": "き",
-    },
-    {
       "characters": "磁",
       "id": 1559,
       "meaning": "Magnet",
@@ -1862,22 +1853,10 @@ exports[`search API find radical by character (一) 1`] = `
       "reading": "かき",
     },
     {
-      "characters": "威",
-      "id": 1852,
-      "meaning": "Dignity",
-      "reading": "い",
-    },
-    {
       "characters": "岳",
       "id": 1855,
       "meaning": "Peak",
       "reading": "がく",
-    },
-    {
-      "characters": "滅",
-      "id": 1868,
-      "meaning": "Destroy",
-      "reading": "めつ",
     },
     {
       "characters": "滋",
@@ -2615,7 +2594,6 @@ exports[`search API find vocabulary by characters (毎晩) 1`] = `
             2182,
             2216,
             2237,
-            2285,
             2328,
             2334,
             2349,
@@ -2836,7 +2814,7 @@ exports[`search API find vocabulary by characters (毎晩) 1`] = `
             {
               "characters": "曜",
               "id": 961,
-              "meaning": "Weekday",
+              "meaning": "Day Of The Week",
               "reading": "よう",
             },
             {
@@ -3118,7 +3096,7 @@ exports[`search API find vocabulary by characters (毎晩) 1`] = `
             {
               "characters": "慢",
               "id": 2179,
-              "meaning": "Ridicule",
+              "meaning": "Overconfidence",
               "reading": "まん",
             },
             {
@@ -3138,12 +3116,6 @@ exports[`search API find vocabulary by characters (毎晩) 1`] = `
               "id": 2237,
               "meaning": "Appear",
               "reading": "けん",
-            },
-            {
-              "characters": "昌",
-              "id": 2285,
-              "meaning": "Prosperous",
-              "reading": "しょう",
             },
             {
               "characters": "智",

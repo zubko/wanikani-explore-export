@@ -622,7 +622,6 @@ exports[`getVocabulary returns enriched vocabulary for known id (毎晩, id=3766
             2182,
             2216,
             2237,
-            2285,
             2328,
             2334,
             2349,
@@ -843,7 +842,7 @@ exports[`getVocabulary returns enriched vocabulary for known id (毎晩, id=3766
             {
               "characters": "曜",
               "id": 961,
-              "meaning": "Weekday",
+              "meaning": "Day Of The Week",
               "reading": "よう",
             },
             {
@@ -1125,7 +1124,7 @@ exports[`getVocabulary returns enriched vocabulary for known id (毎晩, id=3766
             {
               "characters": "慢",
               "id": 2179,
-              "meaning": "Ridicule",
+              "meaning": "Overconfidence",
               "reading": "まん",
             },
             {
@@ -1145,12 +1144,6 @@ exports[`getVocabulary returns enriched vocabulary for known id (毎晩, id=3766
               "id": 2237,
               "meaning": "Appear",
               "reading": "けん",
-            },
-            {
-              "characters": "昌",
-              "id": 2285,
-              "meaning": "Prosperous",
-              "reading": "しょう",
             },
             {
               "characters": "智",
