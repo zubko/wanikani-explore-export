@@ -21,7 +21,7 @@ Configure these templates in Anki: Tools → Manage Note Types → Japanese Voca
 - `reading_note` - User note for reading
 - `sentence_jap` - Japanese context sentence (shortest)
 - `sentence_jap_furigana` - Japanese sentence with furigana (placeholder)
-- `sentence_jap_audio` - Sentence audio filename (Azure TTS)
+- `sentence_jap_audio` - `[sound:]` tag of the sentence audio (Azure TTS)
 - `sentence_eng` - English translation
 - `sentence_eng_audio` - English audio filename (placeholder)
 
@@ -138,7 +138,7 @@ Configure these templates in Anki: Tools → Manage Note Types → Japanese Voca
       {{/sentence_jap_furigana}} {{#sentence_eng}}
       <div class="sentence-eng">{{sentence_eng}}</div>
       {{/sentence_eng}} {{#sentence_jap_audio}}
-      <div class="audio-row">[sound:{{sentence_jap_audio}}]</div>
+      <div class="audio-row">{{sentence_jap_audio}}</div>
       {{/sentence_jap_audio}}
     </div>
     {{/sentence_jap}}

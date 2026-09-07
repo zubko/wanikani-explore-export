@@ -529,7 +529,7 @@ function buildVocabularyNoteFields(params: {
     reading_note: vocabulary.studyMaterial?.data.reading_note ?? "",
     sentence_jap: shortestSentence?.ja ?? "",
     sentence_jap_furigana: shortestSentence?.reading ?? "",
-    sentence_jap_audio: sentenceAudioFilename,
+    sentence_jap_audio: sentenceAudioFilename ? `[sound:${sentenceAudioFilename}]` : "",
     sentence_eng: shortestSentence?.en ?? "",
     sentence_eng_audio: "",
   };

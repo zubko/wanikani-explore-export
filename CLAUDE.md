@@ -181,6 +181,7 @@ AnkiConnect client is in `src/server/services/anki-connect.ts`. Card templates a
 - AnkiConnect endpoint: `http://127.0.0.1:8765`
 - Use `toast.promise()` from `react-hot-toast` for async operations with loading/success/error feedback
 - Store media files with deck ID prefix to avoid filename collisions: `{deckId}_{slug}.svg`
+- An audio field holds the complete `[sound:name.mp3]` tag, never a bare file name, and the template renders the field as is. Anki's Check Media keeps only files that a field references by a `[sound:]` tag or an `<img>`, and deletes the rest. On 2026-09-07 it deleted every sentence clip because that field held bare names
 - Reading audio: one gender per card, picked at random, the other gender when the first has no MP3. All readings of it go into the one `reading_audio_*` field as `[sound:]` tags separated by a space, primary reading first, so Anki plays them in a row. The file name is `{deckId}_{slug}_{gender}_{hash}.mp3`, the hash is the first 8 hex chars of the SHA-1 of the reading
 - Sentence audio: Azure TTS gets the plain kanji sentence, not the kana reading. The generated kana readings in `data/sentence_readings.json` only fill the furigana field. The HD voices read most sentences right but not rare readings, 外面 came out as がいめん. The planned fix is `docs/plans/tts-with-ssml.md`: one `<sub alias>` per kanji block from the reviewed readings
 - Mnemonic HTML tags (`<radical>`, `<kanji>`, etc.) must be pre-styled using `styleMnemonicHtml()` before storing
