@@ -204,11 +204,20 @@ if (result.status === "error") {
 
 ### Task 4: Verify acceptance criteria
 
-- [ ] verify all requirements from Overview are implemented
-- [ ] verify edge cases are handled: a late answer from an older request is dropped, 404 still shows not found. The UI cannot send a bad type or an empty query, so the 400 case is covered by the Task 2 unit test only
-- [ ] run full test suite: `bun test`. Gate: 0 failures
-- [ ] run `bun run lint` and `bun run tsc`
-- [ ] the project has no e2e tests
+- [x] verify all requirements from Overview are implemented
+- [x] verify edge cases are handled: a late answer from an older request is dropped, 404 still shows not found. The UI cannot send a bad type or an empty query, so the 400 case is covered by the Task 2 unit test only
+- [x] run full test suite: `bun test`. Gate: 0 failures — `141 pass / 0 fail` across 14 files (baseline 131, plus the 10 new client tests)
+- [x] run `bun run lint` and `bun run tsc`
+- [x] the project has no e2e tests
+
+**Verification notes:**
+
+1. Server unreachable: `api.search` lets the fetch `TypeError` through (test in `src/client/__tests__/api.test.ts`), `searchErrorMessage` maps it to `SERVER_UNREACHABLE_MESSAGE`, `SearchPage` sets the `error` state. The `error` branch in `SearchResult` sits before the `not_found` branch, so no "No kanji found" text can show.
+2. Retry: `retrySearch` calls `performSearch(resultType, currentQuery)` only. It never calls `pushSearch`, so the URL stays. `setCurrentQuery` gets the same string, so the `initialValue` effect in `SearchInput` does not fire and the input text stays.
+3. 500: `api.search` throws `HttpStatusError(500)`, the message is `Server error (500)`.
+4. 404: `api.search` returns the body, `response.found` is `false`, the `not_found` branch renders as before.
+5. `searchErrorMessage` has 4 branch tests, `api.search` has 5 tests against a mocked `fetch`.
+6. Late answer: the `requestId !== searchIdRef.current` guard is in both the success path and the `catch`.
 
 ### Task 5: [Final] Update documentation
 
