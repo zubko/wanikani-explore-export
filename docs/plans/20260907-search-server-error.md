@@ -165,11 +165,11 @@ if (result.status === "error") {
 - Create: `src/client/utils/search-error.ts`
 - Create: `src/client/utils/__tests__/search-error.test.ts`
 
-- [ ] create `src/client/utils/search-error.ts` with `SERVER_UNREACHABLE_MESSAGE`, `HttpStatusError` and `searchErrorMessage` as shown in Technical Details
-- [ ] write tests: `HttpStatusError(500)` gives `Server error (500)`, and `.status` is 500
-- [ ] write tests: `new TypeError("Failed to fetch")` and `new TypeError("Load failed")` give `SERVER_UNREACHABLE_MESSAGE`
-- [ ] write tests: a plain `Error("Unexpected token <")` gives `Search failed: Unexpected token <`, and a thrown string gives `Search failed: <the string>`
-- [ ] run `bun test src/client/utils/__tests__/search-error.test.ts`, then `bun run lint:fix` and `bun run tsc` - must pass before task 2
+- [x] create `src/client/utils/search-error.ts` with `SERVER_UNREACHABLE_MESSAGE`, `HttpStatusError` and `searchErrorMessage` as shown in Technical Details
+- [x] write tests: `HttpStatusError(500)` gives `Server error (500)`, and `.status` is 500
+- [x] write tests: `new TypeError("Failed to fetch")` and `new TypeError("Load failed")` give `SERVER_UNREACHABLE_MESSAGE`
+- [x] write tests: a plain `Error("Unexpected token <")` gives `Search failed: Unexpected token <`, and a thrown string gives `Search failed: <the string>`
+- [x] run `bun test src/client/utils/__tests__/search-error.test.ts`, then `bun run lint:fix` and `bun run tsc` - must pass before task 2
 
 ### Task 2: Make `api.search` throw a typed status error
 
