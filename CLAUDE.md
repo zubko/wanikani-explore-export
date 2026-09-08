@@ -229,6 +229,7 @@ AnkiConnect client is in `src/server/services/anki-connect.ts`. Card templates a
 - A script module starts with `main()`, puts its helpers below it, and ends with `main().catch(...)`
 - New API endpoints follow the same parameter conventions as existing ones (e.g., `?type=` for subject type filtering)
 - API responses return flat, complete data — let consumers filter or transform as needed
+- A failed request must never fall into an "empty result" state. `src/client/api.ts` throws `HttpStatusError` for a bad status and lets the fetch `TypeError` of a dead server through. `searchErrorMessage` in `src/client/utils/search-error.ts` turns a thrown value into the text the user sees, and the page keeps it in its own `error` state. A missing item and a broken server must look different on screen
 
 ### Configuration & Environment
 
@@ -374,6 +375,7 @@ gh issue close <number>          # Close an issue
 - **Repository tests** (`src/server/repository/__tests__/`): test repository functions directly, use a simple fetch mock from `setup.ts`
 - **Script unit tests** (`scripts/lib/__tests__/`): test the pure script helpers directly, no mock needed
 - **API E2E tests** (`src/server/__tests__/`): test full API through `api.request()` (Hono handles directly, no HTTP server), use `src/test/fetch-interceptor.ts` which routes by URL pattern (AnkiConnect, WaniKani SVGs/audio/pages)
+- **Client tests** (`src/client/__tests__/`, `src/client/utils/__tests__/`): test the client api layer and the pure client helpers. `src/client/__tests__/api.test.ts` replaces `globalThis.fetch` with `createFetchMock` from `src/test/fetch-utils.ts`, keeps the answer in a `let` handler so each test sets its own, and puts the real `fetch` back in `afterAll`. The project has no React component tests, so components are checked by hand
 - Each test type installs its own fetch mock at file top level — no conflict between them
 - The preload also replaces `Math.random` with one seeded generator shared by the whole run, and exports `resetRandom()`. Each vocabulary add consumes two values (voice gender, sentence voice), so a test file that snapshots audio fields must call `resetRandom()` in `beforeEach`. Then test order does not matter and a single test can run alone
 

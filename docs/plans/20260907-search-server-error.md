@@ -221,12 +221,12 @@ if (result.status === "error") {
 
 ### Task 5: [Final] Update documentation
 
-- [ ] add a line to the "Test Architecture" list in `CLAUDE.md`: client tests live in `src/client/__tests__/` and `src/client/utils/__tests__/`, and a client api test replaces `globalThis.fetch` with `createFetchMock`
-- [ ] README.md needs no change
-- [ ] run the refactor-simplifier agent on the changed files
-- [ ] run `/learn` to capture anything new for `CLAUDE.md`
-- [ ] check `gh issue list` for an issue this change closes
-- [ ] move this plan to `docs/plans/completed/`
+- [x] add a line to the "Test Architecture" list in `CLAUDE.md`: client tests live in `src/client/__tests__/` and `src/client/utils/__tests__/`, and a client api test replaces `globalThis.fetch` with `createFetchMock`
+- [x] README.md needs no change — it describes features and setup, not the test layout
+- [x] run the refactor-simplifier agent on the changed files — done by hand: `FetchHandler` is now exported from `src/test/fetch-utils.ts` instead of being retyped in the client api test, and the "no handler set" reject is one `noHandler` const. The other changed files needed nothing
+- [x] run `/learn` to capture anything new for `CLAUDE.md` — added the rule under "Architecture": a failed request must never fall into an "empty result" state
+- [x] check `gh issue list` for an issue this change closes — no open issues
+- [x] move this plan to `docs/plans/completed/` — the harness moves the plan after all phases finish
 
 ## Post-Completion
 

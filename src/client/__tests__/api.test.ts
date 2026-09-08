@@ -1,15 +1,15 @@
 import { describe, expect, it, beforeEach, afterAll } from "bun:test";
 
-import { createFetchMock, resolveUrl } from "@/test/fetch-utils.ts";
+import { createFetchMock, resolveUrl, type FetchHandler } from "@/test/fetch-utils.ts";
 import { api } from "@client/api.ts";
 import { HttpStatusError } from "@client/utils/search-error.ts";
 
-type FetchHandler = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
+const noHandler: FetchHandler = () => Promise.reject(new Error("no handler set"));
 
 const realFetch = globalThis.fetch;
 
 let requestedUrls: string[] = [];
-let handler: FetchHandler = () => Promise.reject(new Error("no handler set"));
+let handler: FetchHandler = noHandler;
 
 globalThis.fetch = createFetchMock((input, init) => {
   requestedUrls.push(resolveUrl(input));
@@ -27,7 +27,7 @@ function answerWith(body: string, status: number): void {
 describe("api.search", () => {
   beforeEach(() => {
     requestedUrls = [];
-    handler = () => Promise.reject(new Error("no handler set"));
+    handler = noHandler;
   });
 
   it("returns the parsed body of a 200 answer", async () => {
