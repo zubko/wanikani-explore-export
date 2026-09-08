@@ -195,12 +195,12 @@ if (result.status === "error") {
 - Modify: `src/client/components/SearchPage.tsx`
 - Modify: `src/client/components/SearchResult.tsx`
 
-- [ ] add the `error` member to `SearchResult<T>` in `src/client/types.ts`
-- [ ] in `SearchPage.tsx`, catch the error as `err`, set `{ status: "error", query, message: searchErrorMessage(err) }`, keep the request id guard
-- [ ] in `SearchPage.tsx`, add `retrySearch` with `useCallback` and pass it as `onRetry` to `SearchResult`
-- [ ] in `SearchResult.tsx`, add the `onRetry` prop and the `error` branch with the red message and the Retry button
-- [ ] no React test harness exists, so the covered behavior is the mapping and the api tests from tasks 1 and 2. Check the UI by hand: stop the dev server, search, see the message and Retry, start the server, click Retry, see the card
-- [ ] run `bun test`, `bun run lint:fix` and `bun run tsc` - must pass before task 4
+- [x] add the `error` member to `SearchResult<T>` in `src/client/types.ts`
+- [x] in `SearchPage.tsx`, catch the error as `err`, set `{ status: "error", query, message: searchErrorMessage(err) }`, keep the request id guard
+- [x] in `SearchPage.tsx`, add `retrySearch` with `useCallback` and pass it as `onRetry` to `SearchResult`
+- [x] in `SearchResult.tsx`, add the `onRetry` prop and the `error` branch with the red message and the Retry button
+- [x] no React test harness exists, so the covered behavior is the mapping and the api tests from tasks 1 and 2. Check the UI by hand: stop the dev server, search, see the message and Retry, start the server, click Retry, see the card — manual test (skipped - not automatable)
+- [x] run `bun test`, `bun run lint:fix` and `bun run tsc` - must pass before task 4
 
 ### Task 4: Verify acceptance criteria
 

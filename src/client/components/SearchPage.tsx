@@ -6,6 +6,7 @@ import {
   searchableTypeToSubjectType,
 } from "../types.ts";
 import { api } from "../api.ts";
+import { searchErrorMessage } from "../utils/search-error.ts";
 import { useSearchUrl, type UrlSearchParams } from "../hooks/useSearchUrl.ts";
 import { SearchContext } from "../context/SearchContext.tsx";
 import { TypeDropdown } from "./TypeDropdown.tsx";
@@ -56,11 +57,15 @@ export function SearchPage() {
       } else {
         setResult({ status: "not_found", query });
       }
-    } catch {
+    } catch (err) {
       if (requestId !== searchIdRef.current) return;
-      setResult({ status: "not_found", query });
+      setResult({ status: "error", query, message: searchErrorMessage(err) });
     }
   }, []);
+
+  const retrySearch = useCallback(() => {
+    performSearch(resultType, currentQuery);
+  }, [resultType, currentQuery, performSearch]);
 
   const handleUrlChange = useCallback(
     (params: UrlSearchParams) => {
@@ -108,7 +113,7 @@ export function SearchPage() {
           />
         </div>
 
-        <SearchResult type={resultType} result={result} />
+        <SearchResult type={resultType} result={result} onRetry={retrySearch} />
       </div>
     </SearchContext.Provider>
   );
