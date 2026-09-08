@@ -178,14 +178,14 @@ if (result.status === "error") {
 - Modify: `src/client/api.ts`
 - Create: `src/client/__tests__/api.test.ts`
 
-- [ ] import `HttpStatusError` from `./utils/search-error.ts` in `src/client/api.ts` and throw it with `res.status` in place of `new Error("Failed to search")`
-- [ ] create `src/client/__tests__/api.test.ts`. Install a fetch mock at file top level with `createFetchMock` from `@/test/fetch-utils.ts`. Keep the current handler in a `let` so each test can set its own answer. Save the real `fetch` and put it back in `afterAll`
-- [ ] write test: a 200 answer `{ found: true, data: { id: 809 } }` is returned as parsed JSON, and the request URL is `/api/search?type=kanji&q=%E5%83%8D`
-- [ ] write test: a 404 answer `{ found: false }` is returned, not thrown
-- [ ] write test: a 500 answer rejects with an `HttpStatusError` whose `status` is 500
-- [ ] write test: a fetch that rejects with `TypeError("Failed to fetch")` makes `api.search` reject with that same `TypeError`
-- [ ] write test: a 200 answer with the body `<!doctype html>` makes `api.search` reject with a `SyntaxError`, which is the case the fallback branch of `searchErrorMessage` is for
-- [ ] run `bun test src/client`, then `bun run lint:fix` and `bun run tsc` - must pass before task 3
+- [x] import `HttpStatusError` from `./utils/search-error.ts` in `src/client/api.ts` and throw it with `res.status` in place of `new Error("Failed to search")`
+- [x] create `src/client/__tests__/api.test.ts`. Install a fetch mock at file top level with `createFetchMock` from `@/test/fetch-utils.ts`. Keep the current handler in a `let` so each test can set its own answer. Save the real `fetch` and put it back in `afterAll`
+- [x] write test: a 200 answer `{ found: true, data: { id: 809 } }` is returned as parsed JSON, and the request URL is `/api/search?type=kanji&q=%E5%83%8D`
+- [x] write test: a 404 answer `{ found: false }` is returned, not thrown
+- [x] write test: a 500 answer rejects with an `HttpStatusError` whose `status` is 500
+- [x] write test: a fetch that rejects with `TypeError("Failed to fetch")` makes `api.search` reject with that same `TypeError`
+- [x] write test: a 200 answer with the body `<!doctype html>` makes `api.search` reject with a `SyntaxError`, which is the case the fallback branch of `searchErrorMessage` is for
+- [x] run `bun test src/client`, then `bun run lint:fix` and `bun run tsc` - must pass before task 3
 
 ### Task 3: Add the `error` result state and the Retry UI
 
