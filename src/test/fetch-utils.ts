@@ -1,8 +1,8 @@
+export type FetchHandler = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
+
 const originalPreconnect = globalThis.fetch.preconnect;
 
-export function createFetchMock(
-  handler: (input: string | URL | Request, init?: RequestInit) => Promise<Response>
-): typeof fetch {
+export function createFetchMock(handler: FetchHandler): typeof fetch {
   return Object.assign(handler, { preconnect: originalPreconnect }) as typeof fetch;
 }
 

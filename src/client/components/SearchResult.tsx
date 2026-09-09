@@ -10,15 +10,30 @@ type AnySubject = Radical | Kanji | Vocabulary | KanaVocabulary;
 type SearchResultProps = {
   type: SearchableType;
   result: SearchResultType<AnySubject>;
+  onRetry: () => void;
 };
 
-export function SearchResult({ type, result }: SearchResultProps) {
+export function SearchResult({ type, result, onRetry }: SearchResultProps) {
   if (result.status === "idle") {
     return <div className="py-6 text-center text-gray-500">Enter a search term to find items</div>;
   }
 
   if (result.status === "loading") {
     return <div className="py-6 text-center text-gray-500">Searching...</div>;
+  }
+
+  if (result.status === "error") {
+    return (
+      <div className="flex flex-col items-center gap-3 py-6 text-center">
+        <div className="text-red-600">{result.message}</div>
+        <button
+          onClick={onRetry}
+          className="rounded-lg border border-gray-300 px-3 py-1.5 hover:bg-gray-100"
+        >
+          Retry
+        </button>
+      </div>
+    );
   }
 
   if (result.status === "not_found") {

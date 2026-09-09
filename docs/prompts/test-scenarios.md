@@ -51,6 +51,14 @@
 - Verify "Enter a search term to find items" message appears before searching
 - Verify "No [type] found for [query]" message appears for searches with no results
 
+## Server Error in Search
+
+- Open the app, then stop the dev server and press Enter in the search input
+- Should show: red "Could not reach the server. Is the dev server running?" and a Retry button
+- Should NOT show: "No [type] found" text
+- Start the server again and click Retry: the card appears, the URL and the input text do not change
+- An answer with a bad status shows "Server error (500)" with the same Retry button
+
 ## Anki Cards
 
 Checked in Anki after `bun run sync-anki-templates`.

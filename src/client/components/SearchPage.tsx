@@ -6,6 +6,7 @@ import {
   searchableTypeToSubjectType,
 } from "../types.ts";
 import { api } from "../api.ts";
+import { searchErrorMessage } from "../utils/search-error.ts";
 import { useSearchUrl, type UrlSearchParams } from "../hooks/useSearchUrl.ts";
 import { SearchContext } from "../context/SearchContext.tsx";
 import { TypeDropdown } from "./TypeDropdown.tsx";
@@ -42,25 +43,33 @@ export function SearchPage() {
     setResultType(type);
     setCurrentQuery(query);
 
+    const subjectType = searchableTypeToSubjectType[type];
+
+    let response;
     try {
-      const subjectType = searchableTypeToSubjectType[type];
-      const response = await api.search(subjectType, query);
-
+      response = await api.search(subjectType, query);
+    } catch (err) {
       if (requestId !== searchIdRef.current) return;
+      console.error("[search] request failed", err);
+      setResult({ status: "error", message: searchErrorMessage(err) });
+      return;
+    }
 
-      if (response.found) {
-        setResult({
-          status: "found",
-          item: response.data as AnySubject,
-        });
-      } else {
-        setResult({ status: "not_found", query });
-      }
-    } catch {
-      if (requestId !== searchIdRef.current) return;
+    if (requestId !== searchIdRef.current) return;
+
+    if (response.found) {
+      setResult({
+        status: "found",
+        item: response.data as AnySubject,
+      });
+    } else {
       setResult({ status: "not_found", query });
     }
   }, []);
+
+  const retrySearch = useCallback(() => {
+    performSearch(resultType, currentQuery);
+  }, [resultType, currentQuery, performSearch]);
 
   const handleUrlChange = useCallback(
     (params: UrlSearchParams) => {
@@ -108,7 +117,7 @@ export function SearchPage() {
           />
         </div>
 
-        <SearchResult type={resultType} result={result} />
+        <SearchResult type={resultType} result={result} onRetry={retrySearch} />
       </div>
     </SearchContext.Provider>
   );

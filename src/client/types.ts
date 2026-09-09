@@ -12,4 +12,5 @@ export type SearchResult<T> =
   | { status: "idle" }
   | { status: "loading" }
   | { status: "found"; item: T }
-  | { status: "not_found"; query: string };
+  | { status: "not_found"; query: string }
+  | { status: "error"; message: string };
