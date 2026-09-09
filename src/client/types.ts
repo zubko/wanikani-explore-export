@@ -13,4 +13,4 @@ export type SearchResult<T> =
   | { status: "loading" }
   | { status: "found"; item: T }
   | { status: "not_found"; query: string }
-  | { status: "error"; query: string; message: string };
+  | { status: "error"; message: string };

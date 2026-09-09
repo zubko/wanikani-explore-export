@@ -1,9 +1,4 @@
-export class HttpStatusError extends Error {
-  constructor(readonly status: number) {
-    super(`Server error (${status})`);
-    this.name = "HttpStatusError";
-  }
-}
+import { HttpStatusError } from "./http-error.ts";
 
 export const SERVER_UNREACHABLE_MESSAGE = "Could not reach the server. Is the dev server running?";
 

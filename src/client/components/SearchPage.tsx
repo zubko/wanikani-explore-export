@@ -43,23 +43,27 @@ export function SearchPage() {
     setResultType(type);
     setCurrentQuery(query);
 
+    const subjectType = searchableTypeToSubjectType[type];
+
+    let response;
     try {
-      const subjectType = searchableTypeToSubjectType[type];
-      const response = await api.search(subjectType, query);
-
-      if (requestId !== searchIdRef.current) return;
-
-      if (response.found) {
-        setResult({
-          status: "found",
-          item: response.data as AnySubject,
-        });
-      } else {
-        setResult({ status: "not_found", query });
-      }
+      response = await api.search(subjectType, query);
     } catch (err) {
       if (requestId !== searchIdRef.current) return;
-      setResult({ status: "error", query, message: searchErrorMessage(err) });
+      console.error("[search] request failed", err);
+      setResult({ status: "error", message: searchErrorMessage(err) });
+      return;
+    }
+
+    if (requestId !== searchIdRef.current) return;
+
+    if (response.found) {
+      setResult({
+        status: "found",
+        item: response.data as AnySubject,
+      });
+    } else {
+      setResult({ status: "not_found", query });
     }
   }, []);
 
