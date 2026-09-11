@@ -118,6 +118,12 @@ describe("add-to-anki API", () => {
     expect(ankiCalls).toMatchSnapshot();
   });
 
+  test("add kana vocabulary (ここ, id=9209) under type vocabulary", async () => {
+    const result = await addToAnkiJson({ id: 9209, type: "vocabulary" });
+    expect(result.ok).toBe(true);
+    expect(result.data.subject.characters).toBe("ここ");
+  });
+
   test("add vocabulary (高校, id=2950) deduplicates shared radicals", async () => {
     const result = await addToAnkiJson({ id: 2950, type: "vocabulary" });
     expect(result.ok).toBe(true);

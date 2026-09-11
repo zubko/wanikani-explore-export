@@ -56,16 +56,11 @@ async function addSubjectToAnki(id: number, type: SubjectType): Promise<AnkiAddR
     return addKanjiWithRadicals(kanji);
   }
 
-  if (type === "vocabulary") {
-    const vocab = await getVocabulary(id);
+  if (type === "vocabulary" || type === "kana_vocabulary") {
+    // /search answers both types from one pool, so a caller can hold a kana id under type "vocabulary"
+    const vocab = (await getVocabulary(id)) ?? getKanaVocabulary(id);
     if (!vocab) return null;
     return addVocabularyWithKanjiAndRadicals(vocab);
-  }
-
-  if (type === "kana_vocabulary") {
-    const kanaVocab = getKanaVocabulary(id);
-    if (!kanaVocab) return null;
-    return addVocabularyWithKanjiAndRadicals(kanaVocab);
   }
 
   throw new Error(`Unknown subject type: ${type}`);
