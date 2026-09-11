@@ -14,6 +14,7 @@
     "sync-anki-fields": "bun run scripts/sync-anki-fields.ts",
     "sync-anki-templates": "bun run scripts/sync-anki-templates.ts",
     "sync-anki-notes": "bun run scripts/sync-anki-notes.ts",
+    "add-iknow-vocab": "bun run scripts/add-iknow-vocab.ts",
     "build": "vite build && bun build src/server/index.ts --outdir dist/server --target bun",
     "preview": "NODE_ENV=production bun run dist/server/index.js",
     "tsc": "bunx tsc --noEmit",

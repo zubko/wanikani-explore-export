@@ -1,0 +1,36 @@
+{
+  "goal_items": [
+    {
+      "position": 1,
+      "item": {
+        "cue": {
+          "text": "行く",
+          "language": "ja",
+          "part_of_speech": "Verb",
+          "transliterations": { "Hira": "いく", "Hrkt": "いく", "Latn": "iku" }
+        }
+      }
+    },
+    {
+      "position": 2,
+      "item": {
+        "cue": {
+          "text": "どこ",
+          "language": "ja",
+          "part_of_speech": "Pronoun",
+          "transliterations": { "Hira": "どこ", "Hrkt": "どこ", "Latn": "doko" }
+        }
+      }
+    },
+    {
+      "position": 3,
+      "item": {
+        "cue": {
+          "text": "ABC",
+          "language": "ja",
+          "part_of_speech": "Noun"
+        }
+      }
+    }
+  ]
+}

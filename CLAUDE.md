@@ -58,6 +58,7 @@ scripts/                # Utility scripts. Top level holds only entry points, sh
   sync-anki-fields.ts            # Add missing note-type fields to Anki (interactive, needs a TTY)
   sync-anki-templates.ts         # Sync Anki templates to Anki via AnkiConnect
   sync-anki-notes.ts             # Re-generate all Anki notes through the dev server API
+  add-iknow-vocab.ts             # Add the next iKnow Core 1000 words to the Anki vocabulary deck
   lib/                           # Modules shared by the scripts, never run directly
     anki-templates.ts            # Shared by the two sync scripts: template table, ankiInvoke, field diff
     anki-template-fields.ts      # Pure markdown parsing of the template files (unit-tested)
@@ -66,6 +67,7 @@ scripts/                # Utility scripts. Top level holds only entry points, sh
     llm-utils.ts                 # Shared by the two LLM scripts: chunk, JSON answers, atomic save
     vocabulary-data.ts           # Shared by the two LLM scripts: load vocabulary, primary reading
     sentence-reading-check.ts    # Order check of a kana reading against its sentence (unit-tested)
+    iknow-vocab.ts               # Pure parts of the iKnow import: parsing, course rollover (unit-tested)
     __tests__/                   # Unit tests for the pure script helpers, fixtures in fixtures/
   .env                  # Script-specific env vars (WANIKANI_API_TOKEN, LLM_BASE_URL, LLM_API_KEY, LLM_MODEL)
                         # Loaded via --env-file in package.json scripts
@@ -103,6 +105,7 @@ bun run generate-sentence-readings     # Generate kana readings for context sent
 bun run sync-anki-fields               # Add missing note-type fields to Anki (interactive, needs a TTY)
 bun run sync-anki-templates            # Sync Anki templates to Anki
 bun run sync-anki-notes                # Sync all Anki vocabulary notes (requires dev server running)
+bun run add-iknow-vocab                # Add the next iKnow Core 1000 words (requires dev server running)
 ```
 
 The verb conjugation script has CLI options: `--limit <n>`, `--batch-size <n>` (default 20), `--dry-run`, `--show-prompt`, `--help`
@@ -135,6 +138,22 @@ The pure logic is `scripts/lib/subject-patches.ts`, tested in `scripts/lib/__tes
 Patching `data/userdata/` changes two checked-in snapshots (`radical.test.ts.snap` and `api.search.test.ts.snap`) whenever a patched radical appears in them. Update them scoped, one file at a time.
 
 Current contents: seven patches for WaniKani's 2026-08-27 content update, which changed the radicals of 万, 別 and 成 on the website but not in the API. Reported at https://community.wanikani.com/t/75554 and to hello@wanikani.com. Delete the file and the script once WaniKani fixes it and no patch is left.
+
+### iKnow Vocabulary Import
+
+`bun run add-iknow-vocab -- --limit <n>` walks the iKnow Core 1000 course files in `data/userdata/iknow/` and adds the next words to the Anki vocabulary deck through the dev server API. CLI options: `--base-url <url>`, `--limit <n>` (default 15), `--dry-run`, `--help`.
+
+`data/userdata/iknow-vocabulary-status.json` holds the place: `current` file, `files[name].index` (the **next** item to process), and `problems`. The script saves it with `saveJsonAtomic` after every word, so a stop in the middle loses nothing. It rolls over to the next course file on its own, and one run never spans two files.
+
+Like `sync-anki-notes`, it adds every word with `sync: false` and calls `/api/anki-sync` once at the end. Syncing per word would run a full AnkiWeb sync 15 times, and a failed sync would answer `ok: false` for a word that is already written — so the word would land in `problems` and not use up the budget, and a `--limit 15` run could add more than 15 words.
+
+The limit counts words really added. A word already in Anki, or already in `problems`, is skipped for free.
+
+A word in `problems` is never revisited — the saved index has already moved past it. Resolve one by adding it directly, then drop its entry by hand.
+
+The search endpoint answers `vocabulary` and `kana_vocabulary` from one pool, so the script sends the type the search reports in `data.object`, never a literal.
+
+The `.claude/skills/add-iknow-vocab/` skill runs the script and triages the new `problems` entries — grammar words WaniKani does not teach vs a different WaniKani spelling (直ぐ for すぐ). It asks before adding an alternative spelling.
 
 ### Anki Template Development
 
