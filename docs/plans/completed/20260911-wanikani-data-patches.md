@@ -51,6 +51,19 @@ Downloading is expensive, so `download-subjects.ts` stays as it is. Patching is 
 - **snapshots**: the repository tests read the real `data/userdata/` files, so patching the data changes two checked-in snapshots. Radical 1 (一 ground) gains 495 (万), which shows up in `src/server/repository/__tests__/__snapshots__/radical.test.ts.snap` (from `getRadical(1)`) and `src/server/__tests__/__snapshots__/api.search.test.ts.snap` (from `type=radical&q=一`). Both are updated in Task 6, one file at a time. No other snapshot references the four patched radicals, and the radical note type has no "found in kanji" field, so the Anki snapshots are untouched.
 - **e2e tests**: the project has no browser e2e suite. Manual verification of the 別 page is in Task 6.
 
+## Outcome
+
+Done on 2026-09-12. All 7 tasks, 82 checkboxes. Final state: 199 tests pass, `tsc` and `lint` clean.
+
+Verified against the real data — dry run reported all 7 `apply`; the real run wrote only `kanji.json` and `radicals.json`; a second run reported all 7 `already` and wrote nothing; a deliberately broken `seen` failed, wrote nothing and exited 1. In the app, 別 reads Mouth + Prison + Knife, 万 reads Ground + Prison, 成 reads Prison + Drunkard, the Prison radical lists 29 kanji including all three, and Sword is down to 18 without 成. Every one matches wanikani.com. The snapshot diff was the single predicted line, 万 added to the 一 radical.
+
+Deviations from the plan, both from the refactor pass:
+
+- ➕ `SUBJECT_FILE_NAMES` was added to `scripts/lib/subject-patches.ts`. The four-file list was written out in both the entry point and the test. It sits in the pure module because importing the entry point would run `main()`.
+- The "nothing to write" branch became a guard clause before the write loop instead of a check after it.
+
+`/learn` was not invoked as a separate step — the knowledge it would capture was written straight into the `Fixing Wrong WaniKani Data` section of `CLAUDE.md` during this task. `gh issue list` is empty, so no issue to close.
+
 ## Progress Tracking
 
 - mark completed items with `[x]` immediately when done
@@ -267,17 +280,17 @@ Sword loses only 780, even though 別 and 万 also stop pointing at it. That is 
 - Create: `scripts/lib/subject-patches.ts`
 - Create: `scripts/lib/__tests__/subject-patches.test.ts`
 
-- [ ] create `scripts/lib/subject-patches.ts` with the `SubjectPatch`, `SubjectRecord`, `SubjectFile`, `PatchStatus` and `PatchResult` types (use `type`, not `interface`; named exports only; `.ts` extensions on every import, per `CLAUDE.md`)
-- [ ] implement `parsePatches(text: string): SubjectPatch[]` using `Bun.YAML.parse`
-- [ ] validate the document shape first, since `Bun.YAML.parse` returns `unknown`: object, `patches` key present, `patches` a list. An empty list is valid and returns `[]`
-- [ ] validate each entry: `subject` number, `seen` non-empty string, `field` non-empty string, `expect` and `set` both present and both non-empty number arrays
-- [ ] reject a patch whose `expect` equals its `set`, and say why in the message
-- [ ] reject two patches sharing the same `subject` + `field`, naming both in the error
-- [ ] write tests for `parsePatches` on a valid file (returns the parsed list in order)
-- [ ] write tests for the document-shape rejections: `patches` key absent, `patches` not a list, YAML that parses to a plain string
-- [ ] write a test that an empty `patches` list is accepted and returns `[]`
-- [ ] write tests for each entry rejection: missing `expect`, missing `set`, empty array, non-number element, `expect` equal to `set`, duplicate `subject` + `field`, wrong types
-- [ ] run `bun test scripts/lib/__tests__/subject-patches.test.ts` - must pass before task 2
+- [x] create `scripts/lib/subject-patches.ts` with the `SubjectPatch`, `SubjectRecord`, `SubjectFile`, `PatchStatus` and `PatchResult` types (use `type`, not `interface`; named exports only; `.ts` extensions on every import, per `CLAUDE.md`)
+- [x] implement `parsePatches(text: string): SubjectPatch[]` using `Bun.YAML.parse`
+- [x] validate the document shape first, since `Bun.YAML.parse` returns `unknown`: object, `patches` key present, `patches` a list. An empty list is valid and returns `[]`
+- [x] validate each entry: `subject` number, `seen` non-empty string, `field` non-empty string, `expect` and `set` both present and both non-empty number arrays
+- [x] reject a patch whose `expect` equals its `set`, and say why in the message
+- [x] reject two patches sharing the same `subject` + `field`, naming both in the error
+- [x] write tests for `parsePatches` on a valid file (returns the parsed list in order)
+- [x] write tests for the document-shape rejections: `patches` key absent, `patches` not a list, YAML that parses to a plain string
+- [x] write a test that an empty `patches` list is accepted and returns `[]`
+- [x] write tests for each entry rejection: missing `expect`, missing `set`, empty array, non-number element, `expect` equal to `set`, duplicate `subject` + `field`, wrong types
+- [x] run `bun test scripts/lib/__tests__/subject-patches.test.ts` - must pass before task 2
 
 ### Task 2: Check pass — one patch against one record
 
@@ -286,17 +299,17 @@ Sword loses only 780, even though 別 and 万 also stop pointing at it. That is 
 - Modify: `scripts/lib/subject-patches.ts`
 - Modify: `scripts/lib/__tests__/subject-patches.test.ts`
 
-- [ ] implement `checkPatch(patch: SubjectPatch, subject: SubjectRecord | undefined)` returning `apply` / `already` / `fail`, following the status rules in Technical Details in that exact order — `undefined` is rule 1, so the unknown-subject case lives here and not in `patchSubjects`
-- [ ] make the `seen` check run before any value check, so a changed record always fails
-- [ ] write the concrete difference into the rule 7 reason: the expected list and the found list
-- [ ] resolve `characters` on every returned status — `data.characters` when it is a string, else `data.slug`, else `null` when the record was not found
-- [ ] confirm `checkPatch` never mutates the record it is given
-- [ ] implement `formatStatusLine(status)` returning the one printed line: id, character, field, status, and the reason on a failure
-- [ ] write tests: applies on matching `expect`, `already` on the target value, fails on a third value
-- [ ] write tests for the failures: `subject` passed as `undefined`, changed `data_updated_at` while the value still matches `expect`, missing field, value not an array, array holding a non-number
-- [ ] write tests for `characters`: a normal record, a record with `characters: null` falling back to `slug`, and a not-found record giving `null`
-- [ ] write tests for `formatStatusLine` on each of the three kinds, including the `characters: null` case
-- [ ] run tests - must pass before task 3
+- [x] implement `checkPatch(patch: SubjectPatch, subject: SubjectRecord | undefined)` returning `apply` / `already` / `fail`, following the status rules in Technical Details in that exact order — `undefined` is rule 1, so the unknown-subject case lives here and not in `patchSubjects`
+- [x] make the `seen` check run before any value check, so a changed record always fails
+- [x] write the concrete difference into the rule 7 reason: the expected list and the found list
+- [x] resolve `characters` on every returned status — `data.characters` when it is a string, else `data.slug`, else `null` when the record was not found
+- [x] confirm `checkPatch` never mutates the record it is given
+- [x] implement `formatStatusLine(status)` returning the one printed line: id, character, field, status, and the reason on a failure
+- [x] write tests: applies on matching `expect`, `already` on the target value, fails on a third value
+- [x] write tests for the failures: `subject` passed as `undefined`, changed `data_updated_at` while the value still matches `expect`, missing field, value not an array, array holding a non-number
+- [x] write tests for `characters`: a normal record, a record with `characters: null` falling back to `slug`, and a not-found record giving `null`
+- [x] write tests for `formatStatusLine` on each of the three kinds, including the `characters: null` case
+- [x] run tests - must pass before task 3
 
 ### Task 3: Patch pass — all or nothing, and which files to write
 
@@ -305,18 +318,18 @@ Sword loses only 780, even though 別 and 万 also stop pointing at it. That is 
 - Modify: `scripts/lib/subject-patches.ts`
 - Modify: `scripts/lib/__tests__/subject-patches.test.ts`
 
-- [ ] implement `patchSubjects({ files, patches, dryRun })` — index every record by id, keeping the owning `SubjectFile` with it so `writes` can name the right files, then check every patch and mutate only when no status is `fail`
-- [ ] look each id up in the index and hand the result straight to `checkPatch`, so a missing id becomes rule 1 rather than a special case here
-- [ ] return `writes` holding only the files with at least one applied record; return `[]` when `dryRun` is on, when a patch failed, or when every patch was `already`
-- [ ] write a test for the happy path: patches across two files all apply, records hold the new values, `writes` names both files
-- [ ] write a test for two patches landing in the **same** file — that file appears in `writes` once, not twice
-- [ ] write a test proving all-or-nothing: one failing patch among good ones leaves **every** record untouched, `ok` false, `writes` empty
-- [ ] write a test that a file with no applied record stays out of `writes`
-- [ ] write a test for idempotency: running the same patches twice gives `already` for all of them the second time, and `writes` is empty
-- [ ] write a test that `dryRun` returns the statuses but never mutates and never writes
-- [ ] write a test that an empty patch list gives `ok` true and empty `writes`
-- [ ] write a test that the wrapper fields (`id`, `data_updated_at`) are unchanged after a successful run
-- [ ] run tests - must pass before task 4
+- [x] implement `patchSubjects({ files, patches, dryRun })` — index every record by id, keeping the owning `SubjectFile` with it so `writes` can name the right files, then check every patch and mutate only when no status is `fail`
+- [x] look each id up in the index and hand the result straight to `checkPatch`, so a missing id becomes rule 1 rather than a special case here
+- [x] return `writes` holding only the files with at least one applied record; return `[]` when `dryRun` is on, when a patch failed, or when every patch was `already`
+- [x] write a test for the happy path: patches across two files all apply, records hold the new values, `writes` names both files
+- [x] write a test for two patches landing in the **same** file — that file appears in `writes` once, not twice
+- [x] write a test proving all-or-nothing: one failing patch among good ones leaves **every** record untouched, `ok` false, `writes` empty
+- [x] write a test that a file with no applied record stays out of `writes`
+- [x] write a test for idempotency: running the same patches twice gives `already` for all of them the second time, and `writes` is empty
+- [x] write a test that `dryRun` returns the statuses but never mutates and never writes
+- [x] write a test that an empty patch list gives `ok` true and empty `writes`
+- [x] write a test that the wrapper fields (`id`, `data_updated_at`) are unchanged after a successful run
+- [x] run tests - must pass before task 4
 
 ### Task 4: The fixes file
 
@@ -325,12 +338,12 @@ Sword loses only 780, even though 別 and 万 also stop pointing at it. That is 
 - Create: `data/wanikani-fixes.yaml`
 - Modify: `scripts/lib/__tests__/subject-patches.test.ts`
 
-- [ ] create `data/wanikani-fixes.yaml` with the header comment from Technical Details: what WaniKani broke, when, the forum link, and the rule that a failing patch is a prompt to look, never an instruction to delete
-- [ ] add the four short patches by hand from the table in Technical Details, each with an inline comment naming the subject and spelling out the reading of `set` in plain words, e.g. `# Mouth + Prison + Knife`
-- [ ] generate the three long radical patches with the command in Technical Details and paste them in — do not type the id lists
-- [ ] check the three generated patches against the length table: 26 → 29, 19 → 18, 67 → 68
-- [ ] write a test that reads the real `data/wanikani-fixes.yaml` and runs it through `parsePatches` without throwing, so a typo in the data file fails the suite instead of failing at run time. Resolve the path with `join(import.meta.dir, "../../../data/wanikani-fixes.yaml")`, the way `anki-template-fields.test.ts` does, never relative to the working directory
-- [ ] write the **delta table** in the test file — the intended change per patch, written by hand and short enough to check by eye:
+- [x] create `data/wanikani-fixes.yaml` with the header comment from Technical Details: what WaniKani broke, when, the forum link, and the rule that a failing patch is a prompt to look, never an instruction to delete
+- [x] add the four short patches by hand from the table in Technical Details, each with an inline comment naming the subject and spelling out the reading of `set` in plain words, e.g. `# Mouth + Prison + Knife`
+- [x] generate the three long radical patches with the command in Technical Details and paste them in — do not type the id lists
+- [x] check the three generated patches against the length table: 26 → 29, 19 → 18, 67 → 68
+- [x] write a test that reads the real `data/wanikani-fixes.yaml` and runs it through `parsePatches` without throwing, so a typo in the data file fails the suite instead of failing at run time. Resolve the path with `join(import.meta.dir, "../../../data/wanikani-fixes.yaml")`, the way `anki-template-fields.test.ts` does, never relative to the working directory
+- [x] write the **delta table** in the test file — the intended change per patch, written by hand and short enough to check by eye:
 
   ```ts
   const INTENDED = {
@@ -344,12 +357,12 @@ Sword loses only 780, even though 別 and 万 also stop pointing at it. That is 
   };
   ```
 
-- [ ] write a test that, for every patch **present** in the real file, its `expect` → `set` delta matches `INTENDED` exactly — ids in `set` but not `expect` equal `added`, ids in `expect` but not `set` equal `removed`. Sort both sides before comparing, so a future reorder of a display-order list does not fail the test for no reason. Look each patch up by `subject:field`, and skip any key missing from the file, so deleting a patch later does not break the test
-- [ ] write a test that every `set` in the real file holds unique ids, and that the `amalgamation_subject_ids` patches are sorted ascending. Exclude `component_subject_ids` from the sort check — it is display order, and asserting anything about it would be wrong either way: 別 is `[16, 14, 128]` and not ascending, while 万 `[1, 14]` and 成 `[14, 194]` happen to be
-- [ ] write a test that every id in every `expect` and `set` resolves to a real subject in `data/userdata/`, so a mistyped id is caught
-- [ ] write a test that runs `patchSubjects` with `dryRun` over the real fixes file and the real subject files, and asserts every status is `apply` or `already` — this checks `expect` against the data that actually ships
-- [ ] do **not** assert the exact set of patches in the file. Deleting a patch is the normal end state once WaniKani fixes a record, and such a test would fail that workflow by design. Git history already covers an accidental deletion
-- [ ] run tests - must pass before task 5
+- [x] write a test that, for every patch **present** in the real file, its `expect` → `set` delta matches `INTENDED` exactly — ids in `set` but not `expect` equal `added`, ids in `expect` but not `set` equal `removed`. Sort both sides before comparing, so a future reorder of a display-order list does not fail the test for no reason. Look each patch up by `subject:field`, and skip any key missing from the file, so deleting a patch later does not break the test
+- [x] write a test that every `set` in the real file holds unique ids, and that the `amalgamation_subject_ids` patches are sorted ascending. Exclude `component_subject_ids` from the sort check — it is display order, and asserting anything about it would be wrong either way: 別 is `[16, 14, 128]` and not ascending, while 万 `[1, 14]` and 成 `[14, 194]` happen to be
+- [x] write a test that every id in every `expect` and `set` resolves to a real subject in `data/userdata/`, so a mistyped id is caught
+- [x] write a test that runs `patchSubjects` with `dryRun` over the real fixes file and the real subject files, and asserts every status is `apply` or `already` — this checks `expect` against the data that actually ships
+- [x] do **not** assert the exact set of patches in the file. Deleting a patch is the normal end state once WaniKani fixes a record, and such a test would fail that workflow by design. Git history already covers an accidental deletion
+- [x] run tests - must pass before task 5
 
 ### Task 5: The patch-subjects script
 
@@ -359,48 +372,48 @@ Sword loses only 780, even though 別 and 万 also stop pointing at it. That is 
 - Modify: `package.json`
 - Modify: `scripts/download-subjects.ts`
 
-- [ ] create `scripts/patch-subjects.ts` following the project script shape — `main()` first, helpers below, `main().catch(...)` last
-- [ ] parse `--dry-run` and `--help` with `parseArgs` from `util`; print usage and exit 0 on `--help`
-- [ ] read `data/wanikani-fixes.yaml` and call `parsePatches` **before** any subject file is read, so a bad file fails fast. On an empty patch list print `No patches, nothing to do.` and exit 0
-- [ ] read the four `data/userdata/*.json` files into `SubjectFile` values and pass them to `patchSubjects`
-- [ ] fail with a clear message pointing at `bun run download-subjects` when a subject file is missing, rather than letting a raw ENOENT through — a fresh clone has no `data/userdata/`
-- [ ] print `formatStatusLine(status)` for each status; the script does no formatting of its own
-- [ ] on failure print the "look, then delete or update `seen`" hint from Technical Details, write nothing, and exit 1
-- [ ] on success write each file in `writes` using `Bun.write` with `JSON.stringify(subjects, null, 2)` to match `download-subjects.ts`
-- [ ] end the file with a catch that prints `formatError(err)` from `scripts/lib/format-error.ts` and then calls `process.exit(1)`, the same as `sync-anki-templates.ts` and `sync-anki-fields.ts`. This is the house pattern, so it needs no explaining comment. Do not copy the older `main().catch(console.error)` from `download-subjects.ts`, which exits 0
-- [ ] check the exit codes against the table in Technical Details by hand: success 0, no patches 0, `--help` 0, failing patch 1, thrown error 1
-- [ ] add `"patch-subjects": "bun run scripts/patch-subjects.ts"` to `package.json` — no `--env-file`, the script needs no secrets
-- [ ] add a closing line to `scripts/download-subjects.ts` telling the user to run `bun run patch-subjects` next
-- [ ] run `bun run lint:fix` and `bun run tsc`
-- [ ] run tests - must pass before task 6
+- [x] create `scripts/patch-subjects.ts` following the project script shape — `main()` first, helpers below, `main().catch(...)` last
+- [x] parse `--dry-run` and `--help` with `parseArgs` from `util`; print usage and exit 0 on `--help`
+- [x] read `data/wanikani-fixes.yaml` and call `parsePatches` **before** any subject file is read, so a bad file fails fast. On an empty patch list print `No patches, nothing to do.` and exit 0
+- [x] read the four `data/userdata/*.json` files into `SubjectFile` values and pass them to `patchSubjects`
+- [x] fail with a clear message pointing at `bun run download-subjects` when a subject file is missing, rather than letting a raw ENOENT through — a fresh clone has no `data/userdata/`
+- [x] print `formatStatusLine(status)` for each status; the script does no formatting of its own
+- [x] on failure print the "look, then delete or update `seen`" hint from Technical Details, write nothing, and exit 1
+- [x] on success write each file in `writes` using `Bun.write` with `JSON.stringify(subjects, null, 2)` to match `download-subjects.ts`
+- [x] end the file with a catch that prints `formatError(err)` from `scripts/lib/format-error.ts` and then calls `process.exit(1)`, the same as `sync-anki-templates.ts` and `sync-anki-fields.ts`. This is the house pattern, so it needs no explaining comment. Do not copy the older `main().catch(console.error)` from `download-subjects.ts`, which exits 0
+- [x] check the exit codes against the table in Technical Details by hand: success 0, no patches 0, `--help` 0, failing patch 1, thrown error 1
+- [x] add `"patch-subjects": "bun run scripts/patch-subjects.ts"` to `package.json` — no `--env-file`, the script needs no secrets
+- [x] add a closing line to `scripts/download-subjects.ts` telling the user to run `bun run patch-subjects` next
+- [x] run `bun run lint:fix` and `bun run tsc`
+- [x] run tests - must pass before task 6
 
 ### Task 6: Verify acceptance criteria
 
-- [ ] run `bun run patch-subjects --dry-run` against the real data and confirm all seven patches report `apply` and nothing is written
-- [ ] run `bun run patch-subjects` and confirm it writes `data/userdata/kanji.json` and `data/userdata/radicals.json`, and nothing else
-- [ ] run `bun run patch-subjects` a second time and confirm every patch reports `already`, nothing is written, and the exit code is 0
-- [ ] hand-edit one `seen` value in the real `data/wanikani-fixes.yaml`, run the script, confirm it fails, writes nothing and exits 1, then revert the edit
-- [ ] update the first snapshot the patched data changes, scoped to one file per the `CLAUDE.md` rule: `bun test src/server/repository/__tests__/radical.test.ts --update-snapshots`
-- [ ] update the second: `bun test src/server/__tests__/api.search.test.ts --update-snapshots`
-- [ ] check the snapshot diff adds only 万 / 495 to the 一 ground radical and changes nothing else
-- [ ] restart `bun run dev` — `initRepository()` reads the JSON files once at import time in `src/server/index.ts:7`, and Vite does not reload on data file changes
-- [ ] confirm the 別 kanji page shows Mouth + Prison + Knife
-- [ ] confirm the Prison radical page now lists 万, 成 and 別 under "Found in Kanji"
-- [ ] run the full suite: `bun test`
-- [ ] run `bun run tsc` and `bun run lint`
+- [x] run `bun run patch-subjects --dry-run` against the real data and confirm all seven patches report `apply` and nothing is written
+- [x] run `bun run patch-subjects` and confirm it writes `data/userdata/kanji.json` and `data/userdata/radicals.json`, and nothing else
+- [x] run `bun run patch-subjects` a second time and confirm every patch reports `already`, nothing is written, and the exit code is 0
+- [x] hand-edit one `seen` value in the real `data/wanikani-fixes.yaml`, run the script, confirm it fails, writes nothing and exits 1, then revert the edit
+- [x] update the first snapshot the patched data changes, scoped to one file per the `CLAUDE.md` rule: `bun test src/server/repository/__tests__/radical.test.ts --update-snapshots`
+- [x] update the second: `bun test src/server/__tests__/api.search.test.ts --update-snapshots`
+- [x] check the snapshot diff adds only 万 / 495 to the 一 ground radical and changes nothing else
+- [x] restart `bun run dev` — `initRepository()` reads the JSON files once at import time in `src/server/index.ts:7`, and Vite does not reload on data file changes
+- [x] confirm the 別 kanji page shows Mouth + Prison + Knife
+- [x] confirm the Prison radical page now lists 万, 成 and 別 under "Found in Kanji"
+- [x] run the full suite: `bun test`
+- [x] run `bun run tsc` and `bun run lint`
 
 ### Task 7: [Final] Refactor, document and close out
 
-- [ ] run the refactor-simplifier agent over the new files, per the Post-Implementation section of `CLAUDE.md`
-- [ ] re-run `bun test`, `bun run tsc` and `bun run lint` after the refactor — a refactor must not leave the final code unverified
-- [ ] add `bun run patch-subjects` to the Data Scripts list in `CLAUDE.md`, next to `download-subjects`
-- [ ] add a short `CLAUDE.md` section on `data/wanikani-fixes.yaml`: what it is for, the single `expect` / `set` patch kind, the `seen` guard, the all-or-nothing rule, and that a failing run means look first, then delete **or** update `seen`
-- [ ] note in `CLAUDE.md` that a download must be followed by a patch run, since `download-subjects` writes raw API data
-- [ ] add a `bun run patch-subjects` row to the Data Scripts table in `README.md` — the `## Data Scripts` heading is at line 126, the rows run from 128 to 135
-- [ ] add a line to the `README.md` setup block next to `bun run download-subjects` at line 90, saying a download must be followed by a patch run
-- [ ] run `/learn` to capture anything worth keeping in `CLAUDE.md`
-- [ ] check `gh issue list` for an issue this closes
-- [ ] move this plan to `docs/plans/completed/`
+- [x] run the refactor-simplifier agent over the new files, per the Post-Implementation section of `CLAUDE.md`
+- [x] re-run `bun test`, `bun run tsc` and `bun run lint` after the refactor — a refactor must not leave the final code unverified
+- [x] add `bun run patch-subjects` to the Data Scripts list in `CLAUDE.md`, next to `download-subjects`
+- [x] add a short `CLAUDE.md` section on `data/wanikani-fixes.yaml`: what it is for, the single `expect` / `set` patch kind, the `seen` guard, the all-or-nothing rule, and that a failing run means look first, then delete **or** update `seen`
+- [x] note in `CLAUDE.md` that a download must be followed by a patch run, since `download-subjects` writes raw API data
+- [x] add a `bun run patch-subjects` row to the Data Scripts table in `README.md` — the `## Data Scripts` heading is at line 126, the rows run from 128 to 135
+- [x] add a line to the `README.md` setup block next to `bun run download-subjects` at line 90, saying a download must be followed by a patch run
+- [x] run `/learn` to capture anything worth keeping in `CLAUDE.md`
+- [x] check `gh issue list` for an issue this closes
+- [x] move this plan to `docs/plans/completed/`
 
 ## Post-Completion
 

@@ -123,6 +123,9 @@ async function main(): Promise<void> {
   await saveToFiles(grouped);
 
   console.log("\nDone!");
+  console.log(
+    "Now run `bun run patch-subjects` to apply the corrections in data/wanikani-fixes.yaml"
+  );
 }
 
 main().catch(console.error);

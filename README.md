@@ -89,7 +89,10 @@ Download WaniKani data (saved to `data/userdata/`, which is gitignored):
 ```bash
 bun run download-subjects
 bun run download-study-materials
+bun run patch-subjects
 ```
+
+`download-subjects` writes the raw API data. `patch-subjects` then applies the corrections in `data/wanikani-fixes.yaml`, so run it after every download.
 
 Create the three Anki note types and decks by hand in Anki. Nothing in this repo creates them, so a fresh install has nothing to sync to. See `docs/anki-decks-fields.md` for the three names — `Japanese Radicals`, `Japanese Kanji`, `Japanese Vocabulary`, each used for both a deck and a note type — and the fields each note type needs.
 
@@ -129,6 +132,7 @@ curl -X POST "http://localhost:5173/api/add-to-anki" \
 | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `bun run download-subjects`          | Download WaniKani subjects                                                                                                                                                    |
 | `bun run download-study-materials`   | Download study materials                                                                                                                                                      |
+| `bun run patch-subjects`             | Apply the corrections in `data/wanikani-fixes.yaml` to the downloaded subjects. Run after every download. Writes nothing unless every patch applies                           |
 | `bun run generate-verb-conjugations` | Generate verb conjugations via LLM. Only fills missing verbs, in batches of 20                                                                                                |
 | `bun run generate-sentence-readings` | Generate kana readings for context sentences via LLM. Only fills missing items, in batches of 20                                                                              |
 | `bun run sync-anki-fields`           | Add note-type fields a template lists and Anki lacks. Interactive, needs a real terminal. Changes the collection schema, so Anki then asks for a one-way sync (choose upload) |

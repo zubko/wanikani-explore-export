@@ -52,6 +52,7 @@ src/
 scripts/                # Utility scripts. Top level holds only entry points, shared code goes to lib/
   download-subjects.ts
   download-study-materials.ts
+  patch-subjects.ts              # Apply data/wanikani-fixes.yaml to the downloaded subjects
   generate-verb-conjugations.ts  # LLM-powered verb conjugation generator
   generate-sentence-readings.ts  # LLM-powered kana readings for context sentences
   sync-anki-fields.ts            # Add missing note-type fields to Anki (interactive, needs a TTY)
@@ -73,6 +74,7 @@ data/                   # Data files
   userdata/             # User-specific data, gitignored
                         #   Downloaded WaniKani subjects, study materials, mnemonic image cache
                         #   Populated via download scripts
+  wanikani-fixes.yaml     # Hand-written corrections for wrong WaniKani API data (see below)
   verb_conjugations.json  # Verb conjugations keyed by vocabulary ID (LLM-generated)
   sentence_readings.json  # Kana readings for context sentences keyed by vocabulary ID (LLM-generated)
 docs/                   # Documentation (API references, prompts, lists)
@@ -95,6 +97,7 @@ bun run tsc        # TypeScript type checking
 ```bash
 bun run download-subjects              # Download Wanikani subjects
 bun run download-study-materials       # Download study materials
+bun run patch-subjects                 # Apply data/wanikani-fixes.yaml to the downloaded subjects
 bun run generate-verb-conjugations     # Generate verb conjugations via LLM
 bun run generate-sentence-readings     # Generate kana readings for context sentences via LLM
 bun run sync-anki-fields               # Add missing note-type fields to Anki (interactive, needs a TTY)
@@ -109,6 +112,29 @@ The sentence readings script has CLI options: `--limit <n>`, `--batch-size <n>` 
 Both LLM scripts only fill ids that are missing in their data file, so a rerun continues where the last run stopped. They send one JSON array of items per request, check every answer item, save after every batch, and stop after 3 batches in a row without a usable answer. An item that fails a check is logged and skipped, a rerun picks it up. `--batch-size 1` helps with the last stubborn items. The model is `LLM_MODEL` from `scripts/.env`
 
 The sync Anki notes script has CLI options: `--base-url <url>`, `--limit <n>`, `--dry-run`, `--help`
+
+### Fixing Wrong WaniKani Data
+
+Sometimes the WaniKani API serves data the website disagrees with. `data/wanikani-fixes.yaml` holds hand-written corrections and `bun run patch-subjects` applies them to the downloaded files in `data/userdata/`. It has `--dry-run` and `--help`.
+
+`download-subjects` writes the raw API answer, so **a download must be followed by a patch run**. The two are separate because a download takes minutes and a patch run takes a second.
+
+Each patch names a `subject` id, a `field` inside `subject.data`, the whole broken value as `expect`, and the whole fixed value as `set`. There is only this one kind. An earlier design also had `add` / `remove` for the long id lists, but it allowed a patch to hold both with no defined precedence, and an empty `add: []` satisfied both its "all present" and "none present" checks, so the patch never settled. Long lists are generated from the real data instead of typed, which makes the verbosity cheap.
+
+Two things guard a patch, and both must fail loudly rather than guess:
+
+- `seen` holds the subject's `data_updated_at` when the patch was written. It is checked **first**, before any value. Any WaniKani edit to that record fails the run, even an unrelated one.
+- `expect` must match the current value exactly. Matching `set` instead means the patch is already applied, which is how a rerun stays idempotent.
+
+**A failing run is a prompt to look, never an instruction to delete.** The `seen` guard also fires when WaniKani edits something else and leaves the wrong ids in place. Deleting then would drop a fix that is still needed, and the next download would bring the bad value back. Open the subject on wanikani.com, then either delete the patch (that field was fixed) or update `seen` and re-check `expect`.
+
+The run is all-or-nothing: one failing patch writes nothing and exits 1. That is not crash-safe atomicity across files — a failure between two writes leaves one file patched. That state is safe, because a rerun reports `already` for the written file and `apply` for the other. Recovery is running the script again.
+
+The pure logic is `scripts/lib/subject-patches.ts`, tested in `scripts/lib/__tests__/subject-patches.test.ts`. Those tests read the real fixes file and the real `data/userdata/`, and check each patch's `expect` → `set` delta against a small hand-written table, because a long pasted id list can keep its length while holding a typo.
+
+Patching `data/userdata/` changes two checked-in snapshots (`radical.test.ts.snap` and `api.search.test.ts.snap`) whenever a patched radical appears in them. Update them scoped, one file at a time.
+
+Current contents: seven patches for WaniKani's 2026-08-27 content update, which changed the radicals of 万, 別 and 成 on the website but not in the API. Reported at https://community.wanikani.com/t/75554 and to hello@wanikani.com. Delete the file and the script once WaniKani fixes it and no patch is left.
 
 ### Anki Template Development
 

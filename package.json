@@ -8,6 +8,7 @@
     "dev": "node node_modules/.bin/vite",
     "download-subjects": "bun --env-file=scripts/.env run scripts/download-subjects.ts",
     "download-study-materials": "bun --env-file=scripts/.env run scripts/download-study-materials.ts",
+    "patch-subjects": "bun run scripts/patch-subjects.ts",
     "generate-verb-conjugations": "bun --env-file=scripts/.env run scripts/generate-verb-conjugations.ts",
     "generate-sentence-readings": "bun --env-file=scripts/.env run scripts/generate-sentence-readings.ts",
     "sync-anki-fields": "bun run scripts/sync-anki-fields.ts",

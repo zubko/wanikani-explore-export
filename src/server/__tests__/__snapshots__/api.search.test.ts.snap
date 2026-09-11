@@ -1414,6 +1414,7 @@ exports[`search API find radical by character (一) 1`] = `
     451,
     468,
     488,
+    495,
     531,
     533,
     568,
@@ -1587,6 +1588,12 @@ exports[`search API find radical by character (一) 1`] = `
       "id": 488,
       "meaning": "Correct",
       "reading": "せい",
+    },
+    {
+      "characters": "万",
+      "id": 495,
+      "meaning": "Ten Thousand",
+      "reading": "まん",
     },
     {
       "characters": "写",

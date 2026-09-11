@@ -1,0 +1,60 @@
+# Corrections for the downloaded WaniKani subject data, applied by `bun run patch-subjects`.
+#
+# WaniKani's content update of 2026-08-27 changed the radical composition of 万, 別 and 成.
+# The website shows the new radicals and the API serves the new mnemonics, but the API still
+# serves the old `component_subject_ids`, and the radicals' `amalgamation_subject_ids` still
+# point the old way. So 別 reads Mouth + Sword + Knife while its own mnemonic talks about a
+# prison, and no radical lists 万 or 別 at all.
+#
+# Reported: https://community.wanikani.com/t/75554  and hello@wanikani.com (2026-09-11)
+#
+# `seen` is the subject's `data_updated_at` when the patch was written. A run fails if
+# WaniKani touched the record at all. That failure is a prompt to look, never an instruction
+# to delete. Open the subject on wanikani.com, then either:
+#   - delete the patch, if WaniKani fixed this field
+#   - update `seen` and re-check `expect`, if they changed something else
+# Never delete a patch just because the run failed.
+
+patches:
+  - subject: 785 # kanji 別
+    seen: "2026-08-27T17:34:38.403049Z"
+    field: component_subject_ids
+    expect: [16, 24, 128] # Mouth + Sword + Knife
+    set: [16, 14, 128] # Mouth + Prison + Knife
+
+  - subject: 495 # kanji 万
+    seen: "2026-08-27T17:36:38.022392Z"
+    field: component_subject_ids
+    expect: [8763, 24] # Leaf + Sword
+    set: [1, 14] # Ground + Prison
+
+  - subject: 780 # kanji 成
+    seen: "2026-08-27T17:38:34.186451Z"
+    field: component_subject_ids
+    expect: [194, 24] # Drunkard + Sword
+    set: [14, 194] # Prison + Drunkard
+
+  - subject: 8763 # radical 丆 leaf
+    seen: "2026-08-27T17:36:38.084930Z"
+    field: amalgamation_subject_ids
+    expect: [495, 549, 659, 1423]
+    set: [549, 659, 1423] # drops 万
+
+  - subject: 14 # radical 勹 prison
+    seen: "2026-03-23T17:20:01.534933Z"
+    field: amalgamation_subject_ids
+    expect: [533, 733, 775, 856, 970, 989, 1044, 1340, 1414, 1506, 1624, 1656, 1672, 1969, 1970, 2070, 2085, 2091, 2142, 2155, 2346, 2349, 2372, 2375, 2450, 8834]
+    set: [495, 533, 733, 775, 780, 785, 856, 970, 989, 1044, 1340, 1414, 1506, 1624, 1656, 1672, 1969, 1970, 2070, 2085, 2091, 2142, 2155, 2346, 2349, 2372, 2375, 2450, 8834]
+
+  - subject: 24 # radical 刀 sword
+    seen: "2026-08-27T17:38:34.259467Z"
+    field: amalgamation_subject_ids
+    expect: [458, 501, 502, 651, 780, 784, 986, 1055, 1150, 1357, 1361, 1613, 1669, 2092, 2228, 2294, 2363, 2367, 2437]
+    set: [458, 501, 502, 651, 784, 986, 1055, 1150, 1357, 1361, 1613, 1669, 2092, 2228, 2294, 2363, 2367, 2437]
+
+  - subject: 1 # radical 一 ground
+    seen: "2026-08-19T15:38:56.507061Z"
+    field: amalgamation_subject_ids
+    expect: [440, 449, 450, 451, 468, 488, 531, 533, 568, 590, 609, 633, 635, 709, 710, 724, 783, 808, 885, 913, 932, 965, 971, 1000, 1020, 1085, 1119, 1126, 1137, 1178, 1198, 1241, 1249, 1310, 1326, 1340, 1367, 1372, 1376, 1379, 1428, 1431, 1463, 1491, 1521, 1559, 1591, 1655, 1769, 1851, 1855, 1869, 1888, 2085, 2104, 2128, 2138, 2148, 2171, 2172, 2182, 2212, 2277, 2334, 2375, 2419, 2437]
+    set: [440, 449, 450, 451, 468, 488, 495, 531, 533, 568, 590, 609, 633, 635, 709, 710, 724, 783, 808, 885, 913, 932, 965, 971, 1000, 1020, 1085, 1119, 1126, 1137, 1178, 1198, 1241, 1249, 1310, 1326, 1340, 1367, 1372, 1376, 1379, 1428, 1431, 1463, 1491, 1521, 1559, 1591, 1655, 1769, 1851, 1855, 1869, 1888, 2085, 2104, 2128, 2138, 2148, 2171, 2172, 2182, 2212, 2277, 2334, 2375, 2419, 2437]
+
