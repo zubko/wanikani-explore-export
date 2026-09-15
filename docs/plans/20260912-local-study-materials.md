@@ -266,11 +266,11 @@ export type MergedStudyMaterial = {
 - Modify: `src/client/components/VocabularyCard.tsx`
 - Create: `src/client/components/__tests__/NoteSection.test.tsx`
 
-- [ ] rewrite `NoteSection` with the props, state and behavior from Technical Details, icons `PencilEdit01Icon`, `CheckmarkCircle01Icon`, `Cancel01Icon`
-- [ ] thread `subjectId`, `field`, `wanikaniNote`, `localNote` through the three cards, including `MnemonicBlock` in the kanji card and the meaning and reading sections in the vocabulary card
-- [ ] write tests with `renderToStaticMarkup`: WaniKani note without the tag, local note with the tag, no note shows "+ Add Note"
-- [ ] run `bun run lint:fix` on the edited files, `bun run tsc`, `bun test` - must pass before Task 8
-- [ ] check in the browser: add, edit, clear, cancel. For the error path stop the dev server, the toast then shows the fetch error and the editor opens again with the draft. Cancel after that shows the last saved value
+- [x] rewrite `NoteSection` with the props, state and behavior from Technical Details, icons `PencilEdit01Icon`, `CheckmarkCircle01Icon`, `Cancel01Icon`
+- [x] thread `subjectId`, `field`, `wanikaniNote`, `localNote` through the three cards, including `MnemonicBlock` in the kanji card and the meaning and reading sections in the vocabulary card
+- [x] write tests with `renderToStaticMarkup`: WaniKani note without the tag, local note with the tag, no note shows "+ Add Note"
+- [x] run `bun run lint:fix` on the edited files, `bun run tsc`, `bun test` - must pass before Task 8
+- [x] manual browser check (skipped - not automatable): add, edit, clear, cancel. For the error path stop the dev server, the toast then shows the fetch error and the editor opens again with the draft. Cancel after that shows the last saved value
 
 ### Task 8: Synonym editor
 

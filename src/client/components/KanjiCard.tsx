@@ -9,7 +9,7 @@ import { CardHeader } from "./card-components/CardHeader.tsx";
 import { HintBox } from "./card-components/HintBox.tsx";
 import { LabeledRow } from "./card-components/LabeledRow.tsx";
 import { MnemonicText } from "./card-components/MnemonicText.tsx";
-import { NoteSection } from "./card-components/NoteSection.tsx";
+import { NoteSection, type NoteSectionProps } from "./card-components/NoteSection.tsx";
 import { RelatedSubjectsSection } from "./card-components/RelatedSubjectsSection.tsx";
 import { scrollToElement } from "../utils/scroll-to-element.ts";
 import { SectionTitle } from "./card-components/SectionTitle.tsx";
@@ -52,13 +52,23 @@ export function KanjiCard({ kanji }: KanjiCardProps) {
           userSynonyms={kanji.studyMaterial?.data.meaning_synonyms ?? []}
           mnemonic={kanji.meaningMnemonic}
           hint={kanji.meaningHint}
-          note={kanji.studyMaterial?.data.meaning_note ?? null}
+          note={{
+            subjectId: kanji.id,
+            field: "meaning_note",
+            wanikaniNote: kanji.studyMaterial?.data.meaning_note ?? "",
+            localNote: kanji.localStudyMaterial?.meaning_note ?? null,
+          }}
         />
         <ReadingsSection
           readings={kanji.readings}
           mnemonic={kanji.readingMnemonic}
           hint={kanji.readingHint}
-          note={kanji.studyMaterial?.data.reading_note ?? null}
+          note={{
+            subjectId: kanji.id,
+            field: "reading_note",
+            wanikaniNote: kanji.studyMaterial?.data.reading_note ?? "",
+            localNote: kanji.localStudyMaterial?.reading_note ?? null,
+          }}
         />
         <RelatedSubjectsSection
           title="Visually Similar Kanji"
@@ -129,7 +139,7 @@ function MeaningSection({
   userSynonyms: string[];
   mnemonic: string;
   hint: string;
-  note: string | null;
+  note: NoteSectionProps;
 }) {
   const primaryMeaning = getPrimaryMeaning(meanings);
   const alternativeMeanings = meanings
@@ -160,7 +170,7 @@ function ReadingsSection({
   readings: Kanji["readings"];
   mnemonic: string;
   hint: string;
-  note: string | null;
+  note: NoteSectionProps;
 }) {
   return (
     <div className="p-4">
@@ -206,7 +216,7 @@ function MnemonicBlock({
 }: {
   mnemonic: string;
   hint: string;
-  note: string | null;
+  note: NoteSectionProps;
 }) {
   return (
     <>
@@ -215,7 +225,7 @@ function MnemonicBlock({
         <MnemonicText html={mnemonic} />
       </div>
       {hint && <HintBox hint={hint} />}
-      <NoteSection note={note} />
+      <NoteSection key={`${note.subjectId}-${note.field}`} {...note} />
     </>
   );
 }

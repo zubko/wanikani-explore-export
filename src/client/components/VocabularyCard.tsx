@@ -15,7 +15,7 @@ import { AddToAnkiButton } from "./card-components/AddToAnkiButton.tsx";
 import { CardHeader } from "./card-components/CardHeader.tsx";
 import { ExplanationBlock } from "./card-components/ExplanationBlock.tsx";
 import { LabeledRow } from "./card-components/LabeledRow.tsx";
-import { NoteSection } from "./card-components/NoteSection.tsx";
+import { NoteSection, type NoteSectionProps } from "./card-components/NoteSection.tsx";
 import { scrollToElement } from "../utils/scroll-to-element.ts";
 import { SectionTitle } from "./card-components/SectionTitle.tsx";
 import { SubjectTile } from "./card-components/SubjectTile.tsx";
@@ -63,14 +63,24 @@ export function VocabularyCard({ vocabulary }: VocabularyCardProps) {
           partsOfSpeech={vocabulary.partsOfSpeech}
           conjugations={vocabData?.conjugations ?? null}
           mnemonic={vocabulary.meaningMnemonic}
-          note={vocabulary.studyMaterial?.data.meaning_note ?? null}
+          note={{
+            subjectId: vocabulary.id,
+            field: "meaning_note",
+            wanikaniNote: vocabulary.studyMaterial?.data.meaning_note ?? "",
+            localNote: vocabulary.localStudyMaterial?.meaning_note ?? null,
+          }}
         />
         {vocabData && (
           <ReadingSection
             readings={vocabData.readings}
             audios={vocabulary.pronunciationAudios}
             mnemonic={vocabData.readingMnemonic}
-            note={vocabulary.studyMaterial?.data.reading_note ?? null}
+            note={{
+              subjectId: vocabulary.id,
+              field: "reading_note",
+              wanikaniNote: vocabulary.studyMaterial?.data.reading_note ?? "",
+              localNote: vocabulary.localStudyMaterial?.reading_note ?? null,
+            }}
           />
         )}
         <ContextSentencesSection sentences={vocabulary.contextSentences} />
@@ -92,7 +102,7 @@ function MeaningSection({
   partsOfSpeech: string[];
   conjugations: Conjugations | null;
   mnemonic: string;
-  note: string | null;
+  note: NoteSectionProps;
 }) {
   const primaryMeaning = getPrimaryMeaning(meanings);
   const alternativeMeanings = meanings
@@ -111,7 +121,7 @@ function MeaningSection({
         <LabeledRow label="Word Type" value={partsOfSpeech.join(", ")} />
         {conjugations && <ConjugationsRow conjugations={conjugations} />}
         <ExplanationBlock mnemonic={mnemonic} />
-        <NoteSection note={note} />
+        <NoteSection key={`${note.subjectId}-${note.field}`} {...note} />
       </div>
     </div>
   );
@@ -126,7 +136,7 @@ function ReadingSection({
   readings: VocabularyReading[];
   audios: PronunciationAudio[];
   mnemonic: string;
-  note: string | null;
+  note: NoteSectionProps;
 }) {
   const primaryReading = getPrimaryReading(readings);
 
@@ -137,7 +147,7 @@ function ReadingSection({
         <p className="text-2xl">{primaryReading}</p>
         <AudioButtons audios={audios} />
         <ExplanationBlock mnemonic={mnemonic} />
-        <NoteSection note={note} />
+        <NoteSection key={`${note.subjectId}-${note.field}`} {...note} />
       </div>
     </div>
   );

@@ -47,7 +47,13 @@ export function RadicalCard({ radical }: RadicalCardProps) {
         />
         <MnemonicSection mnemonic={radical.meaningMnemonic} imageUrl={radical.mnemonicImageUrl} />
         <div className="p-4">
-          <NoteSection note={radical.studyMaterial?.data.meaning_note ?? null} />
+          <NoteSection
+            key={`${radical.id}-meaning_note`}
+            subjectId={radical.id}
+            field="meaning_note"
+            wanikaniNote={radical.studyMaterial?.data.meaning_note ?? ""}
+            localNote={radical.localStudyMaterial?.meaning_note ?? null}
+          />
         </div>
         <RelatedSubjectsSection
           title="Found In Kanji"
