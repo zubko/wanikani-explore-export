@@ -237,12 +237,12 @@ export type MergedStudyMaterial = {
 - Create: `src/server/__tests__/api.study-materials.test.ts`
 - Generated: `src/server/__tests__/__snapshots__/api.study-materials.test.ts.snap` by `bun test src/server/__tests__/api.study-materials.test.ts --update-snapshots`, never written by hand
 
-- [ ] add `.patch("/study-materials", ...)` with the validation list from Technical Details, `as const` on every `ok`
-- [ ] add the `[API]` log lines
-- [ ] test setup: same as Task 4, `beforeAll` init plus `beforeEach` and `afterEach` resets, so a later test file sees the fixture state whatever the file order
-- [ ] write tests for every 400 case, the 404 case, and the 500 case with `setFsError`
-- [ ] write tests for create, update one field, add a synonym, clear a note, remove the last field; snapshot the response body and the written JSON
-- [ ] run `bun test` - must pass before Task 6
+- [x] add `.patch("/study-materials", ...)` with the validation list from Technical Details, `as const` on every `ok`
+- [x] add the `[API]` log lines
+- [x] test setup: same as Task 4, `beforeAll` init plus `beforeEach` and `afterEach` resets, so a later test file sees the fixture state whatever the file order
+- [x] write tests for every 400 case, the 404 case, and the 500 case with `setFsError`
+- [x] write tests for create, update one field, add a synonym, clear a note, remove the last field; snapshot the response body and the written JSON
+- [x] run `bun test` - must pass before Task 6
 
 ### Task 6: Client api method
 

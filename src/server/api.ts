@@ -5,6 +5,7 @@ import type {
   AnkiNoteItem,
   Kanji,
   KanaVocabulary,
+  LocalStudyMaterial,
   Radical,
   SubjectType,
   Vocabulary,
@@ -25,6 +26,7 @@ import {
   kanaVocabulary as kanaVocabularyData,
 } from "./repository/data-loader.ts";
 import { saveCache } from "./repository/data-loader.ts";
+import { findSubjectTypeById, upsertLocalStudyMaterial } from "./repository/study-material.ts";
 import { getPrimaryMeaning } from "@/model/subject-utils.ts";
 import type { AnkiDeckType } from "./services/anki-connect.ts";
 import {
@@ -36,6 +38,9 @@ import {
 } from "./services/anki-connect.ts";
 
 const ANKI_DECK_TYPES: AnkiDeckType[] = ["radical", "kanji", "vocabulary"];
+
+const STUDY_MATERIAL_NOTE_FIELDS = ["meaning_note", "reading_note"] as const;
+const STUDY_MATERIAL_FIELDS = [...STUDY_MATERIAL_NOTE_FIELDS, "meaning_synonyms"] as const;
 
 function getErrorMessage(err: unknown): string {
   if (err instanceof Error) return err.message;
@@ -64,6 +69,31 @@ async function addSubjectToAnki(id: number, type: SubjectType): Promise<AnkiAddR
   }
 
   throw new Error(`Unknown subject type: ${type}`);
+}
+
+function validateStudyMaterialPatch(body: Record<string, unknown>): string | null {
+  const fields = Object.keys(body).filter((key) => key !== "id");
+  if (fields.length === 0) return "Missing required parameter: at least one field besides id";
+
+  const unknown = fields.find(
+    (key) => !STUDY_MATERIAL_FIELDS.includes(key as (typeof STUDY_MATERIAL_FIELDS)[number])
+  );
+  if (unknown) return `Invalid field: ${unknown}`;
+
+  for (const field of STUDY_MATERIAL_NOTE_FIELDS) {
+    if (field in body && typeof body[field] !== "string") {
+      return `Invalid ${field}: must be a string`;
+    }
+  }
+
+  if ("meaning_synonyms" in body) {
+    const value = body.meaning_synonyms;
+    if (!Array.isArray(value) || value.some((item) => typeof item !== "string")) {
+      return "Invalid meaning_synonyms: must be an array of strings";
+    }
+  }
+
+  return null;
 }
 
 function resolveWkSubject(
@@ -209,6 +239,47 @@ const app = new Hono()
       const message = getErrorMessage(err);
       console.error(`[API] Add to Anki: ${type} id=${id} — error: ${message}`);
       return c.json({ ok: false as const, error: message });
+    }
+  })
+  .patch("/study-materials", async (c) => {
+    const body = await c.req.json<Record<string, unknown>>();
+    const id = body.id;
+
+    if (typeof id !== "number" || !Number.isInteger(id)) {
+      return c.json({ ok: false as const, error: "Invalid id: must be an integer" }, 400);
+    }
+
+    const invalid = validateStudyMaterialPatch(body);
+    if (invalid) {
+      return c.json({ ok: false as const, error: invalid }, 400);
+    }
+
+    const type = findSubjectTypeById(id);
+    if (!type) {
+      console.log(`[API] Study material id=${id} — subject not found`);
+      return c.json({ ok: false as const, error: "Subject not found" }, 404);
+    }
+
+    if ("reading_note" in body && (type === "radical" || type === "kana_vocabulary")) {
+      return c.json(
+        { ok: false as const, error: `Invalid reading_note: a ${type} has no reading` },
+        400
+      );
+    }
+
+    const patch = Object.fromEntries(
+      Object.entries(body).filter(([key]) => key !== "id")
+    ) as LocalStudyMaterial;
+    console.log(`[API] Study material ${type} id=${id}: ${Object.keys(patch).join(", ")}`);
+
+    try {
+      const data = await upsertLocalStudyMaterial(id, patch);
+      console.log(`[API] Study material ${type} id=${id} — ${data ? "saved" : "removed"}`);
+      return c.json({ ok: true as const, data });
+    } catch (err) {
+      const message = getErrorMessage(err);
+      console.error(`[API] Study material ${type} id=${id} — error: ${message}`);
+      return c.json({ ok: false as const, error: message }, 500);
     }
   })
   .post("/anki-sync", async (c) => {
