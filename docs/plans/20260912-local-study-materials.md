@@ -186,17 +186,17 @@ export type MergedStudyMaterial = {
 - Modify: `src/server/repository/__tests__/__snapshots__/kanji.test.ts.snap`
 - Modify: `src/server/repository/__tests__/__snapshots__/vocabulary.test.ts.snap`
 
-- [ ] create `data/userdata/study_materials_extra.json` with `{}`
-- [ ] create the fixture with the six entries listed under Test hooks
-- [ ] add the read redirect, the `rename` and `unlink` mocks, and `setFsError` to `src/test/preload.ts`
-- [ ] change `KanaVocabulary.studyMaterial` to `StudyMaterial | null` and add `localStudyMaterial: LocalStudyMaterial | null` to the four enriched types in `src/model/wanikani.ts`
-- [ ] load `localStudyMaterials` in `data-loader.ts` and add `setLocalStudyMaterials`
-- [ ] add `localStudyMaterial: localStudyMaterials[String(data.id)] ?? null` in the radical, kanji and vocabulary builders, and the kana vocabulary builder
-- [ ] replace the hard-coded `studyMaterial: null` for kana vocabulary with `findStudyMaterial(..., "kana_vocabulary")`. It finds nothing with today's data, the change is for future downloads
-- [ ] add search tests for `type=kanji&q=川` and `type=vocabulary&q=アメリカ人` with file snapshots
-- [ ] update the search snapshot: `bun test src/server/__tests__/api.search.test.ts --update-snapshots`, then read the diff and check that every subject gained a `localStudyMaterial` entry (13 today, `null` except 658, 1, 3766 and 958 which show the fixture object) and the two new snapshots appeared
-- [ ] update the three repository snapshots one file at a time: `bun test src/server/repository/__tests__/radical.test.ts --update-snapshots`, then kanji, then vocabulary. Their top-level subjects 一, 校, 毎晩 and the nested 晩 show the fixture object
-- [ ] run `bun run tsc` and `bun test` - must pass before Task 3
+- [x] create `data/userdata/study_materials_extra.json` with `{}`
+- [x] create the fixture with the six entries listed under Test hooks
+- [x] add the read redirect, the `rename` and `unlink` mocks, and `setFsError` to `src/test/preload.ts`
+- [x] change `KanaVocabulary.studyMaterial` to `StudyMaterial | null` and add `localStudyMaterial: LocalStudyMaterial | null` to the four enriched types in `src/model/wanikani.ts`
+- [x] load `localStudyMaterials` in `data-loader.ts` and add `setLocalStudyMaterials`
+- [x] add `localStudyMaterial: localStudyMaterials[String(data.id)] ?? null` in the radical, kanji and vocabulary builders, and the kana vocabulary builder
+- [x] replace the hard-coded `studyMaterial: null` for kana vocabulary with `findStudyMaterial(..., "kana_vocabulary")`. It finds nothing with today's data, the change is for future downloads
+- [x] add search tests for `type=kanji&q=川` and `type=vocabulary&q=アメリカ人` with file snapshots
+- [x] update the search snapshot: `bun test src/server/__tests__/api.search.test.ts --update-snapshots`, then read the diff and check that every subject gained a `localStudyMaterial` entry (13 today, `null` except 658, 1, 3766 and 958 which show the fixture object) and the two new snapshots appeared
+- [x] update the three repository snapshots one file at a time: `bun test src/server/repository/__tests__/radical.test.ts --update-snapshots`, then kanji, then vocabulary. Their top-level subjects 一, 校, 毎晩 and the nested 晩 show the fixture object
+- [x] run `bun run tsc` and `bun test` - must pass before Task 3
 
 ### Task 3: Anki note builders use the merged values
 

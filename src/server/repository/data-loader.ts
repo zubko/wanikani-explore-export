@@ -4,6 +4,7 @@ import type {
   VocabularyData,
   KanaVocabularyData,
   StudyMaterial,
+  LocalStudyMaterial,
   VerbConjugations,
 } from "@/model/wanikani.ts";
 import type { MnemonicImageFetcher } from "./mnemonic-image-fetcher.ts";
@@ -14,11 +15,14 @@ type RawVerbConjugations = Omit<VerbConjugations, "type">;
 
 export type SentenceReadingEntry = { ja: string; reading: string };
 
+export const LOCAL_STUDY_MATERIALS_PATH = "./data/userdata/study_materials_extra.json";
+
 export let radicals: RadicalData[];
 export let kanji: KanjiData[];
 export let vocabulary: VocabularyData[];
 export let kanaVocabulary: KanaVocabularyData[];
 export let studyMaterials: StudyMaterial[];
+export let localStudyMaterials: Record<string, LocalStudyMaterial>;
 export let verbConjugations: Record<string, RawVerbConjugations>;
 export let sentenceReadings: Record<string, SentenceReadingEntry>;
 export let imageFetcher: MnemonicImageFetcher;
@@ -30,6 +34,7 @@ export async function initRepository(): Promise<void> {
     vocabulary,
     kanaVocabulary,
     studyMaterials,
+    localStudyMaterials,
     verbConjugations,
     sentenceReadings,
     imageFetcher,
@@ -39,10 +44,15 @@ export async function initRepository(): Promise<void> {
     readJson<VocabularyData[]>("./data/userdata/vocabulary.json"),
     readJson<KanaVocabularyData[]>("./data/userdata/kana_vocabulary.json"),
     readJson<StudyMaterial[]>("./data/userdata/study_materials.json"),
+    readJson<Record<string, LocalStudyMaterial>>(LOCAL_STUDY_MATERIALS_PATH),
     readJson<Record<string, RawVerbConjugations>>("./data/verb_conjugations.json"),
     readJson<Record<string, SentenceReadingEntry>>("./data/sentence_readings.json"),
     createMnemonicImageFetcher(),
   ]);
+}
+
+export function setLocalStudyMaterials(next: Record<string, LocalStudyMaterial>): void {
+  localStudyMaterials = next;
 }
 
 export async function saveCache(): Promise<void> {

@@ -186,6 +186,7 @@ export type Radical = {
   meaningMnemonic: string;
   amalgamationSubjectIds: number[];
   studyMaterial: StudyMaterial | null;
+  localStudyMaterial: LocalStudyMaterial | null;
   mnemonicImageUrl: string | null;
   foundInKanji: SubjectReference[];
 };
@@ -208,6 +209,7 @@ export type Kanji = {
   amalgamationSubjectIds: number[];
   visuallySimilarSubjectIds: number[];
   studyMaterial: StudyMaterial | null;
+  localStudyMaterial: LocalStudyMaterial | null;
   componentRadicals: Radical[];
   visuallySimilarKanji: SubjectReference[];
   foundInVocabulary: SubjectReference[];
@@ -230,6 +232,7 @@ export type Vocabulary = {
   contextSentences: ContextSentence[];
   pronunciationAudios: PronunciationAudio[];
   studyMaterial: StudyMaterial | null;
+  localStudyMaterial: LocalStudyMaterial | null;
   componentKanji: Kanji[];
   conjugations: Conjugations | null;
 };
@@ -247,7 +250,8 @@ export type KanaVocabulary = {
   partsOfSpeech: string[];
   contextSentences: ContextSentence[];
   pronunciationAudios: PronunciationAudio[];
-  studyMaterial: null;
+  studyMaterial: StudyMaterial | null;
+  localStudyMaterial: LocalStudyMaterial | null;
 };
 
 export type Subject = Radical | Kanji | Vocabulary | KanaVocabulary;

@@ -11,6 +11,7 @@ import {
   vocabulary,
   kanaVocabulary,
   studyMaterials,
+  localStudyMaterials,
   verbConjugations,
   sentenceReadings,
 } from "./data-loader.ts";
@@ -50,6 +51,7 @@ async function mapVocabularyDataToVocabulary(data: VocabularyData): Promise<Voca
     contextSentences: enrichContextSentencesWithReadings(data.id, data.data.context_sentences),
     pronunciationAudios: data.data.pronunciation_audios,
     studyMaterial: findStudyMaterial(studyMaterials, data.id, "vocabulary"),
+    localStudyMaterial: localStudyMaterials[String(data.id)] ?? null,
     componentKanji,
     conjugations: getConjugations(data.id),
   };
@@ -69,7 +71,8 @@ function mapKanaVocabularyDataToKanaVocabulary(data: KanaVocabularyData): KanaVo
     partsOfSpeech: data.data.parts_of_speech,
     contextSentences: enrichContextSentencesWithReadings(data.id, data.data.context_sentences),
     pronunciationAudios: data.data.pronunciation_audios,
-    studyMaterial: null,
+    studyMaterial: findStudyMaterial(studyMaterials, data.id, "kana_vocabulary"),
+    localStudyMaterial: localStudyMaterials[String(data.id)] ?? null,
   };
 }
 

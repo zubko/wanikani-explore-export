@@ -79,6 +79,20 @@ describe("search API", () => {
     expect(result.data).toMatchSnapshot();
   });
 
+  test("find kanji with a local reading note over a WaniKani one (川)", async () => {
+    const result = await searchJson("type=kanji&q=川");
+    expect(result.found).toBe(true);
+    expect(result.data.characters).toBe("川");
+    expect(result.data).toMatchSnapshot();
+  });
+
+  test("find vocabulary with a local synonym next to a WaniKani one (アメリカ人)", async () => {
+    const result = await searchJson("type=vocabulary&q=アメリカ人");
+    expect(result.found).toBe(true);
+    expect(result.data.characters).toBe("アメリカ人");
+    expect(result.data).toMatchSnapshot();
+  });
+
   test("find kana vocabulary (ここ)", async () => {
     const result = await searchJson("type=vocabulary&q=ここ");
     expect(result.found).toBe(true);
