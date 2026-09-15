@@ -20,7 +20,7 @@ import { scrollToElement } from "../utils/scroll-to-element.ts";
 import { SectionTitle } from "./card-components/SectionTitle.tsx";
 import { SubjectTile } from "./card-components/SubjectTile.tsx";
 import { UserSynonymsRow, type UserSynonymsRowProps } from "./card-components/UserSynonymsRow.tsx";
-import { api } from "../api.ts";
+import { addToAnkiAfterSaves } from "../utils/add-to-anki.ts";
 import { formatAnkiResult } from "../utils/format-anki-result.ts";
 import { noteProps, synonymProps } from "./card-components/study-material-props.ts";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -37,7 +37,7 @@ export function VocabularyCard({ vocabulary }: VocabularyCardProps) {
 
   const handleAddToAnki = () => {
     const kanjiCount = vocabData ? vocabData.componentKanji.length : 0;
-    toast.promise(api.addToAnki(vocabulary.id, vocabulary.object), {
+    toast.promise(addToAnkiAfterSaves(vocabulary.id, vocabulary.object), {
       loading:
         kanjiCount > 0
           ? `Adding ${vocabulary.characters} with ${kanjiCount} kanji...`

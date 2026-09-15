@@ -3,7 +3,7 @@ import toast from "react-hot-toast";
 import { getPrimaryMeaning } from "@/model/subject-utils.ts";
 import { getRadicalSvgUrl } from "@/model/radical-utils.ts";
 import { subjectColors } from "@/config/theme.ts";
-import { api } from "../api.ts";
+import { addToAnkiAfterSaves } from "../utils/add-to-anki.ts";
 import { formatAnkiResult } from "../utils/format-anki-result.ts";
 import { AddToAnkiButton } from "./card-components/AddToAnkiButton.tsx";
 import { CardHeader } from "./card-components/CardHeader.tsx";
@@ -24,7 +24,7 @@ export function RadicalCard({ radical }: RadicalCardProps) {
   const characterImage = svgUrl ? <img src={svgUrl} alt="" className="h-8 w-8 invert" /> : null;
 
   const handleAddToAnki = () => {
-    toast.promise(api.addToAnki(radical.id, radical.object), {
+    toast.promise(addToAnkiAfterSaves(radical.id, radical.object), {
       loading: "Saving to Anki...",
       success: (result) => formatAnkiResult(result),
       error: (err) => `Failed: ${err.message}`,

@@ -5,7 +5,7 @@ import { installDom } from "./dom.ts";
 // react-dom reads the DOM globals when it loads, so this must run before any test file imports it
 installDom();
 
-type FsOp = "writeFile" | "rename" | "unlink";
+type FsOp = "readFile" | "writeFile" | "rename" | "unlink";
 
 export const writeCalls: { path: string; data: string }[] = [];
 
@@ -17,6 +17,7 @@ const files = new Map<string, string>();
 export function resetFsMock() {
   writeCalls.length = 0;
   files.clear();
+  delete fsErrors.readFile;
   delete fsErrors.writeFile;
   delete fsErrors.rename;
   delete fsErrors.unlink;
@@ -40,6 +41,7 @@ function throwWhenSet(op: FsOp) {
 const realReadFile = readFile;
 mock.module("fs/promises", () => ({
   readFile: async (path: string, encoding?: BufferEncoding) => {
+    throwWhenSet("readFile");
     const written = files.get(String(path));
     if (written !== undefined) return written;
     // Redirect mnemonic cache and local study material reads to checked-in test fixtures

@@ -76,6 +76,11 @@ export function saveLocalStudyMaterial({
   return run;
 }
 
+/** Resolves once every save of this subject that is already running has answered. */
+export async function waitForLocalStudyMaterialSaves(subjectId: number): Promise<void> {
+  await queues.get(subjectId);
+}
+
 /** Test hook: drops the whole store, so one test file cannot see the records of another. */
 export function resetLocalStudyMaterials(): void {
   queues.clear();
@@ -117,9 +122,22 @@ function confirmedRecord(
   return confirmed.has(subjectId) ? (confirmed.get(subjectId) ?? null) : fromServer;
 }
 
+/**
+ * True when the page was rendered with a record this session never produced, so the file changed
+ * outside the tab. An answer that lands while a save runs can be older than that save, so it
+ * becomes the new origin instead: letting it win would hide the confirmed result, and the next
+ * whole-list save would then be built without it.
+ */
 function serverRecordChanged(subjectId: number, fromServer: LocalStudyMaterial | null): boolean {
   const origin = origins.get(subjectId);
-  return origin !== undefined && origin !== recordKey(fromServer);
+  if (origin === undefined) return false;
+
+  const key = recordKey(fromServer);
+  if (origin === key) return false;
+  if ((pendingSaves.get(subjectId)?.length ?? 0) === 0) return true;
+
+  origins.set(subjectId, key);
+  return false;
 }
 
 /** By value, so the key order of a hand-edited file makes no difference. */

@@ -66,6 +66,27 @@ describe("KanjiCard editors", () => {
     expect(apiMock.requests).toEqual([{ id: 456, reading_note: "Kawa like a river bank" }]);
   });
 
+  it("adds to Anki only after the pending note save answered", async () => {
+    const heldNote = apiMock.answerLater(456, { meaning_note: "Water flows" });
+    const view = mountKanjiCard();
+
+    click(view.findAllByLabel("+ Add Note")[0]!);
+    typeInto(view.find("textarea"), "Water flows");
+    click(view.findByLabel("Save note"));
+    click(view.findByLabel("Add to Anki"));
+    await settle();
+
+    expect(apiMock.requests).toEqual([{ id: 456, meaning_note: "Water flows" }]);
+
+    heldNote.resolve();
+    await settle();
+
+    expect(apiMock.requests).toEqual([
+      { id: 456, meaning_note: "Water flows" },
+      { id: 456, type: "kanji" },
+    ]);
+  });
+
   it("says that kanji synonyms do not reach Anki", () => {
     const view = mountKanjiCard();
 

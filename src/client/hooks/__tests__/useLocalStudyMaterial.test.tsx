@@ -143,6 +143,39 @@ describe("saveLocalStudyMaterial with a changed server record", () => {
     expect(shownRecord(view)).toEqual({ meaning_synonyms: ["alpha", "by hand", "beta"] });
   });
 
+  it("keeps the confirmed result when the new server record lands while the save runs", async () => {
+    const view = mount(<Probe subjectId={1} />);
+    const held = apiMock.answerLater(1, { meaning_synonyms: ["alpha"] });
+
+    const save = saveLocalStudyMaterial({
+      subjectId: 1,
+      fromServer: null,
+      patch: (current) => ({ meaning_synonyms: [...(current?.meaning_synonyms ?? []), "alpha"] }),
+    });
+
+    // a search answer that was already on its way carries the record from before the save
+    const older = { meaning_note: "From the search" };
+    view.rerender(<Probe subjectId={1} fromServer={older} />);
+    await settle();
+
+    held.resolve();
+    await save;
+    await settle();
+
+    expect(shownRecord(view)).toEqual({ meaning_synonyms: ["alpha"] });
+
+    apiMock.answerWith({ meaning_synonyms: ["alpha", "beta"] });
+    await saveLocalStudyMaterial({
+      subjectId: 1,
+      fromServer: older,
+      patch: (current) => ({ meaning_synonyms: [...(current?.meaning_synonyms ?? []), "beta"] }),
+    });
+    await settle();
+
+    expect(apiMock.requests.at(-1)).toEqual({ id: 1, meaning_synonyms: ["alpha", "beta"] });
+    expect(shownRecord(view)).toEqual({ meaning_synonyms: ["alpha", "beta"] });
+  });
+
   it("keeps the session record while the server record stays the same", async () => {
     const view = mount(<Probe subjectId={1} />);
     apiMock.answerWith({ meaning_note: "Saved note" });

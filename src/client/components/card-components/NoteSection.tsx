@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { Cancel01Icon, CheckmarkCircle01Icon, PencilEdit01Icon } from "@hugeicons/core-free-icons";
 import type { LocalStudyMaterial, LocalStudyMaterialNoteField } from "@/model/wanikani.ts";
@@ -26,6 +26,7 @@ export function NoteSection({
   const record = useLocalStudyMaterial(subjectId, localStudyMaterial);
   const [mode, setMode] = useState<"view" | "edit">("view");
   const [draft, setDraft] = useState("");
+  const saveCount = useRef(0);
 
   // `||` and not `??`, to drop an empty note the same way `mergeStudyMaterial` does. The server
   // never writes one, a hand-edited file can hold one.
@@ -44,6 +45,7 @@ export function NoteSection({
 
   const save = async () => {
     setMode("view");
+    const saveNumber = ++saveCount.current;
     try {
       await saveLocalStudyMaterial({
         subjectId,
@@ -51,7 +53,8 @@ export function NoteSection({
         patch: { [field]: draft.trim() },
       });
     } catch (err) {
-      setMode("edit");
+      // a later save of this note may have worked, so the draft would be the newer text
+      if (saveNumber === saveCount.current) setMode("edit");
       toast.error(saveErrorMessage(err));
     }
   };

@@ -15,7 +15,7 @@ import { RelatedSubjectsSection } from "./card-components/RelatedSubjectsSection
 import { scrollToElement } from "../utils/scroll-to-element.ts";
 import { SectionTitle } from "./card-components/SectionTitle.tsx";
 import { UserSynonymsRow, type UserSynonymsRowProps } from "./card-components/UserSynonymsRow.tsx";
-import { api } from "../api.ts";
+import { addToAnkiAfterSaves } from "../utils/add-to-anki.ts";
 import { formatAnkiResult } from "../utils/format-anki-result.ts";
 import { noteProps, synonymProps } from "./card-components/study-material-props.ts";
 
@@ -31,7 +31,7 @@ export function KanjiCard({ kanji }: KanjiCardProps) {
 
   const handleAddToAnki = () => {
     const radicalCount = kanji.componentRadicals.length;
-    toast.promise(api.addToAnki(kanji.id, kanji.object), {
+    toast.promise(addToAnkiAfterSaves(kanji.id, kanji.object), {
       loading:
         radicalCount > 0
           ? `Adding ${kanji.characters} with ${radicalCount} radical(s)...`
