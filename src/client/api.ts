@@ -1,6 +1,6 @@
 import { hc } from "hono/client";
 import type { ApiType } from "@server/api.ts";
-import type { SubjectType } from "@/model/wanikani.ts";
+import type { LocalStudyMaterial, SubjectType } from "@/model/wanikani.ts";
 import { HttpStatusError } from "./utils/http-error.ts";
 
 const client = hc<ApiType>("/api");
@@ -13,6 +13,16 @@ export const api = {
   },
   addToAnki: async (id: number, type: SubjectType) => {
     const res = await client["add-to-anki"].$post({ json: { id, type } });
+    // an unhandled server error answers with plain text, and res.json() would throw a SyntaxError
+    if (!res.headers.get("content-type")?.includes("application/json")) {
+      throw new HttpStatusError(res.status);
+    }
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error);
+    return data.data;
+  },
+  saveStudyMaterial: async (id: number, patch: LocalStudyMaterial) => {
+    const res = await client["study-materials"].$patch({ json: { id, ...patch } });
     // an unhandled server error answers with plain text, and res.json() would throw a SyntaxError
     if (!res.headers.get("content-type")?.includes("application/json")) {
       throw new HttpStatusError(res.status);

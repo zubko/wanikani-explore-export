@@ -251,10 +251,10 @@ export type MergedStudyMaterial = {
 - Modify: `src/client/api.ts`
 - Modify: `src/client/__tests__/api.test.ts`
 
-- [ ] add `saveStudyMaterial(id, patch)` next to `addToAnki`, same error handling
-- [ ] record `init.method` and `init.body` next to the url in the fetch mock of `src/client/__tests__/api.test.ts`
-- [ ] write tests: 200 returns `data`, `ok: false` throws with the server message, non-JSON 500 throws `HttpStatusError`, a rejected fetch propagates, the request is a PATCH to `/api/study-materials` with `id` in the body
-- [ ] run `bun test src/client` - must pass before Task 7
+- [x] add `saveStudyMaterial(id, patch)` next to `addToAnki`, same error handling
+- [x] record `init.method` and `init.body` next to the url in the fetch mock of `src/client/__tests__/api.test.ts`
+- [x] write tests: 200 returns `data`, `ok: false` throws with the server message, non-JSON 500 throws `HttpStatusError`, a rejected fetch propagates, the request is a PATCH to `/api/study-materials` with `id` in the body
+- [x] run `bun test src/client` - must pass before Task 7
 
 ### Task 7: Note editor
 
