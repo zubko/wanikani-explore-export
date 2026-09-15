@@ -1,10 +1,11 @@
 import { describe, test, expect, beforeAll, beforeEach, afterEach } from "bun:test";
 import type { LocalStudyMaterial } from "@/model/wanikani.ts";
-import { writeCalls, setFsError } from "@/test/preload.ts";
+import { writeCalls, setFileContent, setFsError } from "@/test/preload.ts";
 import {
   lastWrite,
   loadStudyMaterialFixture,
   resetStudyMaterialState,
+  setStudyMaterialFile,
   studyMaterialFixture as fixture,
 } from "@/test/study-material-fixture.ts";
 import { localStudyMaterials, LOCAL_STUDY_MATERIALS_PATH } from "../data-loader.ts";
@@ -167,6 +168,41 @@ describe("upsertLocalStudyMaterial write failures", () => {
 
     expect(saved).toEqual({ meaning_note: "New note", meaning_synonyms: ["flat ground"] });
     expect(lastWrite()["1"]).toEqual(saved!);
+  });
+});
+
+describe("upsertLocalStudyMaterial with the file changed outside the app", () => {
+  test("an entry added outside survives the next save", async () => {
+    setStudyMaterialFile({ ...fixture, "2484": { meaning_note: "Typed by hand" } });
+
+    const saved = await upsertLocalStudyMaterial(958, { reading_note: "Ban the night curfew" });
+
+    const file = lastWrite();
+    expect(file["2484"]).toEqual({ meaning_note: "Typed by hand" });
+    expect(file["958"]).toEqual(saved!);
+    expect(localStudyMaterials["2484"]).toEqual({ meaning_note: "Typed by hand" });
+  });
+
+  test("a change outside to the saved subject is the base of the patch", async () => {
+    setStudyMaterialFile({ ...fixture, "958": { meaning_note: "Rewritten by hand" } });
+
+    const saved = await upsertLocalStudyMaterial(958, { reading_note: "Ban the night curfew" });
+
+    expect(saved).toEqual({
+      meaning_note: "Rewritten by hand",
+      reading_note: "Ban the night curfew",
+    });
+  });
+
+  test("an unreadable file fails the save and writes nothing", async () => {
+    setFileContent(LOCAL_STUDY_MATERIALS_PATH, "{ broken");
+
+    await expect(upsertLocalStudyMaterial(1, { meaning_note: "New note" })).rejects.toThrow(
+      "Cannot read"
+    );
+
+    expect(writeCalls).toHaveLength(0);
+    expect(localStudyMaterials["1"]).toEqual(fixture["1"]!);
   });
 });
 

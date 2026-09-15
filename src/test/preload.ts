@@ -10,12 +10,20 @@ type FsOp = "writeFile" | "rename" | "unlink";
 export const writeCalls: { path: string; data: string }[] = [];
 
 const fsErrors: Partial<Record<FsOp, Error>> = {};
+// Holds the written files, so a read after a write sees the new content like a real disk does
+const files = new Map<string, string>();
 
 export function resetWriteCalls() {
   writeCalls.length = 0;
+  files.clear();
   delete fsErrors.writeFile;
   delete fsErrors.rename;
   delete fsErrors.unlink;
+}
+
+/** Puts content under a path without recording a write, for a change made outside the app. */
+export function setFileContent(path: string, data: string) {
+  files.set(path, data);
 }
 
 export function setFsError(op: FsOp, err: Error | null) {
@@ -31,6 +39,8 @@ function throwWhenSet(op: FsOp) {
 const realReadFile = readFile;
 mock.module("fs/promises", () => ({
   readFile: async (path: string, encoding?: BufferEncoding) => {
+    const written = files.get(String(path));
+    if (written !== undefined) return written;
     // Redirect mnemonic cache and local study material reads to checked-in test fixtures
     // so tests don't depend on user-specific state
     if (String(path).includes("mnemonic-images.json")) {
@@ -43,15 +53,22 @@ mock.module("fs/promises", () => ({
   },
   writeFile: async (path: string, data: string) => {
     throwWhenSet("writeFile");
+    files.set(String(path), String(data));
     writeCalls.push({ path: String(path), data: String(data) });
   },
   rename: async (from: string, to: string) => {
     throwWhenSet("rename");
+    const data = files.get(String(from));
+    if (data !== undefined) {
+      files.delete(String(from));
+      files.set(String(to), data);
+    }
     const entry = writeCalls.find((call) => call.path === String(from));
     if (entry) entry.path = String(to);
   },
   unlink: async (path: string) => {
     throwWhenSet("unlink");
+    files.delete(String(path));
     const index = writeCalls.findIndex((call) => call.path === String(path));
     if (index >= 0) writeCalls.splice(index, 1);
   },

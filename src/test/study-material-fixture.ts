@@ -1,7 +1,10 @@
 import type { LocalStudyMaterial } from "@/model/wanikani.ts";
 import { readJson } from "@server/utils/json-utils.ts";
-import { setLocalStudyMaterials } from "@server/repository/data-loader.ts";
-import { resetWriteCalls, writeCalls } from "./preload.ts";
+import {
+  LOCAL_STUDY_MATERIALS_PATH,
+  setLocalStudyMaterials,
+} from "@server/repository/data-loader.ts";
+import { resetWriteCalls, setFileContent, writeCalls } from "./preload.ts";
 
 export const STUDY_MATERIAL_FIXTURE_PATH = "src/test/fixtures/study_materials_extra.json";
 
@@ -22,6 +25,11 @@ export async function loadStudyMaterialFixture(): Promise<void> {
 export function resetStudyMaterialState(): void {
   resetWriteCalls();
   setLocalStudyMaterials(structuredClone(studyMaterialFixture));
+}
+
+/** Changes the file behind the repository, like a hand edit or a git pull does. */
+export function setStudyMaterialFile(file: Record<string, LocalStudyMaterial>): void {
+  setFileContent(LOCAL_STUDY_MATERIALS_PATH, JSON.stringify(file, null, 2) + "\n");
 }
 
 export function lastWrite(): Record<string, LocalStudyMaterial> {

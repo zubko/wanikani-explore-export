@@ -60,7 +60,7 @@ export async function saveCache(): Promise<void> {
 }
 
 // No script creates this file, so a fresh checkout has to be told about it
-async function readLocalStudyMaterials(): Promise<Record<string, LocalStudyMaterial>> {
+export async function readLocalStudyMaterials(): Promise<Record<string, LocalStudyMaterial>> {
   try {
     return await readJson<Record<string, LocalStudyMaterial>>(LOCAL_STUDY_MATERIALS_PATH);
   } catch (error) {
