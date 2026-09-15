@@ -28,12 +28,14 @@ export function UserSynonymsRow({
   const localSynonyms = record?.meaning_synonyms ?? [];
   const ownSynonyms = localSynonyms.filter((synonym) => !wanikaniSynonyms.includes(synonym));
 
-  const save = async (next: string[]) => {
+  // The whole list is sent, so it is built from the confirmed list when the request starts.
+  // Built at click time it would carry a change of an earlier save that failed meanwhile.
+  const save = async (nextList: (confirmed: string[]) => string[]) => {
     try {
       await saveLocalStudyMaterial({
         subjectId,
-        current: record,
-        patch: { meaning_synonyms: next },
+        fromServer: localStudyMaterial,
+        patch: (current) => ({ meaning_synonyms: nextList(current?.meaning_synonyms ?? []) }),
       });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : String(err));
@@ -49,11 +51,11 @@ export function UserSynonymsRow({
       toast.error(`"${trimmed}" is already a synonym`);
       return;
     }
-    void save([...localSynonyms, trimmed]);
+    void save((list) => (list.includes(trimmed) ? list : [...list, trimmed]));
   };
 
   const remove = (synonym: string) => {
-    void save(localSynonyms.filter((item) => item !== synonym));
+    void save((list) => list.filter((item) => item !== synonym));
   };
 
   return (

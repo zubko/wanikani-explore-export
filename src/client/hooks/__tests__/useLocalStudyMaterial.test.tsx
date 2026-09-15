@@ -43,12 +43,12 @@ describe("saveLocalStudyMaterial with two subjects at once", () => {
 
     const saveOne = saveLocalStudyMaterial({
       subjectId: 1,
-      current: null,
+      fromServer: null,
       patch: { meaning_note: "Note of one" },
     });
     const saveTwo = saveLocalStudyMaterial({
       subjectId: 2,
-      current: null,
+      fromServer: null,
       patch: { meaning_note: "Note of two" },
     });
     fast.resolve();
@@ -71,12 +71,12 @@ describe("saveLocalStudyMaterial with two subjects at once", () => {
 
     const saveOne = saveLocalStudyMaterial({
       subjectId: 1,
-      current: { meaning_note: "From server" },
+      fromServer: { meaning_note: "From server" },
       patch: { meaning_note: "Never saved" },
     });
     const saveTwo = saveLocalStudyMaterial({
       subjectId: 2,
-      current: null,
+      fromServer: null,
       patch: { meaning_note: "Note of two" },
     });
     failing.resolve();
@@ -104,12 +104,12 @@ describe("saveLocalStudyMaterial with two saves for one subject", () => {
 
     const saveNote = saveLocalStudyMaterial({
       subjectId: 1,
-      current: { meaning_note: "From server" },
+      fromServer: { meaning_note: "From server" },
       patch: { meaning_note: "Never saved" },
     });
     const saveSynonyms = saveLocalStudyMaterial({
       subjectId: 1,
-      current: { meaning_note: "From server" },
+      fromServer: { meaning_note: "From server" },
       patch: { meaning_synonyms: ["beta"] },
     });
     workingSynonyms.resolve();
@@ -133,6 +133,69 @@ describe("saveLocalStudyMaterial with two saves for one subject", () => {
     view.unmount();
   });
 
+  it("shows the second save at once while the first request is still in flight", async () => {
+    const view = mount(<Probe subjectId={1} />);
+    const heldNote = apiMock.answerLater(1, { meaning_note: "First" });
+
+    const saveNote = saveLocalStudyMaterial({
+      subjectId: 1,
+      fromServer: null,
+      patch: { meaning_note: "First" },
+    });
+    const saveReading = saveLocalStudyMaterial({
+      subjectId: 1,
+      fromServer: null,
+      patch: { reading_note: "Second" },
+    });
+    await settle();
+
+    expect(shownRecord(view)).toEqual({ meaning_note: "First", reading_note: "Second" });
+    expect(apiMock.requests).toEqual([{ id: 1, meaning_note: "First" }]);
+
+    apiMock.answerWith({ meaning_note: "First", reading_note: "Second" });
+    heldNote.resolve();
+    await Promise.all([saveNote, saveReading]);
+    await settle();
+
+    expect(shownRecord(view)).toEqual({ meaning_note: "First", reading_note: "Second" });
+    view.unmount();
+  });
+
+  it("builds a queued payload from the confirmed record, not from the shown one", async () => {
+    const view = mount(<Probe subjectId={1} fromServer={{ meaning_synonyms: ["american"] }} />);
+    const failingAdd = apiMock.failLater(1, "Server error (500)");
+
+    const saveAdd = saveLocalStudyMaterial({
+      subjectId: 1,
+      fromServer: { meaning_synonyms: ["american"] },
+      patch: (current) => ({ meaning_synonyms: [...(current?.meaning_synonyms ?? []), "yank"] }),
+    });
+    const saveRemove = saveLocalStudyMaterial({
+      subjectId: 1,
+      fromServer: { meaning_synonyms: ["american"] },
+      patch: (current) => ({
+        meaning_synonyms: (current?.meaning_synonyms ?? []).filter((item) => item !== "american"),
+      }),
+    });
+    await settle();
+
+    expect(shownRecord(view)).toEqual({ meaning_synonyms: ["yank"] });
+    expect(apiMock.requests).toEqual([{ id: 1, meaning_synonyms: ["american", "yank"] }]);
+
+    apiMock.answerWith(null);
+    failingAdd.resolve();
+    await expect(saveAdd).rejects.toThrow("Server error (500)");
+    await saveRemove;
+    await settle();
+
+    expect(apiMock.requests).toEqual([
+      { id: 1, meaning_synonyms: ["american", "yank"] },
+      { id: 1, meaning_synonyms: [] },
+    ]);
+    expect(shownRecord(view)).toBeNull();
+    view.unmount();
+  });
+
   it("the second save starts from the value the first one stored", async () => {
     const view = mount(<Probe subjectId={1} />);
     const note = apiMock.answerLater(1, { meaning_note: "Saved note" });
@@ -143,12 +206,12 @@ describe("saveLocalStudyMaterial with two saves for one subject", () => {
 
     const saveNote = saveLocalStudyMaterial({
       subjectId: 1,
-      current: null,
+      fromServer: null,
       patch: { meaning_note: "Saved note" },
     });
     const saveSynonyms = saveLocalStudyMaterial({
       subjectId: 1,
-      current: null,
+      fromServer: null,
       patch: { meaning_synonyms: ["beta"] },
     });
     note.resolve();

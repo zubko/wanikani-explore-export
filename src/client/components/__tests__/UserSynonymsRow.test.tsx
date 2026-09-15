@@ -166,6 +166,32 @@ describe("UserSynonymsRow editing", () => {
     view.unmount();
   });
 
+  it("never sends a word again that the save before it failed with", async () => {
+    const failingAdd = apiMock.failLater(2478, "Server error (500)");
+    const view = mount(
+      <UserSynonymsRow {...props({ localStudyMaterial: { meaning_synonyms: ["american"] } })} />
+    );
+
+    addSynonym(view, "yank");
+    click(view.findByLabel("Remove american"));
+    await settle();
+
+    expect(view.html()).toContain("Remove yank");
+    expect(view.html()).not.toContain("Remove american");
+
+    apiMock.answerWith(null);
+    failingAdd.resolve();
+    await settle();
+
+    expect(apiMock.requests).toEqual([
+      { id: 2478, meaning_synonyms: ["american", "yank"] },
+      { id: 2478, meaning_synonyms: [] },
+    ]);
+    expect(view.html()).not.toContain("Remove yank");
+    expect(view.html()).not.toContain("Remove american");
+    view.unmount();
+  });
+
   it("keeps two cards of one subject on the same list", async () => {
     apiMock.answerWith({ meaning_synonyms: ["american", "yank"] });
     const first = mount(

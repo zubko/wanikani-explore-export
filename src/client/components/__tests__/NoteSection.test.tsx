@@ -164,6 +164,36 @@ describe("NoteSection editing", () => {
     view.unmount();
   });
 
+  it("shows the second note while the first save is still in flight", async () => {
+    const heldMeaning = apiMock.answerLater(456, { meaning_note: "Meaning note" });
+    const meaning = mount(<NoteSection {...props({ field: "meaning_note" })} />);
+    const reading = mount(<NoteSection {...props({ field: "reading_note" })} />);
+
+    click(meaning.findByLabel("+ Add Note"));
+    typeInto(meaning.find("textarea"), "Meaning note");
+    click(meaning.findByLabel("Save note"));
+    click(reading.findByLabel("+ Add Note"));
+    typeInto(reading.find("textarea"), "Reading note");
+    click(reading.findByLabel("Save note"));
+    await settle();
+
+    expect(reading.html()).toContain("Reading note");
+    expect(reading.html()).not.toContain("+ Add Note");
+
+    apiMock.answerWith({ meaning_note: "Meaning note", reading_note: "Reading note" });
+    heldMeaning.resolve();
+    await settle();
+
+    expect(apiMock.requests).toEqual([
+      { id: 456, meaning_note: "Meaning note" },
+      { id: 456, reading_note: "Reading note" },
+    ]);
+    expect(meaning.html()).toContain("Meaning note");
+    expect(reading.html()).toContain("Reading note");
+    meaning.unmount();
+    reading.unmount();
+  });
+
   it("shows the same saved note on two cards of one subject", async () => {
     apiMock.answerWith({ reading_note: "Shared" });
     const first = mount(<NoteSection {...props()} />);

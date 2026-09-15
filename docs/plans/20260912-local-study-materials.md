@@ -65,7 +65,7 @@ Add own meaning notes, reading notes and user synonyms for radicals, kanji, voca
 
 - The server keeps two records per subject: the WaniKani `studyMaterial` and the new `localStudyMaterial`. It sends both. One pure helper `mergeStudyMaterial` in `src/model/` merges them. Cards and Anki note builders call it.
 - The client needs both records because the editors must know what is yours: local synonyms get a remove button, and clearing a local note must show the WaniKani note again without a re-fetch.
-- The repository holds the local file in memory like the other data. The upsert writes the whole object to a temp file, renames it over the real file, then replaces the in-memory object. A failed write leaves both the file and memory unchanged.
+- The repository holds the local file in memory like the other data. ➕ The upsert re-reads the file first, because the user also edits it by hand, then writes the whole object to a temp file, renames it over the real file, and replaces the in-memory object. A failed read or write leaves both the file and memory unchanged.
 - All upserts go through one promise queue, so two overlapping saves cannot start from the same old state and drop each other's change.
 - The endpoint is fixed to study materials. A generic "extras" router is not built. The file-level upsert can be extracted when a second kind arrives.
 - `MergedStudyMaterial` uses camelCase on purpose. It is our own computed shape, like the enriched subject fields (`meaningMnemonic`). `LocalStudyMaterial` stays snake_case because it mirrors the WaniKani record field by field. Do not "fix" one to match the other.
@@ -142,14 +142,20 @@ export type MergedStudyMaterial = {
 ### Client
 
 - `api.saveStudyMaterial(id, patch)`: sends `{ id, ...patch }`. A non-JSON answer throws `HttpStatusError`; `ok: false` throws `Error(data.error)`; returns `data`. A rejected fetch (server down) throws the `TypeError` from fetch, and the editor shows its message in the toast.
-- `NoteSection` props: `subjectId`, `field: "meaning_note" | "reading_note"`, `wanikaniNote: string`, `localNote: string | null`. State: `localNote`, `mode: "view" | "edit"`, `draft`, `saving`. Shown text = local when set, else WaniKani.
+- ➕ `src/client/hooks/useLocalStudyMaterial.ts` is the store of the saved records. It is module level, not React state, because one subject can render on several cards at once.
+  - `useLocalStudyMaterial(subjectId, fromServer)` reads it through `useSyncExternalStore` and falls back to the record the page was rendered with.
+  - It keeps two maps: `shown`, what the editors display, and `confirmed`, the answer of the last finished save. A save that is still in flight sits in a pending list, and `shown` is `confirmed` with every pending save applied on top.
+  - `saveLocalStudyMaterial({ subjectId, fromServer, patch })` publishes the new `shown` value at once, then runs the request in a per-subject promise queue. So a second edit of the same subject is on screen while the first request is still open, and the two requests never run at once.
+  - `patch` is a plain record, or a function `(confirmed) => patch` for a whole-list field. The function runs when the request starts, so the list that goes to the server is built from the confirmed record. A change of a save that failed meanwhile is never part of the next payload.
+  - The optimistic value uses the same pure `applyLocalStudyMaterialPatch` as the server, so both sides drop an empty field the same way.
+- `NoteSection` props: `subjectId`, `field: "meaning_note" | "reading_note"`, `wanikaniNote: string`, `localStudyMaterial: LocalStudyMaterial | null`. Own state: `mode: "view" | "edit"` and `draft`. The saved record comes from the store. Shown text = local note when set, else WaniKani.
   - view with a note: "Note" header, pencil icon button, a small "local" tag when the shown note is local, the text below
   - view without a note: "+ Add Note" opens edit with an empty draft
   - edit: textarea with `rows` from the line count (min 3), save and cancel icon buttons below. Esc cancels, Cmd+Enter saves
-  - save: trim the draft, remember the previous local note, set the local note to the trimmed draft, switch to view, send `{ [field]: trimmed }`. Empty draft clears the local note. On error: restore the previous local note for the view, back to edit with the draft kept, `toast.error(message)`. Cancel after an error then shows the last saved value, never the unsaved draft. `saving` blocks a second save while one runs
+  - save: trim the draft, switch to view, send `{ [field]: trimmed }` through the store. Empty draft clears the local note. On error: back to edit with the draft kept, `toast.error(message)`, and the store puts the last saved value back. Cancel after an error then shows that value, never the unsaved draft
   - cancel drops the draft
-- `UserSynonymsRow` props: `subjectId`, `wanikaniSynonyms: string[]`, `localSynonyms: string[]`. WaniKani chips are plain. Local chips get a small × button. "+ Add Synonym" opens an inline input, Enter adds, Esc closes. Every change sends the whole local list as `meaning_synonyms`. On error the list goes back and a toast shows the message. A synonym already in either list is not added twice.
-- Cards pass these props. `mergeStudyMaterial` is not needed on the client, the two components compute the shown value from their props.
+- `UserSynonymsRow` props: `subjectId`, `wanikaniSynonyms: string[]`, `localStudyMaterial: LocalStudyMaterial | null`. The local list comes from the store. WaniKani chips are plain. Local chips get a small × button, and a local word WaniKani also has is shown once, without the button. "+ Add Synonym" opens an inline input, Enter adds, Esc closes. Every change sends the whole local list as `meaning_synonyms`, built from the confirmed list. On error the list goes back and a toast shows the message. A synonym already in either list is not added twice.
+- Cards pass these props. `mergeStudyMaterial` is not needed on the client, the two components compute the shown value from their props and the store.
 
 ## Implementation Steps
 

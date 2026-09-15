@@ -361,6 +361,8 @@ h2 {
   padding: 8px;
   background: #fffde7;
   border-radius: 4px;
+  /* a note field holds raw line breaks */
+  white-space: pre-wrap;
 }
 
 /* Extra margin to visually balance the space above the button,

@@ -43,7 +43,7 @@ export function NoteSection({
     try {
       await saveLocalStudyMaterial({
         subjectId,
-        current: record,
+        fromServer: localStudyMaterial,
         patch: { [field]: draft.trim() },
       });
     } catch (err) {
