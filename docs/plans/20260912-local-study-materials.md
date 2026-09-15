@@ -50,8 +50,8 @@ Add own meaning notes, reading notes and user synonyms for radicals, kanji, voca
 - **unit tests**: `bun:test`, next to the source in `__tests__/`. Required for every task.
 - **integration tests**: the project has API E2E tests in `src/server/__tests__/` that call `api.request()` with the fetch interceptor. This change adds create, update and delete behavior, so the new `api.study-materials.test.ts` must cover all three: create an entry, update one field of an existing entry, clear a field, remove the last field (entry deleted). Each case snapshots the written JSON from `writeCalls` and the response body.
 - **existing snapshots**: four files change in Task 2, because every snapshotted subject gains `localStudyMaterial`: `api.search.test.ts.snap` (13 subjects) and the three repository snapshots `radical.test.ts.snap`, `kanji.test.ts.snap`, `vocabulary.test.ts.snap`. `api.add-to-anki.test.ts.snap` changes in Task 3 only, in the 毎晩 note fields. Update each file on its own, never with a bare `bun test --update-snapshots`.
-- **client tests**: components render with `renderToStaticMarkup`, so only view states are tested. The api layer test uses `createFetchMock`.
-- **no UI e2e framework** in the project. Manual browser checks are listed under Post-Completion.
+- **client tests**: the editor and card tests mount into a real DOM and act on it. `src/test/dom.ts` installs one shared happy-dom window from the preload, `src/test/render.ts` mounts with `createRoot` and sends real click, input and keydown events, and `src/test/api-mock.ts` answers the saves. They cover add, edit, clear, cancel, a failed save, a second edit while the first save is open, and two cards of one subject. Plain view states still render with `renderToStaticMarkup`. The api layer test uses `createFetchMock`.
+- **no UI e2e framework** in the project, so nothing drives a real browser. The manual browser checks under Post-Completion were skipped in this run. The DOM tests cover the same flows.
 - **data dependency**: the 川 and アメリカ人 tests read the real `study_materials.json`. If the WaniKani note or synonym changes after a re-download, those snapshots change too. That is the same class of dependency the other search tests already have.
 
 ## Progress Tracking
@@ -143,7 +143,8 @@ export type MergedStudyMaterial = {
 - Fixture content: `"658"` (校) reading_note; `"3766"` (毎晩) meaning_note and one synonym; `"958"` (晩) meaning_note and reading_note; `"1"` (一) meaning_note and one synonym, both read by the add-to-anki radical test; `"456"` (川) reading_note that overrides "Kawai"; `"2478"` (アメリカ人) one synonym next to "usa person".
 - ➕ `src/test/study-material-fixture.ts` holds the setup every writing test file repeats: `loadStudyMaterialFixture()`, `resetStudyMaterialState()` for `beforeEach` and `afterEach`, `setStudyMaterialFile(file)` for a hand edit, and `lastWrite()`.
 - ➕ `src/test/api-mock.ts` answers the study material saves of the card editors, so a component test needs no server. `answerLater(id, data)` and `failLater(id, message)` hold a request open until the test resolves it, which is how the store tests make two saves overlap.
-- ➕ `src/test/render.ts` mounts a component into a real DOM: `mount`, `click`, `typeInto`, `pressKey`, `settle` and `rerender` for a new render with other props.
+- ➕ `src/test/dom.ts` has `installDom()`, which puts one shared happy-dom window on the globals. The preload calls it at the top, before any test file loads react-dom. react-dom and DOMPurify read the DOM globals when they are imported, so a later call is too late and `onChange` never fires. A second window would only shadow the first, because `bun test` runs all files in one process.
+- ➕ `src/test/render.ts` mounts a component into that DOM: `mount`, `click`, `typeInto`, `pressKey`, `settle` and `rerender` for a new render with other props.
 
 ### Client
 
@@ -279,6 +280,11 @@ export type MergedStudyMaterial = {
 - Modify: `src/client/components/KanjiCard.tsx`
 - Modify: `src/client/components/VocabularyCard.tsx`
 - Create: `src/client/components/__tests__/NoteSection.test.tsx`
+- ➕ Create: `src/client/hooks/useLocalStudyMaterial.ts` and `src/client/hooks/__tests__/useLocalStudyMaterial.test.tsx`
+- ➕ Create: `src/client/utils/study-material-props.ts`, which builds the editor props from a subject
+- ➕ Create: `src/client/components/card-components/IconButton.tsx`, the shared icon button of both editors
+- ➕ Modify: `src/client/components/SearchResult.tsx`, a `key` with the subject id on the top card, so a new search does not keep the old editor state
+- ➕ Create: `src/client/components/__tests__/RadicalCard.test.tsx` and `src/client/components/__tests__/KanjiCard.test.tsx`
 
 - [x] rewrite `NoteSection` with the props, state and behavior from Technical Details, icons `PencilEdit01Icon`, `CheckmarkCircle01Icon`, `Cancel01Icon`
 - [x] thread `subjectId`, `field`, `wanikaniNote`, `localNote` through the three cards, including `MnemonicBlock` in the kanji card and the meaning and reading sections in the vocabulary card
@@ -295,6 +301,8 @@ export type MergedStudyMaterial = {
 - Modify: `src/client/components/KanjiCard.tsx`
 - Modify: `src/client/components/VocabularyCard.tsx`
 - Create: `src/client/components/__tests__/UserSynonymsRow.test.tsx`
+- ➕ Modify: `src/client/hooks/useLocalStudyMaterial.ts`, `src/client/utils/study-material-props.ts` (`synonymProps`) and `src/client/components/card-components/IconButton.tsx`, all shared with Task 7
+- ➕ Modify: the radical and kanji card tests. The radical one saves a synonym under the radical id, the kanji one checks the "not in Anki" hint
 
 - [x] rewrite `UserSynonymsRow` with the props, state and behavior from Technical Details
 - [x] thread `subjectId`, `wanikaniSynonyms`, `localSynonyms` through the three cards
