@@ -1,5 +1,9 @@
 import { describe, expect, it } from "bun:test";
-import { mergeStudyMaterial } from "../subject-utils.ts";
+import {
+  applyLocalStudyMaterialPatch,
+  findStudyMaterial,
+  mergeStudyMaterial,
+} from "../subject-utils.ts";
 import type { StudyMaterial, StudyMaterialData } from "../wanikani.ts";
 
 function studyMaterial(data: Partial<StudyMaterialData>): StudyMaterial {
@@ -89,5 +93,80 @@ describe("mergeStudyMaterial", () => {
       "american",
       "yankee",
     ]);
+  });
+
+  it("takes a partial local record over a full WaniKani one", () => {
+    const wanikani = studyMaterial({
+      meaning_note: "river bank",
+      reading_note: "Kawai",
+      meaning_synonyms: ["stream"],
+    });
+
+    expect(mergeStudyMaterial(wanikani, { meaning_synonyms: ["brook"] })).toEqual({
+      meaningNote: "river bank",
+      readingNote: "Kawai",
+      meaningSynonyms: ["stream", "brook"],
+    });
+    expect(mergeStudyMaterial(wanikani, { reading_note: "my reading" })).toEqual({
+      meaningNote: "river bank",
+      readingNote: "my reading",
+      meaningSynonyms: ["stream"],
+    });
+  });
+});
+
+describe("findStudyMaterial", () => {
+  const kanjiRecord = studyMaterial({ subject_id: 9176, subject_type: "kanji" });
+  const kanaRecord = studyMaterial({ subject_id: 9176, subject_type: "kana_vocabulary" });
+
+  it("matches on the subject type, not only on the id", () => {
+    const records = [kanjiRecord, kanaRecord];
+
+    expect(findStudyMaterial(records, 9176, "kana_vocabulary")).toBe(kanaRecord);
+    expect(findStudyMaterial(records, 9176, "kanji")).toBe(kanjiRecord);
+    expect(findStudyMaterial(records, 9176, "vocabulary")).toBeNull();
+  });
+});
+
+describe("applyLocalStudyMaterialPatch", () => {
+  it("keeps the fields the patch does not name", () => {
+    const current = { meaning_note: "mine", meaning_synonyms: ["one"] };
+
+    expect(applyLocalStudyMaterialPatch(current, { reading_note: "reading" })).toEqual({
+      meaning_note: "mine",
+      reading_note: "reading",
+      meaning_synonyms: ["one"],
+    });
+  });
+
+  it("trims the notes and drops blank synonyms", () => {
+    const patch = { meaning_note: "  mine  ", meaning_synonyms: ["", " one ", "  "] };
+
+    expect(applyLocalStudyMaterialPatch(null, patch)).toEqual({
+      meaning_note: "mine",
+      meaning_synonyms: ["one"],
+    });
+  });
+
+  it("cleans a value that is already in the record", () => {
+    const current = { meaning_note: "  ", meaning_synonyms: ["one", "one", " "] };
+
+    expect(applyLocalStudyMaterialPatch(current, { reading_note: "reading" })).toEqual({
+      reading_note: "reading",
+      meaning_synonyms: ["one"],
+    });
+  });
+
+  it("drops a field that the patch empties", () => {
+    const current = { meaning_note: "mine", reading_note: "reading" };
+
+    expect(applyLocalStudyMaterialPatch(current, { reading_note: "" })).toEqual({
+      meaning_note: "mine",
+    });
+  });
+
+  it("returns null when no field is left", () => {
+    expect(applyLocalStudyMaterialPatch({ meaning_note: "mine" }, { meaning_note: "" })).toBeNull();
+    expect(applyLocalStudyMaterialPatch(null, { meaning_synonyms: [] })).toBeNull();
   });
 });

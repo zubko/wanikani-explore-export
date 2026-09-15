@@ -44,7 +44,7 @@ export async function initRepository(): Promise<void> {
     readJson<VocabularyData[]>("./data/userdata/vocabulary.json"),
     readJson<KanaVocabularyData[]>("./data/userdata/kana_vocabulary.json"),
     readJson<StudyMaterial[]>("./data/userdata/study_materials.json"),
-    readJson<Record<string, LocalStudyMaterial>>(LOCAL_STUDY_MATERIALS_PATH),
+    readLocalStudyMaterials(),
     readJson<Record<string, RawVerbConjugations>>("./data/verb_conjugations.json"),
     readJson<Record<string, SentenceReadingEntry>>("./data/sentence_readings.json"),
     createMnemonicImageFetcher(),
@@ -57,4 +57,15 @@ export function setLocalStudyMaterials(next: Record<string, LocalStudyMaterial>)
 
 export async function saveCache(): Promise<void> {
   await imageFetcher.saveIfNeeded();
+}
+
+// No script creates this file, so a fresh checkout has to be told about it
+async function readLocalStudyMaterials(): Promise<Record<string, LocalStudyMaterial>> {
+  try {
+    return await readJson<Record<string, LocalStudyMaterial>>(LOCAL_STUDY_MATERIALS_PATH);
+  } catch (error) {
+    throw new Error(
+      `Cannot read ${LOCAL_STUDY_MATERIALS_PATH}. Create it with {} inside. ${String(error)}`
+    );
+  }
 }

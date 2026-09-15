@@ -26,13 +26,14 @@ src/
       SearchContext.tsx # Navigation context for search
     hooks/              # React hooks
       useSearchUrl.ts   # URL-based search state management
+      useLocalStudyMaterial.ts # Shared store of the saved local notes / synonyms
     utils/              # Client-side utility functions (non-React)
   server/               # Hono backend
     index.ts            # Server entry, middleware setup
     api.ts              # API routes (exports ApiType for client)
     utils/              # Server-side utility functions
     repository/         # Data access layer (singleton, use initRepository() first)
-                        #   study-material.ts: local notes / synonyms, the only writer here
+                        #   study-material.ts: local notes / synonyms, saved with saveJsonAtomic
     services/           # Server services (AnkiConnect integration, Azure TTS)
   config/               # Shared configuration (theme colors)
   utils/                # Shared utility functions (mnemonic-utils)
@@ -46,7 +47,11 @@ src/
     __tests__/          # Unit tests for the pure model helpers
 
   test/                   # Shared test infrastructure
-    preload.ts            # Shared mock.module + repository init (configured in bunfig.toml)
+    preload.ts            # Shared mock.module + repository init + DOM (configured in bunfig.toml)
+    dom.ts                # One happy-dom window on globalThis, installed by the preload
+    render.ts             # mount / click / typeInto / pressKey / settle for component behavior tests
+    api-mock.ts           # Fetch mock for the study material saves of the card editors
+    study-material-fixture.ts # Fixture load and state reset for the local study material tests
     fetch-interceptor.ts  # Fetch mock for API E2E tests (AnkiConnect, WaniKani media/pages)
     fetch-utils.ts        # Shared fetch mock utilities
 
@@ -77,7 +82,7 @@ data/                   # Data files
   userdata/             # User-specific data, gitignored
                         #   Downloaded WaniKani subjects, study materials, mnemonic image cache
                         #   Populated via download scripts
-                        #   study_materials_extra.json: my own notes and synonyms (see below)
+                        #   study_materials_extra.json: my own notes and synonyms, written by the app (see below)
   wanikani-fixes.yaml     # Hand-written corrections for wrong WaniKani API data (see below)
   verb_conjugations.json  # Verb conjugations keyed by vocabulary ID (LLM-generated)
   sentence_readings.json  # Kana readings for context sentences keyed by vocabulary ID (LLM-generated)
@@ -143,19 +148,23 @@ Current contents: seven patches for WaniKani's 2026-08-27 content update, which 
 
 ### Local Study Materials
 
-My own notes and synonyms for any subject. They never touch the WaniKani data.
+My own notes and synonyms for any subject. They never touch the WaniKani data. There is no script for this, the app writes the file.
 
 - The file is `data/userdata/study_materials_extra.json`. It is an object keyed by the subject id as a string. WaniKani subject ids are unique across all types, so the file holds no type. A record has `meaning_note`, `reading_note` and `meaning_synonyms`, all optional.
-- `data-loader.ts` reads it into `localStudyMaterials` in the same `Promise.all` as the other data files. A missing file fails the start, like every other data file. The path is one exported constant, `LOCAL_STUDY_MATERIALS_PATH`. An exported `let` cannot be assigned from another module, so `setLocalStudyMaterials(next)` sits next to it.
+- `data-loader.ts` reads it into `localStudyMaterials` in the same `Promise.all` as the other data files. A missing file fails the start, like every other data file, but with a message that names the file and asks for `{}`. No script creates it, so a fresh clone of the data repo has to write it by hand. The path is one exported constant, `LOCAL_STUDY_MATERIALS_PATH`. An exported `let` cannot be assigned from another module, so `setLocalStudyMaterials(next)` sits next to it.
 - Every enriched subject carries two records: `studyMaterial` from WaniKani and `localStudyMaterial` from this file. The server sends both. `mergeStudyMaterial(wanikani, local)` in `src/model/subject-utils.ts` joins them: a local note replaces the WaniKani note, local synonyms are appended to the WaniKani ones and duplicates are dropped.
 - The client gets both records on purpose. Local synonyms need a remove button, and clearing a local note must show the WaniKani note again with no re-fetch.
-- The three Anki note builders in `src/server/services/anki-connect.ts` call the same helper, so the deck and the screen agree. Kanji synonyms are the one exception: the kanji note type has no `user_synonyms` field, so they stay on screen only.
+- The three Anki note builders in `src/server/services/anki-connect.ts` call the same helper, so a note built now holds the merged values. A note that is already in the deck keeps its old text until the next `add-to-anki` or `bun run sync-anki-notes`. Kanji synonyms are the one exception: the kanji note type has no `user_synonyms` field, so they stay on screen only. `KanjiCard` says "not in Anki" next to the synonym row.
 - `MergedStudyMaterial` uses camelCase, because it is our own computed shape, like `meaningMnemonic`. `LocalStudyMaterial` stays snake_case, because it mirrors the WaniKani record field by field. Do not "fix" one to match the other.
+- `applyLocalStudyMaterialPatch(current, patch)` in `src/model/subject-utils.ts` is the one place that merges a patch into a record. The server writes its result, the client shows it while the request runs. It trims the notes, drops blank and repeated synonyms, deletes a field that ends up empty and returns `null` when no field is left. It cleans the whole merged record, not only the patched fields, so the file never holds an empty string, an empty list or an empty entry.
 - `upsertLocalStudyMaterial` in `src/server/repository/study-material.ts` writes the whole object with `saveJsonAtomic` from `src/server/utils/json-utils.ts` (write `<path>.tmp`, rename it over the real file, unlink the temp file when a step throws), then publishes it with `setLocalStudyMaterials`. A failed write leaves both the file and the memory unchanged.
-- Notes are trimmed and blank synonyms are dropped before the write. A field that ends up empty is deleted, and a record with no field left is dropped from the object. So the file never holds an empty string, an empty list or an empty entry.
-- Every upsert runs in one module-level promise queue. Two saves at the same time would otherwise start from the same old object, and one change would be lost. The caller's promise stays out of the chain (`const run = queue.then(step); queue = run.catch(() => {}); return run;`), so the caller sees the error and the next save still starts from the last good state.
+- `saveJsonAtomic` exists twice, here and in `scripts/lib/llm-utils.ts`. The scripts must not import from `src/server/`, so the copy stays on purpose. Change both when you change one.
+- Every upsert runs in one module-level promise queue. Two saves at the same time would otherwise start from the same old object, and one change would be lost. The caller's promise stays out of the chain (`const run = queue.then(step); queue = run.catch(() => {}); return run;`). So the caller sees the error, and the next save still starts from the last good state.
 - `findSubjectTypeById(id)` scans the four subject arrays. The route calls it before the write, because a `reading_note` for a radical or for kana vocabulary is a 400. The upsert itself trusts the id.
 - The web UI edits the values in place. `NoteSection.tsx` has a pencil button and a textarea, Esc cancels and Cmd+Enter saves. `UserSynonymsRow.tsx` has an inline input and a small × on every local chip. Both are optimistic: they show the new value at once, send the patch, and on an error put the old value back and show a `toast.error`.
+- One subject can render on several cards at once. A radical under two kanji of one word gets one card per kanji. So the saved records live in one module-level store, `src/client/hooks/useLocalStudyMaterial.ts`, and not in the components. Per-card state would let one card send a synonym list that the other card never saw, and the whole-list write would drop the other card's word. A card reads the store first and falls back to the record the server sent.
+- `SearchResult.tsx` gives the three top-level cards a `key` with the subject id. Without it React reuses the same component instance on a new search, and the open editor would keep the draft of the last subject. The nested cards already sit in keyed wrappers.
+- `noteProps(subject, field)` and `synonymProps(subject)` in `src/client/utils/study-material-props.ts` build the editor props. The cards never pick the fields apart by hand, so a `reading_note` editor cannot end up with a `meaning_note` value.
 - Kana vocabulary has no card of its own. `SearchResult.tsx` sends it to `VocabularyCard`, which hides the reading section for it, so it gets a meaning note editor only.
 - A new download of `study_materials.json` keeps these values, they live in their own file.
 
@@ -440,12 +449,14 @@ gh issue close <number>          # Close an issue
 - Preload handles `mock.module("fs/promises")` (real readFile, mock writeFile) and lazy repository init — Bun's `mock.module()` is process-global, so it must live in one place
 - The preload redirects reads of `mnemonic-images.json` and `study_materials_extra.json` to `src/test/fixtures/`, so no test depends on my own data
 - The `fs/promises` mock also has `rename` and `unlink`, so an atomic save shows up in `writeCalls` under the real path: `writeFile` records the `.tmp` path, `rename` moves that entry to the real path, `unlink` drops it. A failed save leaves no `.tmp` entry behind
-- `setFsError(op, err)` makes the mocked `writeFile` or `rename` throw. It is the only way to test a failed write, because `mock.module` is process-global and set once. `resetWriteCalls()` clears it again
+- `setFsError(op, err)` makes the mocked `writeFile`, `rename` or `unlink` throw. It is the only way to test a failed write, because `mock.module` is process-global and set once. `resetWriteCalls()` clears it again
 - `bun test` runs every file in one process, so module-level state survives a file. A file that changes `localStudyMaterials` or `writeCalls` resets them in `afterEach` too, not only in `beforeEach`
 - **Repository tests** (`src/server/repository/__tests__/`): test repository functions directly, use a simple fetch mock from `setup.ts`
 - **Script unit tests** (`scripts/lib/__tests__/`): test the pure script helpers directly, no mock needed
 - **API E2E tests** (`src/server/__tests__/`): test full API through `api.request()` (Hono handles directly, no HTTP server), use `src/test/fetch-interceptor.ts` which routes by URL pattern (AnkiConnect, WaniKani SVGs/audio/pages)
-- **Client tests** (`src/client/**/__tests__/`): the api layer installs its own `createFetchMock` from `src/test/fetch-utils.ts`. A component is rendered with `renderToStaticMarkup` from `react-dom/server`, which needs no DOM and no extra dependency
+- The preload also calls `installDom()` from `src/test/dom.ts`, which puts one happy-dom window on `globalThis`. It must run before any test file imports `react-dom`: react-dom reads the DOM globals when it loads, and without them its change events never reach `onChange`
+- **Client tests** (`src/client/**/__tests__/`): the api layer installs its own `createFetchMock` from `src/test/fetch-utils.ts`. A view state is checked with `renderToStaticMarkup` from `react-dom/server`. For behavior, `src/test/render.ts` has `mount`, `click`, `typeInto`, `pressKey` and `settle`: it renders with `createRoot`, dispatches real DOM events inside `flushSync`, and `settle()` awaits the save. `src/test/api-mock.ts` answers the study material saves. A card test must wrap the card in a `SearchContext.Provider`, because `RelatedSubjectsSection` throws without one
+- `src/test/study-material-fixture.ts` holds the fixture path, `lastWrite()` and `resetStudyMaterialState()` for every file that writes local study materials
 - Each test type installs its own fetch mock at file top level — no conflict between them
 - The preload also replaces `Math.random` with one seeded generator shared by the whole run, and exports `resetRandom()`. Each vocabulary add consumes two values (voice gender, sentence voice), so a test file that snapshots audio fields must call `resetRandom()` in `beforeEach`. Then test order does not matter and a single test can run alone
 

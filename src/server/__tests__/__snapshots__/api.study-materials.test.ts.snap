@@ -13,6 +13,9 @@ exports[`study-materials API upsert creates an entry for a subject with no local
 {
   "1": {
     "meaning_note": "One flat line on the ground",
+    "meaning_synonyms": [
+      "flat ground",
+    ],
   },
   "2478": {
     "meaning_synonyms": [
@@ -55,6 +58,9 @@ exports[`study-materials API upsert updates one field and keeps the others: file
 {
   "1": {
     "meaning_note": "One flat line on the ground",
+    "meaning_synonyms": [
+      "flat ground",
+    ],
   },
   "2478": {
     "meaning_synonyms": [
@@ -96,6 +102,9 @@ exports[`study-materials API upsert adds a synonym next to the WaniKani one: fil
 {
   "1": {
     "meaning_note": "One flat line on the ground",
+    "meaning_synonyms": [
+      "flat ground",
+    ],
   },
   "2478": {
     "meaning_synonyms": [
@@ -135,6 +144,9 @@ exports[`study-materials API upsert an empty string clears one note: file 1`] = 
 {
   "1": {
     "meaning_note": "One flat line on the ground",
+    "meaning_synonyms": [
+      "flat ground",
+    ],
   },
   "2478": {
     "meaning_synonyms": [
@@ -163,6 +175,9 @@ exports[`study-materials API upsert clearing the last field removes the entry: f
 {
   "1": {
     "meaning_note": "One flat line on the ground",
+    "meaning_synonyms": [
+      "flat ground",
+    ],
   },
   "2478": {
     "meaning_synonyms": [

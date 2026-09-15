@@ -1,32 +1,18 @@
 import { describe, test, expect, beforeAll, beforeEach, afterEach } from "bun:test";
 import type { LocalStudyMaterial } from "@/model/wanikani.ts";
-import { writeCalls, resetWriteCalls, setFsError } from "@/test/preload.ts";
-import { readJson } from "@server/utils/json-utils.ts";
+import { writeCalls, setFsError } from "@/test/preload.ts";
 import {
-  localStudyMaterials,
-  setLocalStudyMaterials,
-  LOCAL_STUDY_MATERIALS_PATH,
-} from "../data-loader.ts";
+  lastWrite,
+  loadStudyMaterialFixture,
+  resetStudyMaterialState,
+  studyMaterialFixture as fixture,
+} from "@/test/study-material-fixture.ts";
+import { localStudyMaterials, LOCAL_STUDY_MATERIALS_PATH } from "../data-loader.ts";
 import { getKanji } from "../kanji.ts";
 import { findSubjectTypeById, upsertLocalStudyMaterial } from "../study-material.ts";
 import { ensureRepositoryInitialized, installFetchMock } from "./setup.ts";
 
 installFetchMock();
-
-const FIXTURE_PATH = "src/test/fixtures/study_materials_extra.json";
-
-let fixture: Record<string, LocalStudyMaterial>;
-
-function lastWrite(): Record<string, LocalStudyMaterial> {
-  const call = writeCalls.at(-1);
-  if (!call) throw new Error("no write recorded");
-  return JSON.parse(call.data) as Record<string, LocalStudyMaterial>;
-}
-
-function resetState() {
-  resetWriteCalls();
-  setLocalStudyMaterials(structuredClone(fixture));
-}
 
 function expectNoBlankValues(file: Record<string, LocalStudyMaterial>) {
   for (const record of Object.values(file)) {
@@ -44,11 +30,11 @@ function expectNoBlankValues(file: Record<string, LocalStudyMaterial>) {
 
 beforeAll(async () => {
   await ensureRepositoryInitialized();
-  fixture = await readJson<Record<string, LocalStudyMaterial>>(FIXTURE_PATH);
+  await loadStudyMaterialFixture();
 });
 
-beforeEach(resetState);
-afterEach(resetState);
+beforeEach(resetStudyMaterialState);
+afterEach(resetStudyMaterialState);
 
 describe("findSubjectTypeById", () => {
   test("finds each subject type", () => {
@@ -179,8 +165,8 @@ describe("upsertLocalStudyMaterial write failures", () => {
 
     const saved = await upsertLocalStudyMaterial(1, { meaning_note: "New note" });
 
-    expect(saved).toEqual({ meaning_note: "New note" });
-    expect(lastWrite()["1"]).toEqual({ meaning_note: "New note" });
+    expect(saved).toEqual({ meaning_note: "New note", meaning_synonyms: ["flat ground"] });
+    expect(lastWrite()["1"]).toEqual(saved!);
   });
 });
 
@@ -191,7 +177,7 @@ describe("upsertLocalStudyMaterial queue", () => {
     await Promise.all([first, second]);
 
     const file = lastWrite();
-    expect(file["1"]).toEqual({ meaning_note: "First" });
+    expect(file["1"]!.meaning_note).toBe("First");
     expect(file["2484"]).toEqual({ meaning_note: "Second" });
   });
 
@@ -200,6 +186,10 @@ describe("upsertLocalStudyMaterial queue", () => {
     const second = upsertLocalStudyMaterial(1, { reading_note: "Second" });
     await Promise.all([first, second]);
 
-    expect(lastWrite()["1"]).toEqual({ meaning_note: "First", reading_note: "Second" });
+    expect(lastWrite()["1"]).toEqual({
+      meaning_note: "First",
+      reading_note: "Second",
+      meaning_synonyms: ["flat ground"],
+    });
   });
 });

@@ -1,4 +1,5 @@
 import type { LocalStudyMaterial, SubjectType } from "@/model/wanikani.ts";
+import { applyLocalStudyMaterialPatch } from "@/model/subject-utils.ts";
 import { saveJsonAtomic } from "@server/utils/json-utils.ts";
 import {
   radicals,
@@ -37,30 +38,11 @@ async function saveLocalStudyMaterial(
 ): Promise<LocalStudyMaterial | null> {
   const key = String(subjectId);
   const next = { ...localStudyMaterials };
-  const record = applyPatch(next[key] ?? {}, patch);
+  const record = applyLocalStudyMaterialPatch(next[key] ?? null, patch);
   if (record) next[key] = record;
   else delete next[key];
 
   await saveJsonAtomic(LOCAL_STUDY_MATERIALS_PATH, next);
   setLocalStudyMaterials(next);
   return record;
-}
-
-function applyPatch(
-  current: LocalStudyMaterial,
-  patch: LocalStudyMaterial
-): LocalStudyMaterial | null {
-  const next: LocalStudyMaterial = {
-    meaning_note: patch.meaning_note?.trim() ?? current.meaning_note,
-    reading_note: patch.reading_note?.trim() ?? current.reading_note,
-    meaning_synonyms: cleanSynonyms(patch.meaning_synonyms) ?? current.meaning_synonyms,
-  };
-  if (!next.meaning_note) delete next.meaning_note;
-  if (!next.reading_note) delete next.reading_note;
-  if (!next.meaning_synonyms?.length) delete next.meaning_synonyms;
-  return Object.keys(next).length > 0 ? next : null;
-}
-
-function cleanSynonyms(synonyms: string[] | undefined): string[] | undefined {
-  return synonyms?.map((item) => item.trim()).filter((item) => item !== "");
 }

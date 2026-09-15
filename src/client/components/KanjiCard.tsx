@@ -16,6 +16,7 @@ import { SectionTitle } from "./card-components/SectionTitle.tsx";
 import { UserSynonymsRow, type UserSynonymsRowProps } from "./card-components/UserSynonymsRow.tsx";
 import { api } from "../api.ts";
 import { formatAnkiResult } from "../utils/format-anki-result.ts";
+import { noteProps, synonymProps } from "../utils/study-material-props.ts";
 
 type KanjiCardProps = {
   kanji: Kanji;
@@ -49,30 +50,16 @@ export function KanjiCard({ kanji }: KanjiCardProps) {
         <RadicalCombinationSection componentRadicals={kanji.componentRadicals} />
         <MeaningSection
           meanings={kanji.meanings}
-          synonyms={{
-            subjectId: kanji.id,
-            wanikaniSynonyms: kanji.studyMaterial?.data.meaning_synonyms ?? [],
-            localSynonyms: kanji.localStudyMaterial?.meaning_synonyms ?? [],
-          }}
+          synonyms={{ ...synonymProps(kanji), hint: "not in Anki" }}
           mnemonic={kanji.meaningMnemonic}
           hint={kanji.meaningHint}
-          note={{
-            subjectId: kanji.id,
-            field: "meaning_note",
-            wanikaniNote: kanji.studyMaterial?.data.meaning_note ?? "",
-            localNote: kanji.localStudyMaterial?.meaning_note ?? null,
-          }}
+          note={noteProps(kanji, "meaning_note")}
         />
         <ReadingsSection
           readings={kanji.readings}
           mnemonic={kanji.readingMnemonic}
           hint={kanji.readingHint}
-          note={{
-            subjectId: kanji.id,
-            field: "reading_note",
-            wanikaniNote: kanji.studyMaterial?.data.reading_note ?? "",
-            localNote: kanji.localStudyMaterial?.reading_note ?? null,
-          }}
+          note={noteProps(kanji, "reading_note")}
         />
         <RelatedSubjectsSection
           title="Visually Similar Kanji"
@@ -158,7 +145,7 @@ function MeaningSection({
         {alternativeMeanings.length > 0 && (
           <LabeledRow label="Alternative" value={alternativeMeanings.join(", ")} />
         )}
-        <UserSynonymsRow key={`${synonyms.subjectId}-synonyms`} {...synonyms} />
+        <UserSynonymsRow {...synonyms} />
         <MnemonicBlock mnemonic={mnemonic} hint={hint} note={note} />
       </div>
     </div>
@@ -229,7 +216,7 @@ function MnemonicBlock({
         <MnemonicText html={mnemonic} />
       </div>
       {hint && <HintBox hint={hint} />}
-      <NoteSection key={`${note.subjectId}-${note.field}`} {...note} />
+      <NoteSection {...note} />
     </>
   );
 }

@@ -1,50 +1,30 @@
 import { describe, test, expect, beforeAll, beforeEach, afterEach } from "bun:test";
-import type { LocalStudyMaterial } from "@/model/wanikani.ts";
+import { ensureRepositoryInitialized, writeCalls, setFsError } from "@/test/preload.ts";
 import {
-  ensureRepositoryInitialized,
-  writeCalls,
-  resetWriteCalls,
-  setFsError,
-} from "@/test/preload.ts";
-import { readJson } from "@server/utils/json-utils.ts";
-import { localStudyMaterials, setLocalStudyMaterials } from "../repository/data-loader.ts";
+  lastWrite,
+  loadStudyMaterialFixture,
+  resetStudyMaterialState,
+  studyMaterialFixture as fixture,
+} from "@/test/study-material-fixture.ts";
+import { localStudyMaterials, LOCAL_STUDY_MATERIALS_PATH } from "../repository/data-loader.ts";
 import { api } from "../api.ts";
 
-const FIXTURE_PATH = "src/test/fixtures/study_materials_extra.json";
-
-let fixture: Record<string, LocalStudyMaterial>;
-
-async function patchStudyMaterial(body: unknown) {
-  return api.request("/study-materials", {
+async function patchJson(body: unknown, rawBody?: string) {
+  const response = await api.request("/study-materials", {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+    body: rawBody ?? JSON.stringify(body),
   });
-}
-
-async function patchJson(body: unknown) {
-  const response = await patchStudyMaterial(body);
   return { status: response.status, json: await response.json() };
-}
-
-function lastWrite(): Record<string, LocalStudyMaterial> {
-  const call = writeCalls.at(-1);
-  if (!call) throw new Error("no write recorded");
-  return JSON.parse(call.data) as Record<string, LocalStudyMaterial>;
-}
-
-function resetState() {
-  resetWriteCalls();
-  setLocalStudyMaterials(structuredClone(fixture));
 }
 
 beforeAll(async () => {
   await ensureRepositoryInitialized();
-  fixture = await readJson<Record<string, LocalStudyMaterial>>(FIXTURE_PATH);
+  await loadStudyMaterialFixture();
 });
 
-beforeEach(resetState);
-afterEach(resetState);
+beforeEach(resetStudyMaterialState);
+afterEach(resetStudyMaterialState);
 
 describe("study-materials API validation", () => {
   test("missing id returns 400", async () => {
@@ -60,8 +40,25 @@ describe("study-materials API validation", () => {
   });
 
   test("a fractional id returns 400", async () => {
-    const { status } = await patchJson({ id: 1.5, meaning_note: "Note" });
+    const { status, json } = await patchJson({ id: 1.5, meaning_note: "Note" });
     expect(status).toBe(400);
+    expect(json).toEqual({ ok: false, error: "Invalid id: must be an integer" });
+  });
+
+  test("a body that is not a JSON object returns 400", async () => {
+    for (const rawBody of ["", "null", "[1]", '"text"']) {
+      const { status, json } = await patchJson(null, rawBody);
+      expect(status).toBe(400);
+      expect(json).toEqual({ ok: false, error: "Invalid body: must be a JSON object" });
+    }
+    expect(writeCalls).toHaveLength(0);
+  });
+
+  test("an empty field name returns 400", async () => {
+    const { status, json } = await patchJson({ id: 1, "": "Note" });
+    expect(status).toBe(400);
+    expect(json).toEqual({ ok: false, error: "Invalid field: " });
+    expect(writeCalls).toHaveLength(0);
   });
 
   test("no field besides id returns 400", async () => {
@@ -146,6 +143,17 @@ describe("study-materials API validation", () => {
     expect(localStudyMaterials["1"]).toEqual(fixture["1"]!);
     expect(writeCalls).toHaveLength(0);
   });
+
+  test("a rename error returns 500 and keeps the memory state", async () => {
+    setFsError("rename", new Error("rename failed"));
+
+    const { status, json } = await patchJson({ id: 1, meaning_note: "New note" });
+
+    expect(status).toBe(500);
+    expect(json).toEqual({ ok: false, error: "rename failed" });
+    expect(localStudyMaterials["1"]).toEqual(fixture["1"]!);
+    expect(writeCalls).toHaveLength(0);
+  });
 });
 
 describe("study-materials API upsert", () => {
@@ -190,10 +198,22 @@ describe("study-materials API upsert", () => {
     expect(lastWrite()).toMatchSnapshot("file");
   });
 
+  test("two requests at the same time both land in the file", async () => {
+    const [first, second] = await Promise.all([
+      patchJson({ id: 1, meaning_note: "First" }),
+      patchJson({ id: 2484, meaning_note: "Second" }),
+    ]);
+
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    expect(lastWrite()["1"]!.meaning_note).toBe("First");
+    expect(lastWrite()["2484"]).toEqual({ meaning_note: "Second" });
+  });
+
   test("the saved file lands under the real path", async () => {
     await patchJson({ id: 1, meaning_note: "One line" });
 
     expect(writeCalls).toHaveLength(1);
-    expect(writeCalls[0]!.path).toBe("./data/userdata/study_materials_extra.json");
+    expect(writeCalls[0]!.path).toBe(LOCAL_STUDY_MATERIALS_PATH);
   });
 });

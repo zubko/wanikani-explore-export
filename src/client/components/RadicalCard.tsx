@@ -12,6 +12,7 @@ import { MnemonicText } from "./card-components/MnemonicText.tsx";
 import { NoteSection } from "./card-components/NoteSection.tsx";
 import { RelatedSubjectsSection } from "./card-components/RelatedSubjectsSection.tsx";
 import { UserSynonymsRow, type UserSynonymsRowProps } from "./card-components/UserSynonymsRow.tsx";
+import { noteProps, synonymProps } from "../utils/study-material-props.ts";
 
 type RadicalCardProps = {
   radical: Radical;
@@ -41,23 +42,10 @@ export function RadicalCard({ radical }: RadicalCardProps) {
         actions={<AddToAnkiButton onClick={handleAddToAnki} />}
       />
       <div className="divide-y divide-gray-200">
-        <NameSection
-          meanings={radical.meanings}
-          synonyms={{
-            subjectId: radical.id,
-            wanikaniSynonyms: radical.studyMaterial?.data.meaning_synonyms ?? [],
-            localSynonyms: radical.localStudyMaterial?.meaning_synonyms ?? [],
-          }}
-        />
+        <NameSection meanings={radical.meanings} synonyms={synonymProps(radical)} />
         <MnemonicSection mnemonic={radical.meaningMnemonic} imageUrl={radical.mnemonicImageUrl} />
         <div className="p-4">
-          <NoteSection
-            key={`${radical.id}-meaning_note`}
-            subjectId={radical.id}
-            field="meaning_note"
-            wanikaniNote={radical.studyMaterial?.data.meaning_note ?? ""}
-            localNote={radical.localStudyMaterial?.meaning_note ?? null}
-          />
+          <NoteSection {...noteProps(radical, "meaning_note")} />
         </div>
         <RelatedSubjectsSection
           title="Found In Kanji"
@@ -90,7 +78,7 @@ function NameSection({
         {alternativeMeanings.length > 0 && (
           <LabeledRow label="Alternative" value={alternativeMeanings.join(", ")} />
         )}
-        <UserSynonymsRow key={`${synonyms.subjectId}-synonyms`} {...synonyms} />
+        <UserSynonymsRow {...synonyms} />
       </div>
     </div>
   );

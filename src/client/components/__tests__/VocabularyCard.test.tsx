@@ -1,24 +1,7 @@
 import { describe, expect, it } from "bun:test";
-import { Window } from "happy-dom";
+import { renderToStaticMarkup } from "react-dom/server";
 import type { KanaVocabulary, Vocabulary } from "@/model/wanikani.ts";
-
-// MnemonicText sanitizes with DOMPurify, which needs a DOM to load
-const window = new Window();
-Object.assign(globalThis, {
-  window,
-  document: window.document,
-  DocumentFragment: window.DocumentFragment,
-  HTMLTemplateElement: window.HTMLTemplateElement,
-  Node: window.Node,
-  Element: window.Element,
-  NodeFilter: window.NodeFilter,
-  NamedNodeMap: window.NamedNodeMap,
-  HTMLFormElement: window.HTMLFormElement,
-  DOMParser: window.DOMParser,
-});
-
-const { renderToStaticMarkup } = await import("react-dom/server");
-const { VocabularyCard } = await import("@client/components/VocabularyCard.tsx");
+import { VocabularyCard } from "@client/components/VocabularyCard.tsx";
 
 const kanaVocabulary: KanaVocabulary = {
   object: "kana_vocabulary",

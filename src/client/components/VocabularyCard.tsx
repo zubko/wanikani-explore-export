@@ -22,6 +22,7 @@ import { SubjectTile } from "./card-components/SubjectTile.tsx";
 import { UserSynonymsRow, type UserSynonymsRowProps } from "./card-components/UserSynonymsRow.tsx";
 import { api } from "../api.ts";
 import { formatAnkiResult } from "../utils/format-anki-result.ts";
+import { noteProps, synonymProps } from "../utils/study-material-props.ts";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { VolumeHighIcon } from "@hugeicons/core-free-icons";
 
@@ -59,32 +60,18 @@ export function VocabularyCard({ vocabulary }: VocabularyCardProps) {
         {vocabData && <KanjiCompositionSection componentKanji={vocabData.componentKanji} />}
         <MeaningSection
           meanings={vocabulary.meanings}
-          synonyms={{
-            subjectId: vocabulary.id,
-            wanikaniSynonyms: vocabulary.studyMaterial?.data.meaning_synonyms ?? [],
-            localSynonyms: vocabulary.localStudyMaterial?.meaning_synonyms ?? [],
-          }}
+          synonyms={synonymProps(vocabulary)}
           partsOfSpeech={vocabulary.partsOfSpeech}
           conjugations={vocabData?.conjugations ?? null}
           mnemonic={vocabulary.meaningMnemonic}
-          note={{
-            subjectId: vocabulary.id,
-            field: "meaning_note",
-            wanikaniNote: vocabulary.studyMaterial?.data.meaning_note ?? "",
-            localNote: vocabulary.localStudyMaterial?.meaning_note ?? null,
-          }}
+          note={noteProps(vocabulary, "meaning_note")}
         />
         {vocabData && (
           <ReadingSection
             readings={vocabData.readings}
             audios={vocabulary.pronunciationAudios}
             mnemonic={vocabData.readingMnemonic}
-            note={{
-              subjectId: vocabulary.id,
-              field: "reading_note",
-              wanikaniNote: vocabulary.studyMaterial?.data.reading_note ?? "",
-              localNote: vocabulary.localStudyMaterial?.reading_note ?? null,
-            }}
+            note={noteProps(vocabulary, "reading_note")}
           />
         )}
         <ContextSentencesSection sentences={vocabulary.contextSentences} />
@@ -121,11 +108,11 @@ function MeaningSection({
         {alternativeMeanings.length > 0 && (
           <LabeledRow label="Alternative" value={alternativeMeanings.join(", ")} />
         )}
-        <UserSynonymsRow key={`${synonyms.subjectId}-synonyms`} {...synonyms} />
+        <UserSynonymsRow {...synonyms} />
         <LabeledRow label="Word Type" value={partsOfSpeech.join(", ")} />
         {conjugations && <ConjugationsRow conjugations={conjugations} />}
         <ExplanationBlock mnemonic={mnemonic} />
-        <NoteSection key={`${note.subjectId}-${note.field}`} {...note} />
+        <NoteSection {...note} />
       </div>
     </div>
   );
@@ -151,7 +138,7 @@ function ReadingSection({
         <p className="text-2xl">{primaryReading}</p>
         <AudioButtons audios={audios} />
         <ExplanationBlock mnemonic={mnemonic} />
-        <NoteSection key={`${note.subjectId}-${note.field}`} {...note} />
+        <NoteSection {...note} />
       </div>
     </div>
   );

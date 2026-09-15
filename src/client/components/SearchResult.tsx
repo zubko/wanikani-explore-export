@@ -46,12 +46,12 @@ export function SearchResult({ type, result, onRetry }: SearchResultProps) {
 
   switch (type) {
     case "radicals":
-      return <RadicalCard radical={result.item as Radical} />;
+      return <RadicalCard key={result.item.id} radical={result.item as Radical} />;
     case "kanji": {
       const kanji = result.item as Kanji;
       return (
         <div className="space-y-3">
-          <KanjiCard kanji={kanji} />
+          <KanjiCard key={kanji.id} kanji={kanji} />
           {kanji.componentRadicals.map((radical) => (
             <div key={radical.id} id={`radical-${radical.id}`} className="ml-3">
               <RadicalCard radical={radical} />
@@ -66,7 +66,7 @@ export function SearchResult({ type, result, onRetry }: SearchResultProps) {
         vocabulary.object === "vocabulary" ? (vocabulary as Vocabulary).componentKanji : [];
       return (
         <div className="space-y-3">
-          <VocabularyCard vocabulary={vocabulary} />
+          <VocabularyCard key={vocabulary.id} vocabulary={vocabulary} />
           {componentKanji.map((kanjiItem) => (
             <Fragment key={kanjiItem.id}>
               <div id={`kanji-${kanjiItem.id}`} className="ml-3">

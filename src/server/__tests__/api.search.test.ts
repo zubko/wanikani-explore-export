@@ -83,6 +83,10 @@ describe("search API", () => {
     const result = await searchJson("type=kanji&q=川");
     expect(result.found).toBe(true);
     expect(result.data.characters).toBe("川");
+    expect(result.data.studyMaterial.data.reading_note).toBe("Kawai");
+    expect(result.data.localStudyMaterial).toEqual({
+      reading_note: "Kawa like a river bank",
+    });
     expect(result.data).toMatchSnapshot();
   });
 
@@ -90,6 +94,8 @@ describe("search API", () => {
     const result = await searchJson("type=vocabulary&q=アメリカ人");
     expect(result.found).toBe(true);
     expect(result.data.characters).toBe("アメリカ人");
+    expect(result.data.studyMaterial.data.meaning_synonyms).toEqual(["usa person"]);
+    expect(result.data.localStudyMaterial).toEqual({ meaning_synonyms: ["american"] });
     expect(result.data).toMatchSnapshot();
   });
 

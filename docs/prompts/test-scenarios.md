@@ -59,6 +59,7 @@ Edited in place on every card. The values are stored in `data/userdata/study_mat
 - Add a synonym that is already there, a local one or a WaniKani one (`アメリカ人` has "usa person"): a toast says it is already a synonym and the list does not change
 - Click the × on a local chip: the chip goes away. WaniKani chips have no × and cannot be removed
 - Edit a note on a kanji card shown under a vocabulary word, then search that kanji on its own: the note is there
+- Search a word whose two kanji share a radical (`一万`, `毎年`, `土地`): the radical gets one card under each kanji. Add a synonym on the first card, then add another one on the second card. Both cards show both words, and nothing is lost
 - Stop the dev server, then save a note: a red toast shows the fetch error and the editor opens again with the text. Cancel after that shows the last saved value, not the draft
 - Run "Add to Anki" for a word with a local note and a local synonym, then check the fields in Anki. Kanji synonyms are the one thing that does not reach Anki, the kanji note type has no field for them
 

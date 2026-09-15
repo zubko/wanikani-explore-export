@@ -69,7 +69,7 @@ Add own meaning notes, reading notes and user synonyms for radicals, kanji, voca
 - All upserts go through one promise queue, so two overlapping saves cannot start from the same old state and drop each other's change.
 - The endpoint is fixed to study materials. A generic "extras" router is not built. The file-level upsert can be extracted when a second kind arrives.
 - `MergedStudyMaterial` uses camelCase on purpose. It is our own computed shape, like the enriched subject fields (`meaningMnemonic`). `LocalStudyMaterial` stays snake_case because it mirrors the WaniKani record field by field. Do not "fix" one to match the other.
-- Editors keep their own state. A radical that appears under two kanji of one word renders two cards, and an edit in one does not reach the other. Accepted.
+- ➕ The saved records live in one module-level client store (`src/client/hooks/useLocalStudyMaterial.ts`), not in the editors. A radical that appears under two kanji of one word renders two cards, and each save sends the whole synonym list, so per-editor state would let one card drop the other card's word.
 
 ## Technical Details
 

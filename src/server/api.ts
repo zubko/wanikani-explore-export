@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import type { Context } from "hono";
 import { isSubjectType } from "@/model/wanikani.ts";
 import type {
   AnkiAddResult,
@@ -71,29 +72,35 @@ async function addSubjectToAnki(id: number, type: SubjectType): Promise<AnkiAddR
   throw new Error(`Unknown subject type: ${type}`);
 }
 
-function validateStudyMaterialPatch(body: Record<string, unknown>): string | null {
-  const fields = Object.keys(body).filter((key) => key !== "id");
+function validateStudyMaterialPatch(patch: Record<string, unknown>): string | null {
+  const fields = Object.keys(patch);
   if (fields.length === 0) return "Missing required parameter: at least one field besides id";
 
   const unknown = fields.find(
     (key) => !STUDY_MATERIAL_FIELDS.includes(key as (typeof STUDY_MATERIAL_FIELDS)[number])
   );
-  if (unknown) return `Invalid field: ${unknown}`;
+  if (unknown !== undefined) return `Invalid field: ${unknown}`;
 
   for (const field of STUDY_MATERIAL_NOTE_FIELDS) {
-    if (field in body && typeof body[field] !== "string") {
+    if (field in patch && typeof patch[field] !== "string") {
       return `Invalid ${field}: must be a string`;
     }
   }
 
-  if ("meaning_synonyms" in body) {
-    const value = body.meaning_synonyms;
+  if ("meaning_synonyms" in patch) {
+    const value = patch.meaning_synonyms;
     if (!Array.isArray(value) || value.some((item) => typeof item !== "string")) {
       return "Invalid meaning_synonyms: must be an array of strings";
     }
   }
 
   return null;
+}
+
+async function readJsonObjectBody(c: Context): Promise<Record<string, unknown> | null> {
+  const body = await c.req.json().catch(() => null);
+  if (typeof body !== "object" || body === null || Array.isArray(body)) return null;
+  return body as Record<string, unknown>;
 }
 
 function resolveWkSubject(
@@ -242,14 +249,18 @@ const app = new Hono()
     }
   })
   .patch("/study-materials", async (c) => {
-    const body = await c.req.json<Record<string, unknown>>();
-    const id = body.id;
+    const body = await readJsonObjectBody(c);
+    if (!body) {
+      return c.json({ ok: false as const, error: "Invalid body: must be a JSON object" }, 400);
+    }
 
+    const id = body.id;
     if (typeof id !== "number" || !Number.isInteger(id)) {
       return c.json({ ok: false as const, error: "Invalid id: must be an integer" }, 400);
     }
 
-    const invalid = validateStudyMaterialPatch(body);
+    const patch = Object.fromEntries(Object.entries(body).filter(([key]) => key !== "id"));
+    const invalid = validateStudyMaterialPatch(patch);
     if (invalid) {
       return c.json({ ok: false as const, error: invalid }, 400);
     }
@@ -260,20 +271,17 @@ const app = new Hono()
       return c.json({ ok: false as const, error: "Subject not found" }, 404);
     }
 
-    if ("reading_note" in body && (type === "radical" || type === "kana_vocabulary")) {
+    if ("reading_note" in patch && (type === "radical" || type === "kana_vocabulary")) {
       return c.json(
         { ok: false as const, error: `Invalid reading_note: a ${type} has no reading` },
         400
       );
     }
 
-    const patch = Object.fromEntries(
-      Object.entries(body).filter(([key]) => key !== "id")
-    ) as LocalStudyMaterial;
     console.log(`[API] Study material ${type} id=${id}: ${Object.keys(patch).join(", ")}`);
 
     try {
-      const data = await upsertLocalStudyMaterial(id, patch);
+      const data = await upsertLocalStudyMaterial(id, patch as LocalStudyMaterial);
       console.log(`[API] Study material ${type} id=${id} — ${data ? "saved" : "removed"}`);
       return c.json({ ok: true as const, data });
     } catch (err) {

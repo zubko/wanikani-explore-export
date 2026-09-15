@@ -1,7 +1,11 @@
 import { mock } from "bun:test";
 import { readFile } from "fs/promises";
+import { installDom } from "./dom.ts";
 
-type FsOp = "writeFile" | "rename";
+// react-dom reads the DOM globals when it loads, so this must run before any test file imports it
+installDom();
+
+type FsOp = "writeFile" | "rename" | "unlink";
 
 export const writeCalls: { path: string; data: string }[] = [];
 
@@ -11,6 +15,7 @@ export function resetWriteCalls() {
   writeCalls.length = 0;
   delete fsErrors.writeFile;
   delete fsErrors.rename;
+  delete fsErrors.unlink;
 }
 
 export function setFsError(op: FsOp, err: Error | null) {
@@ -46,6 +51,7 @@ mock.module("fs/promises", () => ({
     if (entry) entry.path = String(to);
   },
   unlink: async (path: string) => {
+    throwWhenSet("unlink");
     const index = writeCalls.findIndex((call) => call.path === String(path));
     if (index >= 0) writeCalls.splice(index, 1);
   },

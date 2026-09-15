@@ -36,24 +36,24 @@ async function addToAnkiJson(body: AddBody) {
   return (await addToAnki(body)).json();
 }
 
-function findVocabularyFields(action: string, characters: string): Record<string, string> {
+/** The vocabulary note type holds the word in `characters`, the radical one in `character`. */
+function findNoteFields(params: {
+  action: string;
+  field: "characters" | "character";
+  value: string;
+}): Record<string, string> {
+  const { action, field, value } = params;
   const call = ankiCalls.find((c) => {
     if (c.action !== action) return false;
     const note = c.params.note as { fields?: Record<string, string> } | undefined;
-    return note?.fields?.characters === characters;
+    return note?.fields?.[field] === value;
   });
-  if (!call) throw new Error(`No ${action} call for ${characters}`);
+  if (!call) throw new Error(`No ${action} call for ${value}`);
   return (call.params.note as { fields: Record<string, string> }).fields;
 }
 
-function findRadicalFields(action: string, character: string): Record<string, string> {
-  const call = ankiCalls.find((c) => {
-    if (c.action !== action) return false;
-    const note = c.params.note as { fields?: Record<string, string> } | undefined;
-    return note?.fields?.character === character;
-  });
-  if (!call) throw new Error(`No ${action} call for ${character}`);
-  return (call.params.note as { fields: Record<string, string> }).fields;
+function findVocabularyFields(action: string, characters: string): Record<string, string> {
+  return findNoteFields({ action, field: "characters", value: characters });
 }
 
 function storedAudioFilenames(): string[] {
@@ -81,7 +81,9 @@ describe("add-to-anki API", () => {
     const result = await addToAnkiJson({ id: 1, type: "radical" });
     expect(result.ok).toBe(true);
     expect(result.data.subject.name).toBe("Ground");
-    expect(findRadicalFields("addNote", "一").note).toBe("One flat line on the ground");
+    const fields = findNoteFields({ action: "addNote", field: "character", value: "一" });
+    expect(fields.note).toBe("One flat line on the ground");
+    expect(fields.user_synonyms).toBe("flat ground");
 
     const actions = ankiCalls.map((c) => c.action);
     expect(actions).toMatchSnapshot();

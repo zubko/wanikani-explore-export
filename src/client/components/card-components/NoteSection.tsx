@@ -1,23 +1,32 @@
 import { useState } from "react";
 import toast from "react-hot-toast";
-import { HugeiconsIcon } from "@hugeicons/react";
 import { Cancel01Icon, CheckmarkCircle01Icon, PencilEdit01Icon } from "@hugeicons/core-free-icons";
-import { api } from "../../api.ts";
+import type { LocalStudyMaterial } from "@/model/wanikani.ts";
+import {
+  saveLocalStudyMaterial,
+  useLocalStudyMaterial,
+} from "../../hooks/useLocalStudyMaterial.ts";
+import { IconButton } from "./IconButton.tsx";
 
 export type NoteSectionProps = {
   subjectId: number;
   field: "meaning_note" | "reading_note";
   wanikaniNote: string;
-  localNote: string | null;
+  localStudyMaterial: LocalStudyMaterial | null;
 };
 
-export function NoteSection({ subjectId, field, wanikaniNote, localNote }: NoteSectionProps) {
-  const [savedNote, setSavedNote] = useState(localNote);
+export function NoteSection({
+  subjectId,
+  field,
+  wanikaniNote,
+  localStudyMaterial,
+}: NoteSectionProps) {
+  const record = useLocalStudyMaterial(subjectId, localStudyMaterial);
   const [mode, setMode] = useState<"view" | "edit">("view");
   const [draft, setDraft] = useState("");
-  const [saving, setSaving] = useState(false);
 
-  const shownNote = savedNote ?? wanikaniNote;
+  const localNote = record?.[field] ?? null;
+  const shownNote = localNote ?? wanikaniNote;
 
   const startEdit = () => {
     setDraft(shownNote);
@@ -30,20 +39,16 @@ export function NoteSection({ subjectId, field, wanikaniNote, localNote }: NoteS
   };
 
   const save = async () => {
-    if (saving) return;
-    const trimmed = draft.trim();
-    const previousNote = savedNote;
-    setSavedNote(trimmed === "" ? null : trimmed);
     setMode("view");
-    setSaving(true);
     try {
-      await api.saveStudyMaterial(subjectId, { [field]: trimmed });
+      await saveLocalStudyMaterial({
+        subjectId,
+        current: record,
+        patch: { [field]: draft.trim() },
+      });
     } catch (err) {
-      setSavedNote(previousNote);
       setMode("edit");
       toast.error(err instanceof Error ? err.message : String(err));
-    } finally {
-      setSaving(false);
     }
   };
 
@@ -73,6 +78,7 @@ export function NoteSection({ subjectId, field, wanikaniNote, localNote }: NoteS
   if (shownNote === "") {
     return (
       <div>
+        <NoteHeader />
         <button
           type="button"
           onClick={startEdit}
@@ -86,7 +92,7 @@ export function NoteSection({ subjectId, field, wanikaniNote, localNote }: NoteS
 
   return (
     <div>
-      <NoteHeader isLocal={savedNote !== null}>
+      <NoteHeader isLocal={localNote !== null}>
         <IconButton icon={PencilEdit01Icon} title="Edit note" onClick={startEdit} />
       </NoteHeader>
       <p className="text-sm whitespace-pre-wrap text-gray-700">{shownNote}</p>
@@ -101,26 +107,5 @@ function NoteHeader({ isLocal, children }: { isLocal?: boolean; children?: React
       {isLocal && <span className="rounded bg-gray-100 px-1.5 text-xs text-gray-500">local</span>}
       {children}
     </div>
-  );
-}
-
-function IconButton({
-  icon,
-  title,
-  onClick,
-}: {
-  icon: React.ComponentProps<typeof HugeiconsIcon>["icon"];
-  title: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      title={title}
-      className="cursor-pointer text-gray-400 transition-colors hover:text-gray-600"
-    >
-      <HugeiconsIcon icon={icon} size={16} />
-    </button>
   );
 }

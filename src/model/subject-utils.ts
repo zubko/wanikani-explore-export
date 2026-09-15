@@ -53,6 +53,21 @@ export function mergeStudyMaterial(
   };
 }
 
+export function applyLocalStudyMaterialPatch(
+  current: LocalStudyMaterial | null,
+  patch: LocalStudyMaterial
+): LocalStudyMaterial | null {
+  const meaningNote = (patch.meaning_note ?? current?.meaning_note)?.trim();
+  const readingNote = (patch.reading_note ?? current?.reading_note)?.trim();
+  const synonyms = cleanSynonyms(patch.meaning_synonyms ?? current?.meaning_synonyms);
+
+  const next: LocalStudyMaterial = {};
+  if (meaningNote) next.meaning_note = meaningNote;
+  if (readingNote) next.reading_note = readingNote;
+  if (synonyms.length > 0) next.meaning_synonyms = synonyms;
+  return Object.keys(next).length > 0 ? next : null;
+}
+
 export function buildSubjectReference(params: {
   id: number;
   characters: string | null;
@@ -88,4 +103,8 @@ export function buildSubjectReferences(
       meanings: item.data.meanings,
     })
   );
+}
+
+function cleanSynonyms(synonyms: string[] | undefined): string[] {
+  return [...new Set((synonyms ?? []).map((item) => item.trim()).filter((item) => item !== ""))];
 }
