@@ -51,12 +51,16 @@ function applyPatch(
   patch: LocalStudyMaterial
 ): LocalStudyMaterial | null {
   const next: LocalStudyMaterial = {
-    meaning_note: patch.meaning_note ?? current.meaning_note,
-    reading_note: patch.reading_note ?? current.reading_note,
-    meaning_synonyms: patch.meaning_synonyms ?? current.meaning_synonyms,
+    meaning_note: patch.meaning_note?.trim() ?? current.meaning_note,
+    reading_note: patch.reading_note?.trim() ?? current.reading_note,
+    meaning_synonyms: cleanSynonyms(patch.meaning_synonyms) ?? current.meaning_synonyms,
   };
   if (!next.meaning_note) delete next.meaning_note;
   if (!next.reading_note) delete next.reading_note;
   if (!next.meaning_synonyms?.length) delete next.meaning_synonyms;
   return Object.keys(next).length > 0 ? next : null;
+}
+
+function cleanSynonyms(synonyms: string[] | undefined): string[] | undefined {
+  return synonyms?.map((item) => item.trim()).filter((item) => item !== "");
 }

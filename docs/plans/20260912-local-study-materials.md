@@ -290,12 +290,12 @@ export type MergedStudyMaterial = {
 
 ### Task 9: Verify acceptance criteria
 
-- [ ] every subject type shows and edits its notes: radical (meaning only), kanji, vocabulary, kana vocabulary (meaning only)
-- [ ] a local note replaces the WaniKani note, clearing it brings the WaniKani note back
-- [ ] local synonyms are appended, WaniKani ones cannot be removed
-- [ ] "Add to Anki" after an edit puts the merged values into the Anki fields, except kanji synonyms, which have no field on the kanji note type
-- [ ] `data/userdata/study_materials_extra.json` stays valid JSON and never holds empty strings, empty lists or empty entries
-- [ ] run `bun run lint:fix`, `bun run tsc`, `bun test`
+- [x] every subject type shows and edits its notes: radical (meaning only), kanji, vocabulary, kana vocabulary (meaning only) (verified by reading the code, browser check skipped - no browser in this run). Kana vocabulary has no own card, `SearchResult` sends it to `VocabularyCard`, and `ReadingSection` only renders for `object === "vocabulary"`. New `src/client/components/__tests__/VocabularyCard.test.tsx` proves kana vocabulary shows one note editor and no Reading section, regular vocabulary shows two
+- [x] a local note replaces the WaniKani note, clearing it brings the WaniKani note back (verified by reading the code, browser check skipped - no browser in this run). `mergeStudyMaterial` prefers the local note, `NoteSection` shows `savedNote ?? wanikaniNote` and sets `savedNote` to `null` on an empty draft, the upsert deletes a field set to an empty string
+- [x] local synonyms are appended, WaniKani ones cannot be removed. `mergeStudyMaterial` puts the WaniKani list first and drops duplicates, `UserSynonymsRow` renders the remove button only on local chips and `remove` filters the local list only
+- [x] "Add to Anki" after an edit puts the merged values into the Anki fields, except kanji synonyms, which have no field on the kanji note type. All three note builders call `mergeStudyMaterial`, `KANJI_EXPECTED_FIELDS` has no `user_synonyms`, and a new repository test shows a saved note on the subject at the next read
+- [x] `data/userdata/study_materials_extra.json` stays valid JSON and never holds empty strings, empty lists or empty entries. ➕ fixed: `applyPatch` now trims the notes and drops blank synonyms, so a list like `["", " yank "]` no longer stores an empty string. New test `blank values never reach the file` checks the whole written file
+- [x] run `bun run lint:fix`, `bun run tsc`, `bun test`
 
 ### Task 10: Update documentation
 

@@ -7,8 +7,11 @@ import {
   setLocalStudyMaterials,
   LOCAL_STUDY_MATERIALS_PATH,
 } from "../data-loader.ts";
+import { getKanji } from "../kanji.ts";
 import { findSubjectTypeById, upsertLocalStudyMaterial } from "../study-material.ts";
-import { ensureRepositoryInitialized } from "./setup.ts";
+import { ensureRepositoryInitialized, installFetchMock } from "./setup.ts";
+
+installFetchMock();
 
 const FIXTURE_PATH = "src/test/fixtures/study_materials_extra.json";
 
@@ -23,6 +26,20 @@ function lastWrite(): Record<string, LocalStudyMaterial> {
 function resetState() {
   resetWriteCalls();
   setLocalStudyMaterials(structuredClone(fixture));
+}
+
+function expectNoBlankValues(file: Record<string, LocalStudyMaterial>) {
+  for (const record of Object.values(file)) {
+    expect(Object.keys(record).length).toBeGreaterThan(0);
+    for (const value of Object.values(record)) {
+      if (Array.isArray(value)) {
+        expect(value.length).toBeGreaterThan(0);
+        for (const item of value) expect(item.trim()).not.toBe("");
+      } else {
+        expect(value.trim()).not.toBe("");
+      }
+    }
+  }
 }
 
 beforeAll(async () => {
@@ -93,6 +110,33 @@ describe("upsertLocalStudyMaterial", () => {
 
     expect(saved).toBeNull();
     expect(lastWrite()).not.toHaveProperty("2484");
+  });
+
+  test("blank values never reach the file", async () => {
+    await upsertLocalStudyMaterial(2478, {
+      meaning_note: "   ",
+      meaning_synonyms: ["", "  ", " yank "],
+    });
+    await upsertLocalStudyMaterial(958, { reading_note: " \n " });
+    await upsertLocalStudyMaterial(1, { meaning_note: "", meaning_synonyms: [" "] });
+
+    expect(localStudyMaterials["2478"]).toEqual({ meaning_synonyms: ["yank"] });
+    expect(localStudyMaterials["958"]).toEqual({
+      meaning_note: "Evening comes after the sun goes down",
+    });
+    expect(localStudyMaterials["1"]).toBeUndefined();
+    expectNoBlankValues(lastWrite());
+  });
+
+  test("a saved note is on the subject at the next read", async () => {
+    await upsertLocalStudyMaterial(456, { meaning_note: "Three lines of water" });
+
+    const kanji = await getKanji(456);
+
+    expect(kanji!.localStudyMaterial).toEqual({
+      reading_note: "Kawa like a river bank",
+      meaning_note: "Three lines of water",
+    });
   });
 
   test("the finished save lands under the real path with a trailing newline", async () => {
