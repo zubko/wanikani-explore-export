@@ -206,11 +206,11 @@ export type MergedStudyMaterial = {
 - Modify: `src/server/__tests__/api.add-to-anki.test.ts`
 - Modify: `src/server/__tests__/__snapshots__/api.add-to-anki.test.ts.snap`
 
-- [ ] call `mergeStudyMaterial(subject.studyMaterial, subject.localStudyMaterial)` once per builder. Radical reads `meaningNote` and `meaningSynonyms.join(", ")`, vocabulary reads all three, kanji reads only the two notes because its note type has no synonyms field
-- [ ] remove the `?.data.meaning_note ?? ""` chains
-- [ ] in the `add radical (一, id=1)` test, assert that the `note` field of the addNote call holds the fixture note. The existing `findVocabularyFields` helper matches on `characters`, the radical note type has `character`, so the test needs its own lookup over `ankiCalls`
-- [ ] update the add-to-anki snapshot scoped to that file and check that only the 毎晩 test changed: `meaning_note` and `user_synonyms` of the vocabulary note, `meaning_note` and `reading_note` of the 晩 kanji note
-- [ ] run `bun run tsc` and `bun test` - must pass before Task 4
+- [x] call `mergeStudyMaterial(subject.studyMaterial, subject.localStudyMaterial)` once per builder. Radical reads `meaningNote` and `meaningSynonyms.join(", ")`, vocabulary reads all three, kanji reads only the two notes because its note type has no synonyms field
+- [x] remove the `?.data.meaning_note ?? ""` chains
+- [x] in the `add radical (一, id=1)` test, assert that the `note` field of the addNote call holds the fixture note. The existing `findVocabularyFields` helper matches on `characters`, the radical note type has `character`, so the test needs its own lookup over `ankiCalls`
+- [x] update the add-to-anki snapshot scoped to that file and check that only the 毎晩 test changed: `meaning_note` and `user_synonyms` of the vocabulary note, `meaning_note` and `reading_note` of the 晩 kanji note
+- [x] run `bun run tsc` and `bun test` - must pass before Task 4
 
 ### Task 4: Repository upsert
 

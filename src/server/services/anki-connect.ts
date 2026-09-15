@@ -8,7 +8,12 @@ import type {
   PronunciationAudio,
   AnkiAddResult,
 } from "@/model/wanikani.ts";
-import { getPrimaryMeaning, getPrimaryReading, getExtraMeanings } from "@/model/subject-utils.ts";
+import {
+  getPrimaryMeaning,
+  getPrimaryReading,
+  getExtraMeanings,
+  mergeStudyMaterial,
+} from "@/model/subject-utils.ts";
 import { getRadicalSvgUrl } from "@/model/radical-utils.ts";
 import { getReadingsByType } from "@/model/kanji-utils.ts";
 import { selectReadingAudios, getShortestSentence } from "@/model/vocabulary-utils.ts";
@@ -278,6 +283,7 @@ export async function syncAnkiWeb(): Promise<void> {
 
 function buildRadicalNoteFields(radical: Radical, storedSvgFilename?: string): RadicalNoteFields {
   const primaryMeaning = getPrimaryMeaning(radical.meanings);
+  const studyMaterial = mergeStudyMaterial(radical.studyMaterial, radical.localStudyMaterial);
 
   const character =
     radical.characters ?? (storedSvgFilename ? `<img src="${storedSvgFilename}">` : primaryMeaning);
@@ -286,10 +292,10 @@ function buildRadicalNoteFields(radical: Radical, storedSvgFilename?: string): R
     character,
     primary_name: primaryMeaning,
     extra_names: getExtraMeanings(radical.meanings),
-    user_synonyms: radical.studyMaterial?.data.meaning_synonyms?.join(", ") ?? "",
+    user_synonyms: studyMaterial.meaningSynonyms.join(", "),
     mnemonic_text: styleMnemonicHtml(radical.meaningMnemonic),
     mnemonic_image: radical.mnemonicImageUrl ?? "",
-    note: radical.studyMaterial?.data.meaning_note ?? "",
+    note: studyMaterial.meaningNote,
   };
 }
 
@@ -369,6 +375,7 @@ async function buildRadicalsHtml(componentRadicals: Radical[]): Promise<string> 
 
 async function buildKanjiNoteFields(kanji: Kanji): Promise<KanjiNoteFields> {
   const radicalsHtml = await buildRadicalsHtml(kanji.componentRadicals);
+  const studyMaterial = mergeStudyMaterial(kanji.studyMaterial, kanji.localStudyMaterial);
 
   return {
     character: kanji.characters,
@@ -378,13 +385,13 @@ async function buildKanjiNoteFields(kanji: Kanji): Promise<KanjiNoteFields> {
     extra_meanings: getExtraMeanings(kanji.meanings),
     meaning_mnemonic: styleMnemonicHtml(kanji.meaningMnemonic),
     meaning_hint: styleMnemonicHtml(kanji.meaningHint),
-    meaning_note: kanji.studyMaterial?.data.meaning_note ?? "",
+    meaning_note: studyMaterial.meaningNote,
     readings_onyomi: formatReadingsHtml(kanji.readings, "onyomi"),
     readings_kunyomi: formatReadingsHtml(kanji.readings, "kunyomi"),
     readings_nanori: formatReadingsHtml(kanji.readings, "nanori"),
     reading_mnemonic: styleMnemonicHtml(kanji.readingMnemonic),
     reading_hint: styleMnemonicHtml(kanji.readingHint),
-    reading_note: kanji.studyMaterial?.data.reading_note ?? "",
+    reading_note: studyMaterial.readingNote,
   };
 }
 
@@ -505,6 +512,7 @@ function buildVocabularyNoteFields(params: {
   const vocabData = isRegularVocab ? (vocabulary as Vocabulary) : null;
 
   const kanjiCompositionHtml = buildKanjiCompositionHtml(componentKanji);
+  const studyMaterial = mergeStudyMaterial(vocabulary.studyMaterial, vocabulary.localStudyMaterial);
 
   const conjugations = vocabData?.conjugations;
   const conjugationsStr = conjugations
@@ -516,17 +524,17 @@ function buildVocabularyNoteFields(params: {
     kanji_composition: kanjiCompositionHtml,
     primary_meaning: getPrimaryMeaning(vocabulary.meanings),
     extra_meanings: getExtraMeanings(vocabulary.meanings),
-    user_synonyms: vocabulary.studyMaterial?.data.meaning_synonyms?.join(", ") ?? "",
+    user_synonyms: studyMaterial.meaningSynonyms.join(", "),
     word_type: vocabulary.partsOfSpeech.join(", "),
     conjugations: conjugationsStr,
     masu_form: conjugations?.masu ?? "",
     meaning_explanation: styleMnemonicHtml(vocabulary.meaningMnemonic),
-    meaning_note: vocabulary.studyMaterial?.data.meaning_note ?? "",
+    meaning_note: studyMaterial.meaningNote,
     reading: vocabData ? getPrimaryReading(vocabData.readings) : "",
     reading_audio_female: readingAudioTags.female,
     reading_audio_male: readingAudioTags.male,
     reading_explanation: vocabData ? styleMnemonicHtml(vocabData.readingMnemonic) : "",
-    reading_note: vocabulary.studyMaterial?.data.reading_note ?? "",
+    reading_note: studyMaterial.readingNote,
     sentence_jap: shortestSentence?.ja ?? "",
     sentence_jap_furigana: shortestSentence?.reading ?? "",
     sentence_jap_audio: sentenceAudioFilename ? `[sound:${sentenceAudioFilename}]` : "",

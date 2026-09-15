@@ -46,6 +46,16 @@ function findVocabularyFields(action: string, characters: string): Record<string
   return (call.params.note as { fields: Record<string, string> }).fields;
 }
 
+function findRadicalFields(action: string, character: string): Record<string, string> {
+  const call = ankiCalls.find((c) => {
+    if (c.action !== action) return false;
+    const note = c.params.note as { fields?: Record<string, string> } | undefined;
+    return note?.fields?.character === character;
+  });
+  if (!call) throw new Error(`No ${action} call for ${character}`);
+  return (call.params.note as { fields: Record<string, string> }).fields;
+}
+
 function storedAudioFilenames(): string[] {
   return ankiCalls
     .filter((c) => c.action === "storeMediaFile")
@@ -71,6 +81,7 @@ describe("add-to-anki API", () => {
     const result = await addToAnkiJson({ id: 1, type: "radical" });
     expect(result.ok).toBe(true);
     expect(result.data.subject.name).toBe("Ground");
+    expect(findRadicalFields("addNote", "一").note).toBe("One flat line on the ground");
 
     const actions = ankiCalls.map((c) => c.action);
     expect(actions).toMatchSnapshot();
