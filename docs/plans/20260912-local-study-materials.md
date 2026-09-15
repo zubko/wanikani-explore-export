@@ -161,12 +161,12 @@ export type MergedStudyMaterial = {
 - Modify: `src/model/subject-utils.ts`
 - Create: `src/model/__tests__/subject-utils.test.ts`
 
-- [ ] add `LocalStudyMaterial` and `MergedStudyMaterial` to `src/model/wanikani.ts`
-- [ ] add `"kana_vocabulary"` to `StudyMaterialData.subject_type`
-- [ ] change the `findStudyMaterial` type parameter to `SubjectType`
-- [ ] add `mergeStudyMaterial` to `src/model/subject-utils.ts`
-- [ ] write tests: no records, WaniKani only, local only, local note wins, empty local field falls back to WaniKani, synonyms appended with a duplicate dropped
-- [ ] run `bun run tsc` and `bun test` - must pass before Task 2
+- [x] add `LocalStudyMaterial` and `MergedStudyMaterial` to `src/model/wanikani.ts`
+- [x] add `"kana_vocabulary"` to `StudyMaterialData.subject_type`
+- [x] change the `findStudyMaterial` type parameter to `SubjectType`
+- [x] add `mergeStudyMaterial` to `src/model/subject-utils.ts`
+- [x] write tests: no records, WaniKani only, local only, local note wins, empty local field falls back to WaniKani, synonyms appended with a duplicate dropped
+- [x] run `bun run tsc` and `bun test` - must pass before Task 2
 
 ### Task 2: Load the local file and expose it on every subject
 

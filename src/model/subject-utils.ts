@@ -1,4 +1,11 @@
-import type { Meaning, StudyMaterial, SubjectReference } from "./wanikani.ts";
+import type {
+  LocalStudyMaterial,
+  Meaning,
+  MergedStudyMaterial,
+  StudyMaterial,
+  SubjectReference,
+  SubjectType,
+} from "./wanikani.ts";
 
 export function getPrimaryMeaning(meanings: { meaning: string; primary: boolean }[]): string {
   return meanings.find((m) => m.primary)?.meaning ?? "";
@@ -24,13 +31,26 @@ export function getExtraMeanings(meanings: Meaning[]): string {
 export function findStudyMaterial(
   studyMaterials: StudyMaterial[],
   subjectId: number,
-  subjectType: "radical" | "kanji" | "vocabulary"
+  subjectType: SubjectType
 ): StudyMaterial | null {
   return (
     studyMaterials.find(
       (sm) => sm.data.subject_id === subjectId && sm.data.subject_type === subjectType
     ) ?? null
   );
+}
+
+export function mergeStudyMaterial(
+  wanikani: StudyMaterial | null,
+  local: LocalStudyMaterial | null
+): MergedStudyMaterial {
+  return {
+    meaningNote: local?.meaning_note || wanikani?.data.meaning_note || "",
+    readingNote: local?.reading_note || wanikani?.data.reading_note || "",
+    meaningSynonyms: [
+      ...new Set([...(wanikani?.data.meaning_synonyms ?? []), ...(local?.meaning_synonyms ?? [])]),
+    ],
+  };
 }
 
 export function buildSubjectReference(params: {

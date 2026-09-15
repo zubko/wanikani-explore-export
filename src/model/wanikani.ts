@@ -66,7 +66,7 @@ export type PronunciationAudio = {
 export type StudyMaterialData = {
   created_at: string;
   subject_id: number;
-  subject_type: "radical" | "kanji" | "vocabulary";
+  subject_type: "radical" | "kanji" | "vocabulary" | "kana_vocabulary";
   meaning_note: string;
   reading_note: string;
   meaning_synonyms: string[];
@@ -79,6 +79,18 @@ export type StudyMaterial = {
   url: string;
   data_updated_at: string;
   data: StudyMaterialData;
+};
+
+export type LocalStudyMaterial = {
+  meaning_note?: string;
+  reading_note?: string;
+  meaning_synonyms?: string[];
+};
+
+export type MergedStudyMaterial = {
+  meaningNote: string;
+  readingNote: string;
+  meaningSynonyms: string[];
 };
 
 export type VerbConjugations = {
