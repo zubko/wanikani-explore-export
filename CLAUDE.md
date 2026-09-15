@@ -32,6 +32,7 @@ src/
     api.ts              # API routes (exports ApiType for client)
     utils/              # Server-side utility functions
     repository/         # Data access layer (singleton, use initRepository() first)
+                        #   study-material.ts: local notes / synonyms, the only writer here
     services/           # Server services (AnkiConnect integration, Azure TTS)
   config/               # Shared configuration (theme colors)
   utils/                # Shared utility functions (mnemonic-utils)
@@ -76,6 +77,7 @@ data/                   # Data files
   userdata/             # User-specific data, gitignored
                         #   Downloaded WaniKani subjects, study materials, mnemonic image cache
                         #   Populated via download scripts
+                        #   study_materials_extra.json: my own notes and synonyms (see below)
   wanikani-fixes.yaml     # Hand-written corrections for wrong WaniKani API data (see below)
   verb_conjugations.json  # Verb conjugations keyed by vocabulary ID (LLM-generated)
   sentence_readings.json  # Kana readings for context sentences keyed by vocabulary ID (LLM-generated)
@@ -138,6 +140,24 @@ The pure logic is `scripts/lib/subject-patches.ts`, tested in `scripts/lib/__tes
 Patching `data/userdata/` changes two checked-in snapshots (`radical.test.ts.snap` and `api.search.test.ts.snap`) whenever a patched radical appears in them. Update them scoped, one file at a time.
 
 Current contents: seven patches for WaniKani's 2026-08-27 content update, which changed the radicals of 万, 別 and 成 on the website but not in the API. Reported at https://community.wanikani.com/t/75554 and to hello@wanikani.com. Delete the file and the script once WaniKani fixes it and no patch is left.
+
+### Local Study Materials
+
+My own notes and synonyms for any subject. They never touch the WaniKani data.
+
+- The file is `data/userdata/study_materials_extra.json`. It is an object keyed by the subject id as a string. WaniKani subject ids are unique across all types, so the file holds no type. A record has `meaning_note`, `reading_note` and `meaning_synonyms`, all optional.
+- `data-loader.ts` reads it into `localStudyMaterials` in the same `Promise.all` as the other data files. A missing file fails the start, like every other data file. The path is one exported constant, `LOCAL_STUDY_MATERIALS_PATH`. An exported `let` cannot be assigned from another module, so `setLocalStudyMaterials(next)` sits next to it.
+- Every enriched subject carries two records: `studyMaterial` from WaniKani and `localStudyMaterial` from this file. The server sends both. `mergeStudyMaterial(wanikani, local)` in `src/model/subject-utils.ts` joins them: a local note replaces the WaniKani note, local synonyms are appended to the WaniKani ones and duplicates are dropped.
+- The client gets both records on purpose. Local synonyms need a remove button, and clearing a local note must show the WaniKani note again with no re-fetch.
+- The three Anki note builders in `src/server/services/anki-connect.ts` call the same helper, so the deck and the screen agree. Kanji synonyms are the one exception: the kanji note type has no `user_synonyms` field, so they stay on screen only.
+- `MergedStudyMaterial` uses camelCase, because it is our own computed shape, like `meaningMnemonic`. `LocalStudyMaterial` stays snake_case, because it mirrors the WaniKani record field by field. Do not "fix" one to match the other.
+- `upsertLocalStudyMaterial` in `src/server/repository/study-material.ts` writes the whole object with `saveJsonAtomic` from `src/server/utils/json-utils.ts` (write `<path>.tmp`, rename it over the real file, unlink the temp file when a step throws), then publishes it with `setLocalStudyMaterials`. A failed write leaves both the file and the memory unchanged.
+- Notes are trimmed and blank synonyms are dropped before the write. A field that ends up empty is deleted, and a record with no field left is dropped from the object. So the file never holds an empty string, an empty list or an empty entry.
+- Every upsert runs in one module-level promise queue. Two saves at the same time would otherwise start from the same old object, and one change would be lost. The caller's promise stays out of the chain (`const run = queue.then(step); queue = run.catch(() => {}); return run;`), so the caller sees the error and the next save still starts from the last good state.
+- `findSubjectTypeById(id)` scans the four subject arrays. The route calls it before the write, because a `reading_note` for a radical or for kana vocabulary is a 400. The upsert itself trusts the id.
+- The web UI edits the values in place. `NoteSection.tsx` has a pencil button and a textarea, Esc cancels and Cmd+Enter saves. `UserSynonymsRow.tsx` has an inline input and a small × on every local chip. Both are optimistic: they show the new value at once, send the patch, and on an error put the old value back and show a `toast.error`.
+- Kana vocabulary has no card of its own. `SearchResult.tsx` sends it to `VocabularyCard`, which hides the reading section for it, so it gets a meaning note editor only.
+- A new download of `study_materials.json` keeps these values, they live in their own file.
 
 ### iKnow Vocabulary Import
 
@@ -291,12 +311,13 @@ AnkiConnect client is in `src/server/services/anki-connect.ts`. Card templates a
 
 All routes are prefixed with `/api`.
 
-| Method | Path                | Description                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| ------ | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| GET    | `/search?type=&q=`  | Search by type (`radical`, `kanji`, `vocabulary`) and query string. Falls back to name/meaning search if character search fails. 400 if params missing, 404 if not found, 200 with `{ found: true, data }` on success                                                                                                                                                                                                         |
-| GET    | `/anki-notes?type=` | List all Anki notes for a subject type (`radical`, `kanji`, `vocabulary`). Returns `{ ok: true, data: AnkiNoteItem[] }`. 400 if type missing/invalid.                                                                                                                                                                                                                                                                         |
-| POST   | `/add-to-anki`      | Add subject to Anki. Body: `{ id: number, type: SubjectType, sync?: boolean }`. Looks up enriched subject, creates/updates Anki notes for the subject and its components (radicals, kanji), downloads media, then syncs to AnkiWeb unless `sync` is `false`. 400 if params missing, 404 if subject not found, 200 with `{ ok: true, data: AnkiAddResult }` on success, 200 with `{ ok: false, error }` on AnkiConnect failure |
-| POST   | `/anki-sync`        | Sync the Anki collection to AnkiWeb once. No body. 200 with `{ ok: true }`, 200 with `{ ok: false, error }` on AnkiConnect failure. `sync-anki-notes` adds every note with `sync: false` and calls this once at the end                                                                                                                                                                                                       |
+| Method | Path                | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| ------ | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/search?type=&q=`  | Search by type (`radical`, `kanji`, `vocabulary`) and query string. Falls back to name/meaning search if character search fails. 400 if params missing, 404 if not found, 200 with `{ found: true, data }` on success                                                                                                                                                                                                                                                                                                                                                                                       |
+| GET    | `/anki-notes?type=` | List all Anki notes for a subject type (`radical`, `kanji`, `vocabulary`). Returns `{ ok: true, data: AnkiNoteItem[] }`. 400 if type missing/invalid.                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| POST   | `/add-to-anki`      | Add subject to Anki. Body: `{ id: number, type: SubjectType, sync?: boolean }`. Looks up enriched subject, creates/updates Anki notes for the subject and its components (radicals, kanji), downloads media, then syncs to AnkiWeb unless `sync` is `false`. 400 if params missing, 404 if subject not found, 200 with `{ ok: true, data: AnkiAddResult }` on success, 200 with `{ ok: false, error }` on AnkiConnect failure                                                                                                                                                                               |
+| POST   | `/anki-sync`        | Sync the Anki collection to AnkiWeb once. No body. 200 with `{ ok: true }`, 200 with `{ ok: false, error }` on AnkiConnect failure. `sync-anki-notes` adds every note with `sync: false` and calls this once at the end                                                                                                                                                                                                                                                                                                                                                                                     |
+| PATCH  | `/study-materials`  | Save my own note or synonyms for one subject. Body: `{ id: number, meaning_note?: string, reading_note?: string, meaning_synonyms?: string[] }`. A field sent as `""` or `[]` is deleted, an entry with no field left is removed. 400 if `id` is not an integer, no field besides `id` is sent, a key is unknown, a note is not a string, synonyms are not an array of strings, or `reading_note` is sent for a radical or kana vocabulary. 404 if the subject is not found. 500 if the write fails. 200 with `{ ok: true, data: LocalStudyMaterial \| null }`, `data` is `null` when the entry was removed |
 
 Use proper HTTP status codes: 400 for missing/invalid parameters, 404 for "not found" results. Don't return 200 with error-shaped JSON for input errors or missing resources.
 
@@ -417,6 +438,10 @@ gh issue close <number>          # Close an issue
 
 - `bunfig.toml` configures `src/test/preload.ts` as a shared preload for all tests
 - Preload handles `mock.module("fs/promises")` (real readFile, mock writeFile) and lazy repository init — Bun's `mock.module()` is process-global, so it must live in one place
+- The preload redirects reads of `mnemonic-images.json` and `study_materials_extra.json` to `src/test/fixtures/`, so no test depends on my own data
+- The `fs/promises` mock also has `rename` and `unlink`, so an atomic save shows up in `writeCalls` under the real path: `writeFile` records the `.tmp` path, `rename` moves that entry to the real path, `unlink` drops it. A failed save leaves no `.tmp` entry behind
+- `setFsError(op, err)` makes the mocked `writeFile` or `rename` throw. It is the only way to test a failed write, because `mock.module` is process-global and set once. `resetWriteCalls()` clears it again
+- `bun test` runs every file in one process, so module-level state survives a file. A file that changes `localStudyMaterials` or `writeCalls` resets them in `afterEach` too, not only in `beforeEach`
 - **Repository tests** (`src/server/repository/__tests__/`): test repository functions directly, use a simple fetch mock from `setup.ts`
 - **Script unit tests** (`scripts/lib/__tests__/`): test the pure script helpers directly, no mock needed
 - **API E2E tests** (`src/server/__tests__/`): test full API through `api.request()` (Hono handles directly, no HTTP server), use `src/test/fetch-interceptor.ts` which routes by URL pattern (AnkiConnect, WaniKani SVGs/audio/pages)

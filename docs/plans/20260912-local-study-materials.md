@@ -306,11 +306,11 @@ export type MergedStudyMaterial = {
 - Modify: `docs/prompts/test-scenarios.md`
 - Modify: `docs/backlog.md`
 
-- [ ] CLAUDE.md: add the API table row for `PATCH /study-materials`, a short "Local Study Materials" section after "Fixing Wrong WaniKani Data", `study_materials_extra.json` in the structure tree, `study-material.ts` in the repository list, the fixture redirect, the `rename` / `unlink` mocks and `setFsError` in the test architecture notes
-- [ ] `data/userdata/README.md`: one row for the new file
-- [ ] `docs/prompts/test-scenarios.md`: manual scenarios for note and synonym editing
-- [ ] `docs/backlog.md`: one line for a `user_synonyms` field on the kanji note type, which needs the interactive field migration, a template change and the field docs
-- [ ] move this plan to `docs/plans/completed/`
+- [x] CLAUDE.md: add the API table row for `PATCH /study-materials`, a short "Local Study Materials" section after "Fixing Wrong WaniKani Data", `study_materials_extra.json` in the structure tree, `study-material.ts` in the repository list, the fixture redirect, the `rename` / `unlink` mocks and `setFsError` in the test architecture notes
+- [x] `data/userdata/README.md`: one row for the new file
+- [x] `docs/prompts/test-scenarios.md`: manual scenarios for note and synonym editing
+- [x] `docs/backlog.md`: one line for a `user_synonyms` field on the kanji note type, which needs the interactive field migration, a template change and the field docs
+- [x] move this plan to `docs/plans/completed/` (done by the harness after the review phases)
 
 ## Post-Completion
 
