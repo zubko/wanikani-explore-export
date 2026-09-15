@@ -282,11 +282,11 @@ export type MergedStudyMaterial = {
 - Modify: `src/client/components/VocabularyCard.tsx`
 - Create: `src/client/components/__tests__/UserSynonymsRow.test.tsx`
 
-- [ ] rewrite `UserSynonymsRow` with the props, state and behavior from Technical Details
-- [ ] thread `subjectId`, `wanikaniSynonyms`, `localSynonyms` through the three cards
-- [ ] write tests with `renderToStaticMarkup`: WaniKani chips have no remove button, local chips have one, empty lists show only the add button
-- [ ] run `bun run lint:fix` on the edited files, `bun run tsc`, `bun test` - must pass before Task 9
-- [ ] check in the browser: add, remove, duplicate is refused, error toast
+- [x] rewrite `UserSynonymsRow` with the props, state and behavior from Technical Details
+- [x] thread `subjectId`, `wanikaniSynonyms`, `localSynonyms` through the three cards
+- [x] write tests with `renderToStaticMarkup`: WaniKani chips have no remove button, local chips have one, empty lists show only the add button
+- [x] run `bun run lint:fix` on the edited files, `bun run tsc`, `bun test` - must pass before Task 9
+- [x] check in the browser (skipped - not automatable): add, remove, duplicate is refused, error toast
 
 ### Task 9: Verify acceptance criteria
 

@@ -19,7 +19,7 @@ import { NoteSection, type NoteSectionProps } from "./card-components/NoteSectio
 import { scrollToElement } from "../utils/scroll-to-element.ts";
 import { SectionTitle } from "./card-components/SectionTitle.tsx";
 import { SubjectTile } from "./card-components/SubjectTile.tsx";
-import { UserSynonymsRow } from "./card-components/UserSynonymsRow.tsx";
+import { UserSynonymsRow, type UserSynonymsRowProps } from "./card-components/UserSynonymsRow.tsx";
 import { api } from "../api.ts";
 import { formatAnkiResult } from "../utils/format-anki-result.ts";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -59,7 +59,11 @@ export function VocabularyCard({ vocabulary }: VocabularyCardProps) {
         {vocabData && <KanjiCompositionSection componentKanji={vocabData.componentKanji} />}
         <MeaningSection
           meanings={vocabulary.meanings}
-          userSynonyms={vocabulary.studyMaterial?.data.meaning_synonyms ?? []}
+          synonyms={{
+            subjectId: vocabulary.id,
+            wanikaniSynonyms: vocabulary.studyMaterial?.data.meaning_synonyms ?? [],
+            localSynonyms: vocabulary.localStudyMaterial?.meaning_synonyms ?? [],
+          }}
           partsOfSpeech={vocabulary.partsOfSpeech}
           conjugations={vocabData?.conjugations ?? null}
           mnemonic={vocabulary.meaningMnemonic}
@@ -91,14 +95,14 @@ export function VocabularyCard({ vocabulary }: VocabularyCardProps) {
 
 function MeaningSection({
   meanings,
-  userSynonyms,
+  synonyms,
   partsOfSpeech,
   conjugations,
   mnemonic,
   note,
 }: {
   meanings: { meaning: string; primary: boolean; accepted_answer: boolean }[];
-  userSynonyms: string[];
+  synonyms: UserSynonymsRowProps;
   partsOfSpeech: string[];
   conjugations: Conjugations | null;
   mnemonic: string;
@@ -117,7 +121,7 @@ function MeaningSection({
         {alternativeMeanings.length > 0 && (
           <LabeledRow label="Alternative" value={alternativeMeanings.join(", ")} />
         )}
-        <UserSynonymsRow synonyms={userSynonyms} />
+        <UserSynonymsRow key={`${synonyms.subjectId}-synonyms`} {...synonyms} />
         <LabeledRow label="Word Type" value={partsOfSpeech.join(", ")} />
         {conjugations && <ConjugationsRow conjugations={conjugations} />}
         <ExplanationBlock mnemonic={mnemonic} />

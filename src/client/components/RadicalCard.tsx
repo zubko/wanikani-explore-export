@@ -11,7 +11,7 @@ import { LabeledRow } from "./card-components/LabeledRow.tsx";
 import { MnemonicText } from "./card-components/MnemonicText.tsx";
 import { NoteSection } from "./card-components/NoteSection.tsx";
 import { RelatedSubjectsSection } from "./card-components/RelatedSubjectsSection.tsx";
-import { UserSynonymsRow } from "./card-components/UserSynonymsRow.tsx";
+import { UserSynonymsRow, type UserSynonymsRowProps } from "./card-components/UserSynonymsRow.tsx";
 
 type RadicalCardProps = {
   radical: Radical;
@@ -43,7 +43,11 @@ export function RadicalCard({ radical }: RadicalCardProps) {
       <div className="divide-y divide-gray-200">
         <NameSection
           meanings={radical.meanings}
-          userSynonyms={radical.studyMaterial?.data.meaning_synonyms ?? []}
+          synonyms={{
+            subjectId: radical.id,
+            wanikaniSynonyms: radical.studyMaterial?.data.meaning_synonyms ?? [],
+            localSynonyms: radical.localStudyMaterial?.meaning_synonyms ?? [],
+          }}
         />
         <MnemonicSection mnemonic={radical.meaningMnemonic} imageUrl={radical.mnemonicImageUrl} />
         <div className="p-4">
@@ -68,10 +72,10 @@ export function RadicalCard({ radical }: RadicalCardProps) {
 
 function NameSection({
   meanings,
-  userSynonyms,
+  synonyms,
 }: {
   meanings: Radical["meanings"];
-  userSynonyms: string[];
+  synonyms: UserSynonymsRowProps;
 }) {
   const primaryMeaning = getPrimaryMeaning(meanings);
   const alternativeMeanings = meanings
@@ -86,7 +90,7 @@ function NameSection({
         {alternativeMeanings.length > 0 && (
           <LabeledRow label="Alternative" value={alternativeMeanings.join(", ")} />
         )}
-        <UserSynonymsRow synonyms={userSynonyms} />
+        <UserSynonymsRow key={`${synonyms.subjectId}-synonyms`} {...synonyms} />
       </div>
     </div>
   );

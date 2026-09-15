@@ -13,7 +13,7 @@ import { NoteSection, type NoteSectionProps } from "./card-components/NoteSectio
 import { RelatedSubjectsSection } from "./card-components/RelatedSubjectsSection.tsx";
 import { scrollToElement } from "../utils/scroll-to-element.ts";
 import { SectionTitle } from "./card-components/SectionTitle.tsx";
-import { UserSynonymsRow } from "./card-components/UserSynonymsRow.tsx";
+import { UserSynonymsRow, type UserSynonymsRowProps } from "./card-components/UserSynonymsRow.tsx";
 import { api } from "../api.ts";
 import { formatAnkiResult } from "../utils/format-anki-result.ts";
 
@@ -49,7 +49,11 @@ export function KanjiCard({ kanji }: KanjiCardProps) {
         <RadicalCombinationSection componentRadicals={kanji.componentRadicals} />
         <MeaningSection
           meanings={kanji.meanings}
-          userSynonyms={kanji.studyMaterial?.data.meaning_synonyms ?? []}
+          synonyms={{
+            subjectId: kanji.id,
+            wanikaniSynonyms: kanji.studyMaterial?.data.meaning_synonyms ?? [],
+            localSynonyms: kanji.localStudyMaterial?.meaning_synonyms ?? [],
+          }}
           mnemonic={kanji.meaningMnemonic}
           hint={kanji.meaningHint}
           note={{
@@ -130,13 +134,13 @@ function RadicalItem({ radical, onClick }: { radical: Radical; onClick: () => vo
 
 function MeaningSection({
   meanings,
-  userSynonyms,
+  synonyms,
   mnemonic,
   hint,
   note,
 }: {
   meanings: Kanji["meanings"];
-  userSynonyms: string[];
+  synonyms: UserSynonymsRowProps;
   mnemonic: string;
   hint: string;
   note: NoteSectionProps;
@@ -154,7 +158,7 @@ function MeaningSection({
         {alternativeMeanings.length > 0 && (
           <LabeledRow label="Alternative" value={alternativeMeanings.join(", ")} />
         )}
-        <UserSynonymsRow synonyms={userSynonyms} />
+        <UserSynonymsRow key={`${synonyms.subjectId}-synonyms`} {...synonyms} />
         <MnemonicBlock mnemonic={mnemonic} hint={hint} note={note} />
       </div>
     </div>
