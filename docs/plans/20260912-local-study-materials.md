@@ -220,14 +220,14 @@ export type MergedStudyMaterial = {
 - Create: `src/server/repository/__tests__/study-material.test.ts`
 - Modify: `src/server/utils/json-utils.ts`
 
-- [ ] add `saveJsonAtomic` to `src/server/utils/json-utils.ts`
-- [ ] add `findSubjectTypeById` scanning radicals, kanji, vocabulary, kana vocabulary
-- [ ] add `upsertLocalStudyMaterial(subjectId, patch)` with the field-drop and entry-drop rules, `saveJsonAtomic` first, then `setLocalStudyMaterials`, the whole step inside the promise queue
-- [ ] test setup: `beforeAll` calls `ensureRepositoryInitialized()`; import the fixture from `src/test/fixtures/study_materials_extra.json`; `beforeEach` and `afterEach` both call `resetWriteCalls()` and `setLocalStudyMaterials(structuredClone(fixture))`, so the last test leaves nothing behind for the next file
-- [ ] write tests: create entry, update one field keeps the others, clear a field, remove the last field deletes the entry, the saved entry in `writeCalls` has the real path and no `.tmp` entry is left
-- [ ] write failure tests: a `writeFile` error and a `rename` error (`setFsError`) both leave the in-memory object unchanged and leave no `.tmp` entry, and after `setFsError(op, null)` the next save works
-- [ ] write a queue test: two saves started without awaiting, for two subjects and for two fields of one subject, both end up in the final file
-- [ ] run `bun test src/server/repository` - must pass before Task 5
+- [x] add `saveJsonAtomic` to `src/server/utils/json-utils.ts`
+- [x] add `findSubjectTypeById` scanning radicals, kanji, vocabulary, kana vocabulary
+- [x] add `upsertLocalStudyMaterial(subjectId, patch)` with the field-drop and entry-drop rules, `saveJsonAtomic` first, then `setLocalStudyMaterials`, the whole step inside the promise queue
+- [x] test setup: `beforeAll` calls `ensureRepositoryInitialized()`; import the fixture from `src/test/fixtures/study_materials_extra.json`; `beforeEach` and `afterEach` both call `resetWriteCalls()` and `setLocalStudyMaterials(structuredClone(fixture))`, so the last test leaves nothing behind for the next file
+- [x] write tests: create entry, update one field keeps the others, clear a field, remove the last field deletes the entry, the saved entry in `writeCalls` has the real path and no `.tmp` entry is left
+- [x] write failure tests: a `writeFile` error and a `rename` error (`setFsError`) both leave the in-memory object unchanged and leave no `.tmp` entry, and after `setFsError(op, null)` the next save works
+- [x] write a queue test: two saves started without awaiting, for two subjects and for two fields of one subject, both end up in the final file
+- [x] run `bun test src/server/repository` - must pass before Task 5
 
 ### Task 5: PATCH endpoint
 
