@@ -58,6 +58,15 @@ describe("NoteSection view state", () => {
     expect(html).not.toContain("Kawai");
   });
 
+  // only a hand-edited file holds one, and `mergeStudyMaterial` falls back for it too
+  it("shows the WaniKani note when the local note is an empty string", () => {
+    const html = renderStatic({ wanikaniNote: "Kawai", localStudyMaterial: { reading_note: "" } });
+
+    expect(html).toContain("Kawai");
+    expect(html).not.toContain(">local<");
+    expect(html).not.toContain("+ Add Note");
+  });
+
   it("keeps the Note header on the add button", () => {
     const html = renderStatic();
 

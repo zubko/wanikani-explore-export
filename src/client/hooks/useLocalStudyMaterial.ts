@@ -30,8 +30,12 @@ type RunParams = {
 // One subject can render on several cards at once, for example a radical under two kanji
 // of the same word. Per-card state would let one card save a list the other card never saw.
 let shown: SavedRecords = {};
-// The answer of the last finished save per subject
-let confirmed: SavedRecords = {};
+// The answer of the last finished save per subject. A Map and not an object, because a write
+// after an await cannot then carry a stale copy of the other subjects with it.
+const confirmed = new Map<number, LocalStudyMaterial | null>();
+// The record the page was rendered with when the subject's session started. A later render with
+// another value means the file changed outside this tab, so the session record is dropped.
+const origins = new Map<number, string>();
 const pendingSaves = new Map<number, PendingSave[]>();
 const listeners = new Set<() => void>();
 // Two saves for one subject must not run at once: the slower answer would land on top of the
@@ -43,6 +47,7 @@ export function useLocalStudyMaterial(
   fromServer: LocalStudyMaterial | null
 ): LocalStudyMaterial | null {
   const records = useSyncExternalStore(subscribe, getShown, getShown);
+  if (serverRecordChanged(subjectId, fromServer)) return fromServer;
   return Object.hasOwn(records, subjectId) ? (records[subjectId] ?? null) : fromServer;
 }
 
@@ -51,6 +56,9 @@ export function saveLocalStudyMaterial({
   fromServer,
   patch,
 }: SaveParams): Promise<void> {
+  if (serverRecordChanged(subjectId, fromServer)) confirmed.delete(subjectId);
+  origins.set(subjectId, recordKey(fromServer));
+
   const save: PendingSave = { build: typeof patch === "function" ? patch : () => patch };
   pendingSaves.set(subjectId, [...(pendingSaves.get(subjectId) ?? []), save]);
   // published before the queue, so a second edit of the same subject is on screen at once
@@ -71,14 +79,16 @@ export function saveLocalStudyMaterial({
 export function resetLocalStudyMaterials(): void {
   queues.clear();
   pendingSaves.clear();
-  confirmed = {};
+  confirmed.clear();
+  origins.clear();
   publish({});
 }
 
 async function runSave({ subjectId, fromServer, save }: RunParams): Promise<void> {
   try {
     const patch = save.build(confirmedRecord(subjectId, fromServer));
-    confirmed = { ...confirmed, [subjectId]: await api.saveStudyMaterial(subjectId, patch) };
+    const saved = await api.saveStudyMaterial(subjectId, patch);
+    confirmed.set(subjectId, saved);
   } finally {
     dropPending(subjectId, save);
     refresh(subjectId, fromServer);
@@ -88,7 +98,7 @@ async function runSave({ subjectId, fromServer, save }: RunParams): Promise<void
 /** Shows the confirmed record with every pending save applied on top, in the order they started. */
 function refresh(subjectId: number, fromServer: LocalStudyMaterial | null): void {
   const saves = pendingSaves.get(subjectId) ?? [];
-  if (saves.length === 0 && !Object.hasOwn(confirmed, subjectId)) {
+  if (saves.length === 0 && !confirmed.has(subjectId)) {
     const next = { ...shown };
     delete next[subjectId];
     publish(next);
@@ -104,7 +114,22 @@ function confirmedRecord(
   subjectId: number,
   fromServer: LocalStudyMaterial | null
 ): LocalStudyMaterial | null {
-  return Object.hasOwn(confirmed, subjectId) ? (confirmed[subjectId] ?? null) : fromServer;
+  return confirmed.has(subjectId) ? (confirmed.get(subjectId) ?? null) : fromServer;
+}
+
+function serverRecordChanged(subjectId: number, fromServer: LocalStudyMaterial | null): boolean {
+  const origin = origins.get(subjectId);
+  return origin !== undefined && origin !== recordKey(fromServer);
+}
+
+/** Compares two records by value, so the key order of a hand-edited file makes no difference. */
+function recordKey(record: LocalStudyMaterial | null): string {
+  if (!record) return "";
+  return JSON.stringify([
+    record.meaning_note ?? "",
+    record.reading_note ?? "",
+    record.meaning_synonyms ?? [],
+  ]);
 }
 
 function dropPending(subjectId: number, save: PendingSave): void {

@@ -8,6 +8,7 @@ export type Mounted = {
   find: <T extends HTMLElement = HTMLElement>(selector: string) => T;
   findByLabel: (label: string) => HTMLElement;
   findAllByLabel: (label: string) => HTMLElement[];
+  rerender: (element: ReactElement) => void;
   unmount: () => void;
 };
 
@@ -23,6 +24,7 @@ export function mount(element: ReactElement): Mounted {
     find: (selector) => findOrThrow(container, selector),
     findByLabel: (label) => findByLabelOrThrow(container, label),
     findAllByLabel: (label) => findAllByLabel(container, label),
+    rerender: (next) => flushSync(() => root.render(next)),
     unmount: () => {
       root.unmount();
       container.remove();

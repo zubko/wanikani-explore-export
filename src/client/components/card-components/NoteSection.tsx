@@ -25,7 +25,9 @@ export function NoteSection({
   const [mode, setMode] = useState<"view" | "edit">("view");
   const [draft, setDraft] = useState("");
 
-  const localNote = record?.[field] ?? null;
+  // `||` and not `??`, to drop an empty note the same way `mergeStudyMaterial` does. The server
+  // never writes one, a hand-edited file can hold one.
+  const localNote = record?.[field] || null;
   const shownNote = localNote ?? wanikaniNote;
 
   const startEdit = () => {

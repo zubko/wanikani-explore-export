@@ -8,7 +8,7 @@ Add own meaning notes, reading notes and user synonyms for radicals, kanji, voca
 - A local note replaces the WaniKani note per field. Local synonyms are appended to the WaniKani list.
 - The web UI edits them in place: a pencil button next to "Note", an inline input for synonyms. Saves are optimistic.
 - A new `PATCH /api/study-materials` endpoint upserts one entry. The subject id is in the body, like every other route in the project. Hono RPC cannot type a route that has both a path param and a JSON body without a validator.
-- Anki gets the merged result through the same helper the cards use, so the screen and the deck always agree. The one exception is kanji synonyms, the kanji note type has no field for them.
+- Anki gets the merged result from `mergeStudyMaterial`, the cards follow the same rules on their own props, so the screen and the deck agree. The one exception is kanji synonyms, the kanji note type has no field for them.
 
 ## Context (from discovery)
 
@@ -63,7 +63,7 @@ Add own meaning notes, reading notes and user synonyms for radicals, kanji, voca
 
 ## Solution Overview
 
-- The server keeps two records per subject: the WaniKani `studyMaterial` and the new `localStudyMaterial`. It sends both. One pure helper `mergeStudyMaterial` in `src/model/` merges them. Cards and Anki note builders call it.
+- The server keeps two records per subject: the WaniKani `studyMaterial` and the new `localStudyMaterial`. It sends both. One pure helper `mergeStudyMaterial` in `src/model/` merges them. Only the Anki note builders in `src/server/services/anki-connect.ts` call it. The editors need the two records apart, so they apply the same fallback rules to their own props (see the Client part).
 - The client needs both records because the editors must know what is yours: local synonyms get a remove button, and clearing a local note must show the WaniKani note again without a re-fetch.
 - The repository holds the local file in memory like the other data. ➕ The upsert re-reads the file first, because the user also edits it by hand, then writes the whole object to a temp file, renames it over the real file, and replaces the in-memory object. A failed read or write leaves both the file and memory unchanged.
 - All upserts go through one promise queue, so two overlapping saves cannot start from the same old state and drop each other's change.
@@ -125,19 +125,25 @@ export type MergedStudyMaterial = {
   - The file path is one exported constant, used by `data-loader.ts` for the read and by `study-material.ts` for the write.
 - `src/server/utils/json-utils.ts` gets `saveJsonAtomic(path, data)`: write `${path}.tmp`, `rename` it over `path`, `unlink` the temp file when either step throws. Same as the scripts copy.
 - `PATCH /api/study-materials`, body `{ id, meaning_note?, reading_note?, meaning_synonyms? }`. Every answer has `ok` with `as const`, like `/add-to-anki`, so the client can narrow:
-  - 400 `{ ok: false, error }`: id missing or not an integer; no field besides id; unknown key; a note that is not a string; synonyms that are not an array of strings; `reading_note` for a radical or kana vocabulary
+  - 400 `{ ok: false, error }`: ➕ the body is not a JSON object (`Invalid body: must be a JSON object`, checked first); id missing or not an integer; no field besides id; unknown key; a note that is not a string; synonyms that are not an array of strings; `reading_note` for a radical or kana vocabulary
   - 404 `{ ok: false, error }`: subject not found
   - 500 `{ ok: false, error }` when the write throws
   - 200 `{ ok: true, data: LocalStudyMaterial | null }`
   - log `[API] Study material kanji id=456: reading_note` on entry, then `— saved` or `— removed`
 - `saveCache()` is not involved. The upsert writes its own file.
+- ➕ This is the only route that writes user data, so `src/server/index.ts` allows CORS for the vite dev client only (`http://localhost:5173`, `http://127.0.0.1:5173`). With the default `cors()` any open page could rewrite the notes of any subject id. A built client is served from the same origin and needs no CORS.
+- ➕ Anki renders a note field as HTML, so `anki-connect.ts` wraps the merge in `mergeStudyMaterialForAnki`, which escapes `&`, `<` and `>` in the two notes and in every synonym. Without it a note like "use < for the smaller one" loses everything after the `<`. The escape happens only where the Anki fields are built, never in `mergeStudyMaterial` itself, because the client renders the same values through React and needs the raw text.
 
 ### Test hooks (`src/test/preload.ts`)
 
 - Read redirect: `study_materials_extra.json` -> `src/test/fixtures/study_materials_extra.json`, next to the mnemonic redirect.
-- The `fs/promises` mock gains `rename(from, to)`, which changes the recorded path of the `writeCalls` entry from `from` to `to`, and `unlink(path)`, which removes that entry. Both find the entry by exact path and do nothing when there is none, because after a failed `writeFile` no `.tmp` entry exists and `unlink` still runs. So a finished atomic save shows up in `writeCalls` under the real path, and a failed one leaves no `.tmp` entry behind.
-- `setFsError(op: "writeFile" | "rename", err: Error | null)`: when set, that mocked call throws instead of doing its work. `resetWriteCalls()` also clears it. This is the only way to test a failed write, because `mock.module` is process-global and set once.
-- Fixture content: `"658"` (校) reading_note; `"3766"` (毎晩) meaning_note and one synonym; `"958"` (晩) meaning_note and reading_note; `"1"` (一) meaning_note; `"456"` (川) reading_note that overrides "Kawai"; `"2478"` (アメリカ人) one synonym next to "usa person".
+- ➕ The mock keeps an in-memory `files` map of everything it wrote. `readFile` answers from that map first, so a read after a write sees the new content like a real disk does. The upsert re-reads the file inside its queue, so without this the second save of a test would read the fixture again and drop the first one. `setFileContent(path, data)` puts content there without recording a write, for a change made outside the app. `resetWriteCalls()` clears the map too.
+- The `fs/promises` mock gains `rename(from, to)`, which moves the `files` entry and changes the recorded path of the `writeCalls` entry from `from` to `to`, and `unlink(path)`, which removes both. Both find the entry by exact path and do nothing when there is none, because after a failed `writeFile` no `.tmp` entry exists and `unlink` still runs. So a finished atomic save shows up in `writeCalls` under the real path, and a failed one leaves no `.tmp` entry behind.
+- `setFsError(op: "writeFile" | "rename" | "unlink", err: Error | null)`: when set, that mocked call throws instead of doing its work. `resetWriteCalls()` also clears it. This is the only way to test a failed write, because `mock.module` is process-global and set once.
+- Fixture content: `"658"` (校) reading_note; `"3766"` (毎晩) meaning_note and one synonym; `"958"` (晩) meaning_note and reading_note; `"1"` (一) meaning_note and one synonym, both read by the add-to-anki radical test; `"456"` (川) reading_note that overrides "Kawai"; `"2478"` (アメリカ人) one synonym next to "usa person".
+- ➕ `src/test/study-material-fixture.ts` holds the setup every writing test file repeats: `loadStudyMaterialFixture()`, `resetStudyMaterialState()` for `beforeEach` and `afterEach`, `setStudyMaterialFile(file)` for a hand edit, and `lastWrite()`.
+- ➕ `src/test/api-mock.ts` answers the study material saves of the card editors, so a component test needs no server. `answerLater(id, data)` and `failLater(id, message)` hold a request open until the test resolves it, which is how the store tests make two saves overlap.
+- ➕ `src/test/render.ts` mounts a component into a real DOM: `mount`, `click`, `typeInto`, `pressKey`, `settle` and `rerender` for a new render with other props.
 
 ### Client
 
@@ -145,6 +151,8 @@ export type MergedStudyMaterial = {
 - ➕ `src/client/hooks/useLocalStudyMaterial.ts` is the store of the saved records. It is module level, not React state, because one subject can render on several cards at once.
   - `useLocalStudyMaterial(subjectId, fromServer)` reads it through `useSyncExternalStore` and falls back to the record the page was rendered with.
   - It keeps two maps: `shown`, what the editors display, and `confirmed`, the answer of the last finished save. A save that is still in flight sits in a pending list, and `shown` is `confirmed` with every pending save applied on top.
+  - ➕ `confirmed` is a real `Map` and not an object. Two subjects save at the same time, and `confirmed = { ...confirmed, [id]: await save() }` would copy the other subjects **before** the await and write that stale copy back after it, so the slower answer erased the faster one. A `Map.set` after the await touches one key only.
+  - ➕ `origins` holds the `fromServer` record the subject's session started from. A render with another value means the file changed outside this tab, for example a hand edit or a `git pull` of `data/userdata`. The hook then shows `fromServer`, and the next save drops the confirmed entry first, so a whole-list payload is built from the fresh record and does not delete the change made outside.
   - `saveLocalStudyMaterial({ subjectId, fromServer, patch })` publishes the new `shown` value at once, then runs the request in a per-subject promise queue. So a second edit of the same subject is on screen while the first request is still open, and the two requests never run at once.
   - `patch` is a plain record, or a function `(confirmed) => patch` for a whole-list field. The function runs when the request starts, so the list that goes to the server is built from the confirmed record. A change of a save that failed meanwhile is never part of the next payload.
   - The optimistic value uses the same pure `applyLocalStudyMaterialPatch` as the server, so both sides drop an empty field the same way.
@@ -155,7 +163,7 @@ export type MergedStudyMaterial = {
   - save: trim the draft, switch to view, send `{ [field]: trimmed }` through the store. Empty draft clears the local note. On error: back to edit with the draft kept, `toast.error(message)`, and the store puts the last saved value back. Cancel after an error then shows that value, never the unsaved draft
   - cancel drops the draft
 - `UserSynonymsRow` props: `subjectId`, `wanikaniSynonyms: string[]`, `localStudyMaterial: LocalStudyMaterial | null`. The local list comes from the store. WaniKani chips are plain. Local chips get a small × button, and a local word WaniKani also has is shown once, without the button. "+ Add Synonym" opens an inline input, Enter adds, Esc closes. Every change sends the whole local list as `meaning_synonyms`, built from the confirmed list. On error the list goes back and a toast shows the message. A synonym already in either list is not added twice.
-- Cards pass these props. `mergeStudyMaterial` is not needed on the client, the two components compute the shown value from their props and the store.
+- Cards pass these props. `mergeStudyMaterial` is not needed on the client, the two components compute the shown value from their props and the store. They must follow its rules: a local note falls back with `||` and not `??`, so an empty note in a hand-edited file shows the WaniKani note on both sides.
 
 ## Implementation Steps
 

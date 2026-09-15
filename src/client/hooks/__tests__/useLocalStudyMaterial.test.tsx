@@ -91,6 +91,96 @@ describe("saveLocalStudyMaterial with two subjects at once", () => {
     first.unmount();
     second.unmount();
   });
+
+  it("keeps the confirmed record of the other subject when the slower save answers", async () => {
+    const first = mount(<Probe subjectId={1} />);
+    const second = mount(<Probe subjectId={2} />);
+    const slow = apiMock.answerLater(1, { meaning_note: "Note of one" });
+    const fast = apiMock.answerLater(2, { meaning_synonyms: ["alpha"] });
+
+    const saveOne = saveLocalStudyMaterial({
+      subjectId: 1,
+      fromServer: null,
+      patch: { meaning_note: "Note of one" },
+    });
+    const saveTwo = saveLocalStudyMaterial({
+      subjectId: 2,
+      fromServer: null,
+      patch: (current) => ({ meaning_synonyms: [...(current?.meaning_synonyms ?? []), "alpha"] }),
+    });
+    fast.resolve();
+    await saveTwo;
+    slow.resolve();
+    await saveOne;
+    await settle();
+
+    apiMock.answerWith({ meaning_synonyms: ["alpha", "beta"] });
+    await saveLocalStudyMaterial({
+      subjectId: 2,
+      fromServer: null,
+      patch: (current) => ({ meaning_synonyms: [...(current?.meaning_synonyms ?? []), "beta"] }),
+    });
+    await settle();
+
+    expect(apiMock.requests.at(-1)).toEqual({ id: 2, meaning_synonyms: ["alpha", "beta"] });
+    expect(shownRecord(second)).toEqual({ meaning_synonyms: ["alpha", "beta"] });
+    first.unmount();
+    second.unmount();
+  });
+});
+
+describe("saveLocalStudyMaterial with a changed server record", () => {
+  it("drops the session record when the page is rendered with a new server record", async () => {
+    const view = mount(<Probe subjectId={1} />);
+    apiMock.answerWith({ meaning_synonyms: ["alpha"] });
+
+    await saveLocalStudyMaterial({
+      subjectId: 1,
+      fromServer: null,
+      patch: (current) => ({ meaning_synonyms: [...(current?.meaning_synonyms ?? []), "alpha"] }),
+    });
+    await settle();
+    expect(shownRecord(view)).toEqual({ meaning_synonyms: ["alpha"] });
+
+    // the file changed outside the tab, so a new search answer carries another record
+    const fresh = { meaning_synonyms: ["alpha", "by hand"] };
+    view.rerender(<Probe subjectId={1} fromServer={fresh} />);
+    await settle();
+    expect(shownRecord(view)).toEqual(fresh);
+
+    apiMock.answerWith({ meaning_synonyms: ["alpha", "by hand", "beta"] });
+    await saveLocalStudyMaterial({
+      subjectId: 1,
+      fromServer: fresh,
+      patch: (current) => ({ meaning_synonyms: [...(current?.meaning_synonyms ?? []), "beta"] }),
+    });
+    await settle();
+
+    expect(apiMock.requests.at(-1)).toEqual({
+      id: 1,
+      meaning_synonyms: ["alpha", "by hand", "beta"],
+    });
+    expect(shownRecord(view)).toEqual({ meaning_synonyms: ["alpha", "by hand", "beta"] });
+    view.unmount();
+  });
+
+  it("keeps the session record while the server record stays the same", async () => {
+    const view = mount(<Probe subjectId={1} />);
+    apiMock.answerWith({ meaning_note: "Saved note" });
+
+    await saveLocalStudyMaterial({
+      subjectId: 1,
+      fromServer: null,
+      patch: { meaning_note: "Saved note" },
+    });
+    await settle();
+
+    view.rerender(<Probe subjectId={1} />);
+    await settle();
+
+    expect(shownRecord(view)).toEqual({ meaning_note: "Saved note" });
+    view.unmount();
+  });
 });
 
 describe("saveLocalStudyMaterial with two saves for one subject", () => {

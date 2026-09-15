@@ -1,4 +1,6 @@
-import { describe, test, expect, beforeAll, beforeEach } from "bun:test";
+import { describe, test, expect, beforeAll, beforeEach, afterEach } from "bun:test";
+import type { LocalStudyMaterial } from "@/model/wanikani.ts";
+import { localStudyMaterials, setLocalStudyMaterials } from "@server/repository/data-loader.ts";
 import {
   installFetchInterceptor,
   resetFetchInterceptor,
@@ -248,5 +250,55 @@ describe("add-to-anki API", () => {
     const response = await api.request("/anki-sync", { method: "POST" });
     expect(await response.json()).toEqual({ ok: true });
     expect(ankiCalls.map((c) => c.action)).toEqual(["sync"]);
+  });
+});
+
+describe("HTML in a local note", () => {
+  let original: Record<string, LocalStudyMaterial>;
+
+  beforeEach(() => {
+    original = structuredClone(localStudyMaterials);
+    setLocalStudyMaterials({
+      ...original,
+      "1": {
+        meaning_note: "use < for the smaller one & > for the bigger",
+        meaning_synonyms: ["a & b", "c < d"],
+      },
+      "958": { meaning_note: "night & day", reading_note: "ban < bang" },
+    });
+  });
+
+  afterEach(() => setLocalStudyMaterials(original));
+
+  test("a radical note and its synonyms reach Anki escaped", async () => {
+    const result = await addToAnkiJson({ id: 1, type: "radical" });
+    expect(result.ok).toBe(true);
+
+    const fields = findNoteFields({ action: "addNote", field: "character", value: "一" });
+    expect(fields.note).toBe("use &lt; for the smaller one &amp; &gt; for the bigger");
+    expect(fields.user_synonyms).toBe("a &amp; b, c &lt; d");
+  });
+
+  test("a kanji note reaches Anki escaped", async () => {
+    const result = await addToAnkiJson({ id: 958, type: "kanji" });
+    expect(result.ok).toBe(true);
+
+    const fields = findNoteFields({ action: "addNote", field: "character", value: "晩" });
+    expect(fields.meaning_note).toBe("night &amp; day");
+    expect(fields.reading_note).toBe("ban &lt; bang");
+  });
+
+  test("a vocabulary note and its synonyms reach Anki escaped", async () => {
+    setLocalStudyMaterials({
+      ...original,
+      "3766": { meaning_note: "every evening & night", meaning_synonyms: ["a < b"] },
+    });
+
+    const result = await addToAnkiJson({ id: 3766, type: "vocabulary" });
+    expect(result.ok).toBe(true);
+
+    const fields = findVocabularyFields("addNote", "毎晩");
+    expect(fields.meaning_note).toBe("every evening &amp; night");
+    expect(fields.user_synonyms).toBe("a &lt; b");
   });
 });

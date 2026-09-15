@@ -7,6 +7,9 @@ import type {
   ContextSentence,
   PronunciationAudio,
   AnkiAddResult,
+  StudyMaterial,
+  LocalStudyMaterial,
+  MergedStudyMaterial,
 } from "@/model/wanikani.ts";
 import {
   getPrimaryMeaning,
@@ -279,11 +282,36 @@ export async function syncAnkiWeb(): Promise<void> {
   await ankiInvoke("sync");
 }
 
+// === Study material ===
+
+/**
+ * Anki renders a note field as HTML, and the notes and synonyms are plain text the user wrote.
+ * Without this a note like "use < for the smaller one" loses everything after the `<`.
+ */
+function mergeStudyMaterialForAnki(
+  wanikani: StudyMaterial | null,
+  local: LocalStudyMaterial | null
+): MergedStudyMaterial {
+  const merged = mergeStudyMaterial(wanikani, local);
+  return {
+    meaningNote: escapeHtml(merged.meaningNote),
+    readingNote: escapeHtml(merged.readingNote),
+    meaningSynonyms: merged.meaningSynonyms.map(escapeHtml),
+  };
+}
+
+function escapeHtml(text: string): string {
+  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
 // === Radical ===
 
 function buildRadicalNoteFields(radical: Radical, storedSvgFilename?: string): RadicalNoteFields {
   const primaryMeaning = getPrimaryMeaning(radical.meanings);
-  const studyMaterial = mergeStudyMaterial(radical.studyMaterial, radical.localStudyMaterial);
+  const studyMaterial = mergeStudyMaterialForAnki(
+    radical.studyMaterial,
+    radical.localStudyMaterial
+  );
 
   const character =
     radical.characters ?? (storedSvgFilename ? `<img src="${storedSvgFilename}">` : primaryMeaning);
@@ -375,7 +403,7 @@ async function buildRadicalsHtml(componentRadicals: Radical[]): Promise<string> 
 
 async function buildKanjiNoteFields(kanji: Kanji): Promise<KanjiNoteFields> {
   const radicalsHtml = await buildRadicalsHtml(kanji.componentRadicals);
-  const studyMaterial = mergeStudyMaterial(kanji.studyMaterial, kanji.localStudyMaterial);
+  const studyMaterial = mergeStudyMaterialForAnki(kanji.studyMaterial, kanji.localStudyMaterial);
 
   return {
     character: kanji.characters,
@@ -512,7 +540,10 @@ function buildVocabularyNoteFields(params: {
   const vocabData = isRegularVocab ? (vocabulary as Vocabulary) : null;
 
   const kanjiCompositionHtml = buildKanjiCompositionHtml(componentKanji);
-  const studyMaterial = mergeStudyMaterial(vocabulary.studyMaterial, vocabulary.localStudyMaterial);
+  const studyMaterial = mergeStudyMaterialForAnki(
+    vocabulary.studyMaterial,
+    vocabulary.localStudyMaterial
+  );
 
   const conjugations = vocabData?.conjugations;
   const conjugationsStr = conjugations
