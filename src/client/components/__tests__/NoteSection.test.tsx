@@ -1,12 +1,11 @@
-import { describe, expect, it, beforeEach, afterEach, afterAll } from "bun:test";
+import { describe, expect, it } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
-import { click, mount, pressKey, settle, typeInto } from "@/test/render.ts";
+import { click, mount, pressKey, settle, typeInto } from "@/test/render.tsx";
 import { installApiMock, type ApiMock } from "@/test/api-mock.ts";
 import {
   NoteSection,
   type NoteSectionProps,
 } from "@client/components/card-components/NoteSection.tsx";
-import { resetLocalStudyMaterials } from "@client/hooks/useLocalStudyMaterial.ts";
 
 const apiMock: ApiMock = installApiMock();
 
@@ -23,19 +22,6 @@ function props(overrides: Partial<NoteSectionProps> = {}): NoteSectionProps {
 function renderStatic(overrides: Partial<NoteSectionProps> = {}): string {
   return renderToStaticMarkup(<NoteSection {...props(overrides)} />);
 }
-
-beforeEach(() => {
-  apiMock.reset();
-  resetLocalStudyMaterials();
-});
-
-afterEach(() => {
-  resetLocalStudyMaterials();
-});
-
-afterAll(() => {
-  apiMock.restore();
-});
 
 describe("NoteSection view state", () => {
   it("shows the WaniKani note without the local tag", () => {
@@ -83,7 +69,6 @@ describe("NoteSection editing", () => {
     click(view.findByLabel("Edit note"));
 
     expect(view.find<HTMLTextAreaElement>("textarea").value).toBe("Kawai");
-    view.unmount();
   });
 
   it("saves the trimmed draft and shows it as local", async () => {
@@ -98,7 +83,6 @@ describe("NoteSection editing", () => {
     expect(apiMock.requests).toEqual([{ id: 456, reading_note: "My own note" }]);
     expect(view.html()).toContain("My own note");
     expect(view.html()).toContain(">local<");
-    view.unmount();
   });
 
   it("saves with Cmd+Enter and cancels with Esc", async () => {
@@ -107,17 +91,16 @@ describe("NoteSection editing", () => {
 
     click(view.findByLabel("+ Add Note"));
     typeInto(view.find("textarea"), "Typed");
-    pressKey(view.find("textarea"), "Enter", true);
+    pressKey({ node: view.find("textarea"), key: "Enter", metaKey: true });
     await settle();
     expect(apiMock.requests).toEqual([{ id: 456, reading_note: "Typed" }]);
 
     click(view.findByLabel("Edit note"));
     typeInto(view.find("textarea"), "Dropped");
-    pressKey(view.find("textarea"), "Escape");
+    pressKey({ node: view.find("textarea"), key: "Escape" });
 
     expect(view.html()).toContain("Typed");
     expect(view.html()).not.toContain("Dropped");
-    view.unmount();
   });
 
   it("drops the draft on cancel", () => {
@@ -129,7 +112,6 @@ describe("NoteSection editing", () => {
     click(view.findByLabel("Edit note"));
 
     expect(view.find<HTMLTextAreaElement>("textarea").value).toBe("Kawai");
-    view.unmount();
   });
 
   it("an empty draft clears the local note and shows the WaniKani one again", async () => {
@@ -148,7 +130,6 @@ describe("NoteSection editing", () => {
     expect(apiMock.requests).toEqual([{ id: 456, reading_note: "" }]);
     expect(view.html()).toContain("Kawai");
     expect(view.html()).not.toContain(">local<");
-    view.unmount();
   });
 
   it("puts the old note back and reopens the editor when the save fails", async () => {
@@ -170,7 +151,6 @@ describe("NoteSection editing", () => {
 
     expect(view.html()).toContain("Saved");
     expect(view.html()).not.toContain("Never saved");
-    view.unmount();
   });
 
   it("shows the second note while the first save is still in flight", async () => {
@@ -199,8 +179,6 @@ describe("NoteSection editing", () => {
     ]);
     expect(meaning.html()).toContain("Meaning note");
     expect(reading.html()).toContain("Reading note");
-    meaning.unmount();
-    reading.unmount();
   });
 
   it("shows the same saved note on two cards of one subject", async () => {
@@ -215,7 +193,5 @@ describe("NoteSection editing", () => {
 
     expect(second.html()).toContain("Shared");
     expect(second.html()).toContain(">local<");
-    first.unmount();
-    second.unmount();
   });
 });

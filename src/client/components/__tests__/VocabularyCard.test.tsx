@@ -1,7 +1,11 @@
 import { describe, expect, it } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { KanaVocabulary, Vocabulary } from "@/model/wanikani.ts";
+import { installApiMock } from "@/test/api-mock.ts";
 import { VocabularyCard } from "@client/components/VocabularyCard.tsx";
+
+// the note editors read the client store, which this clears around every test
+installApiMock();
 
 const kanaVocabulary: KanaVocabulary = {
   object: "kana_vocabulary",

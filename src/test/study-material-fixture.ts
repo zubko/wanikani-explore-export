@@ -4,9 +4,9 @@ import {
   LOCAL_STUDY_MATERIALS_PATH,
   setLocalStudyMaterials,
 } from "@server/repository/data-loader.ts";
-import { resetWriteCalls, setFileContent, writeCalls } from "./preload.ts";
+import { resetFsMock, setFileContent, writeCalls } from "./preload.ts";
 
-export const STUDY_MATERIAL_FIXTURE_PATH = "src/test/fixtures/study_materials_extra.json";
+const FIXTURE_PATH = "src/test/fixtures/study_materials_extra.json";
 
 /** Filled by `loadStudyMaterialFixture`, so a test can compare against the untouched records. */
 export const studyMaterialFixture: Record<string, LocalStudyMaterial> = {};
@@ -14,7 +14,7 @@ export const studyMaterialFixture: Record<string, LocalStudyMaterial> = {};
 export async function loadStudyMaterialFixture(): Promise<void> {
   Object.assign(
     studyMaterialFixture,
-    await readJson<Record<string, LocalStudyMaterial>>(STUDY_MATERIAL_FIXTURE_PATH)
+    await readJson<Record<string, LocalStudyMaterial>>(FIXTURE_PATH)
   );
 }
 
@@ -23,7 +23,7 @@ export async function loadStudyMaterialFixture(): Promise<void> {
  * because bun runs all files in one process and the repository state is module level.
  */
 export function resetStudyMaterialState(): void {
-  resetWriteCalls();
+  resetFsMock();
   setLocalStudyMaterials(structuredClone(studyMaterialFixture));
 }
 

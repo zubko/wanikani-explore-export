@@ -1,6 +1,10 @@
 import { Hono } from "hono";
 import type { Context } from "hono";
-import { isSubjectType } from "@/model/wanikani.ts";
+import {
+  isSubjectType,
+  LOCAL_STUDY_MATERIAL_FIELDS,
+  LOCAL_STUDY_MATERIAL_NOTE_FIELDS,
+} from "@/model/wanikani.ts";
 import type {
   AnkiAddResult,
   AnkiNoteItem,
@@ -40,9 +44,6 @@ import {
 
 const ANKI_DECK_TYPES: AnkiDeckType[] = ["radical", "kanji", "vocabulary"];
 
-const STUDY_MATERIAL_NOTE_FIELDS = ["meaning_note", "reading_note"] as const;
-const STUDY_MATERIAL_FIELDS = [...STUDY_MATERIAL_NOTE_FIELDS, "meaning_synonyms"] as const;
-
 function getErrorMessage(err: unknown): string {
   if (err instanceof Error) return err.message;
   if (typeof err === "object" && err !== null && "message" in err) return String(err.message);
@@ -76,12 +77,11 @@ function validateStudyMaterialPatch(patch: Record<string, unknown>): string | nu
   const fields = Object.keys(patch);
   if (fields.length === 0) return "Missing required parameter: at least one field besides id";
 
-  const unknown = fields.find(
-    (key) => !STUDY_MATERIAL_FIELDS.includes(key as (typeof STUDY_MATERIAL_FIELDS)[number])
-  );
+  const knownFields: readonly string[] = LOCAL_STUDY_MATERIAL_FIELDS;
+  const unknown = fields.find((key) => !knownFields.includes(key));
   if (unknown !== undefined) return `Invalid field: ${unknown}`;
 
-  for (const field of STUDY_MATERIAL_NOTE_FIELDS) {
+  for (const field of LOCAL_STUDY_MATERIAL_NOTE_FIELDS) {
     if (field in patch && typeof patch[field] !== "string") {
       return `Invalid ${field}: must be a string`;
     }

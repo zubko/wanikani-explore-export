@@ -12,7 +12,7 @@ import { MnemonicText } from "./card-components/MnemonicText.tsx";
 import { NoteSection } from "./card-components/NoteSection.tsx";
 import { RelatedSubjectsSection } from "./card-components/RelatedSubjectsSection.tsx";
 import { UserSynonymsRow, type UserSynonymsRowProps } from "./card-components/UserSynonymsRow.tsx";
-import { noteProps, synonymProps } from "../utils/study-material-props.ts";
+import { noteProps, synonymProps } from "./card-components/study-material-props.ts";
 
 type RadicalCardProps = {
   radical: Radical;

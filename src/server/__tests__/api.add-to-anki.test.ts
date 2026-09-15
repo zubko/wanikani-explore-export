@@ -1,6 +1,10 @@
 import { describe, test, expect, beforeAll, beforeEach, afterEach } from "bun:test";
-import type { LocalStudyMaterial } from "@/model/wanikani.ts";
-import { localStudyMaterials, setLocalStudyMaterials } from "@server/repository/data-loader.ts";
+import { setLocalStudyMaterials } from "@server/repository/data-loader.ts";
+import {
+  loadStudyMaterialFixture,
+  resetStudyMaterialState,
+  studyMaterialFixture as fixture,
+} from "@/test/study-material-fixture.ts";
 import {
   installFetchInterceptor,
   resetFetchInterceptor,
@@ -18,7 +22,10 @@ process.env.AZURE_TTS_REGION = "eastus";
 process.env.AZURE_TTS_VOICES = "ja-JP-TestNeural";
 
 installFetchInterceptor();
-beforeAll(() => ensureRepositoryInitialized());
+beforeAll(async () => {
+  await ensureRepositoryInitialized();
+  await loadStudyMaterialFixture();
+});
 beforeEach(() => {
   resetFetchInterceptor();
   resetRandom();
@@ -254,12 +261,10 @@ describe("add-to-anki API", () => {
 });
 
 describe("HTML in a local note", () => {
-  let original: Record<string, LocalStudyMaterial>;
-
   beforeEach(() => {
-    original = structuredClone(localStudyMaterials);
+    resetStudyMaterialState();
     setLocalStudyMaterials({
-      ...original,
+      ...fixture,
       "1": {
         meaning_note: "use < for the smaller one & > for the bigger",
         meaning_synonyms: ["a & b", "c < d"],
@@ -268,7 +273,7 @@ describe("HTML in a local note", () => {
     });
   });
 
-  afterEach(() => setLocalStudyMaterials(original));
+  afterEach(resetStudyMaterialState);
 
   test("a radical note and its synonyms reach Anki escaped", async () => {
     const result = await addToAnkiJson({ id: 1, type: "radical" });
@@ -290,7 +295,7 @@ describe("HTML in a local note", () => {
 
   test("a vocabulary note and its synonyms reach Anki escaped", async () => {
     setLocalStudyMaterials({
-      ...original,
+      ...fixture,
       "3766": { meaning_note: "every evening & night", meaning_synonyms: ["a < b"] },
     });
 

@@ -1,6 +1,7 @@
 import type { Radical, RadicalData } from "@/model/wanikani.ts";
 import {
   findStudyMaterial,
+  findLocalStudyMaterial,
   findByIds,
   buildSubjectReferences,
   getPrimaryMeaning,
@@ -31,7 +32,7 @@ async function buildRadical(data: RadicalData): Promise<Radical> {
     meaningMnemonic: data.data.meaning_mnemonic,
     amalgamationSubjectIds: data.data.amalgamation_subject_ids,
     studyMaterial: findStudyMaterial(studyMaterials, data.id, "radical"),
-    localStudyMaterial: localStudyMaterials[String(data.id)] ?? null,
+    localStudyMaterial: findLocalStudyMaterial(localStudyMaterials, data.id),
     mnemonicImageUrl,
     foundInKanji,
   };

@@ -22,7 +22,7 @@ import { SubjectTile } from "./card-components/SubjectTile.tsx";
 import { UserSynonymsRow, type UserSynonymsRowProps } from "./card-components/UserSynonymsRow.tsx";
 import { api } from "../api.ts";
 import { formatAnkiResult } from "../utils/format-anki-result.ts";
-import { noteProps, synonymProps } from "../utils/study-material-props.ts";
+import { noteProps, synonymProps } from "./card-components/study-material-props.ts";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { VolumeHighIcon } from "@hugeicons/core-free-icons";
 

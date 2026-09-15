@@ -40,6 +40,13 @@ export function findStudyMaterial(
   );
 }
 
+export function findLocalStudyMaterial(
+  localStudyMaterials: Record<string, LocalStudyMaterial>,
+  subjectId: number
+): LocalStudyMaterial | null {
+  return localStudyMaterials[String(subjectId)] ?? null;
+}
+
 export function mergeStudyMaterial(
   wanikani: StudyMaterial | null,
   local: LocalStudyMaterial | null

@@ -1,5 +1,6 @@
 import toast from "react-hot-toast";
 import type { Kanji, Radical } from "@/model/wanikani.ts";
+import { KANJI_EXPECTED_FIELDS } from "@/model/anki-models.ts";
 import { getPrimaryMeaning } from "@/model/subject-utils.ts";
 import { getRadicalSvgUrl } from "@/model/radical-utils.ts";
 import { getReadingsByType, type ReadingWithPrimary } from "@/model/kanji-utils.ts";
@@ -16,11 +17,14 @@ import { SectionTitle } from "./card-components/SectionTitle.tsx";
 import { UserSynonymsRow, type UserSynonymsRowProps } from "./card-components/UserSynonymsRow.tsx";
 import { api } from "../api.ts";
 import { formatAnkiResult } from "../utils/format-anki-result.ts";
-import { noteProps, synonymProps } from "../utils/study-material-props.ts";
+import { noteProps, synonymProps } from "./card-components/study-material-props.ts";
 
 type KanjiCardProps = {
   kanji: Kanji;
 };
+
+// The hint goes away on its own once the kanji note type gets the field
+const SYNONYM_HINT = KANJI_EXPECTED_FIELDS.includes("user_synonyms") ? undefined : "not in Anki";
 
 export function KanjiCard({ kanji }: KanjiCardProps) {
   const primaryMeaning = getPrimaryMeaning(kanji.meanings);
@@ -50,7 +54,7 @@ export function KanjiCard({ kanji }: KanjiCardProps) {
         <RadicalCombinationSection componentRadicals={kanji.componentRadicals} />
         <MeaningSection
           meanings={kanji.meanings}
-          synonyms={{ ...synonymProps(kanji), hint: "not in Anki" }}
+          synonyms={{ ...synonymProps(kanji), hint: SYNONYM_HINT }}
           mnemonic={kanji.meaningMnemonic}
           hint={kanji.meaningHint}
           note={noteProps(kanji, "meaning_note")}

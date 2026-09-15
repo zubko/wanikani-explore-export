@@ -1,11 +1,11 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
-import { resetWriteCalls, setFsError, writeCalls } from "@/test/preload.ts";
+import { resetFsMock, setFsError, writeCalls } from "@/test/preload.ts";
 import { saveJsonAtomic } from "../json-utils.ts";
 
 const PATH = "./data/userdata/json-utils-test.json";
 
-beforeEach(resetWriteCalls);
-afterEach(resetWriteCalls);
+beforeEach(resetFsMock);
+afterEach(resetFsMock);
 
 describe("saveJsonAtomic", () => {
   test("writes a temp file and renames it over the real one", async () => {

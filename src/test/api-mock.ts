@@ -1,5 +1,8 @@
+import { afterAll, afterEach, beforeEach } from "bun:test";
 import type { LocalStudyMaterial } from "@/model/wanikani.ts";
+import { resetLocalStudyMaterials } from "@client/hooks/useLocalStudyMaterial.ts";
 import { createFetchMock } from "./fetch-utils.ts";
+import { unmountAll } from "./render.tsx";
 
 /** A held back answer. The request stays in flight until the test calls `resolve`. */
 export type HeldAnswer = { resolve: () => void };
@@ -11,13 +14,15 @@ export type ApiMock = {
   failWith: (message: string) => void;
   answerLater: (id: number, data: LocalStudyMaterial | null) => HeldAnswer;
   failLater: (id: number, message: string) => HeldAnswer;
-  reset: () => void;
-  restore: () => void;
 };
 
 type HeldRequest = { id: number; open: Promise<void>; response: () => Response };
 
-/** Answers the study material saves of the card editors, so a component test needs no server. */
+/**
+ * Answers the study material saves of the card editors, so a component test needs no server.
+ * Called once at the top of a test file: it also clears the client store and unmounts the views
+ * around every test, because bun runs all files in one process.
+ */
 export function installApiMock(): ApiMock {
   const requests: Record<string, unknown>[] = [];
   // other test files install their own fetch mock and never restore it, so this is whichever
@@ -45,6 +50,22 @@ export function installApiMock(): ApiMock {
     return next!.response();
   });
 
+  beforeEach(() => {
+    requests.length = 0;
+    held.length = 0;
+    answer = () => jsonResponse({ ok: true, data: null }, 200);
+    resetLocalStudyMaterials();
+  });
+
+  afterEach(() => {
+    unmountAll();
+    resetLocalStudyMaterials();
+  });
+
+  afterAll(() => {
+    globalThis.fetch = previousFetch;
+  });
+
   return {
     requests,
     answerWith: (data) => {
@@ -55,14 +76,6 @@ export function installApiMock(): ApiMock {
     },
     answerLater: (id, data) => hold(id, () => jsonResponse({ ok: true, data }, 200)),
     failLater: (id, message) => hold(id, () => jsonResponse({ ok: false, error: message }, 500)),
-    reset: () => {
-      requests.length = 0;
-      held.length = 0;
-      answer = () => jsonResponse({ ok: true, data: null }, 200);
-    },
-    restore: () => {
-      globalThis.fetch = previousFetch;
-    },
   };
 }
 

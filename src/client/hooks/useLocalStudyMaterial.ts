@@ -76,6 +76,7 @@ export function saveLocalStudyMaterial({
   return run;
 }
 
+/** Test hook: drops the whole store, so one test file cannot see the records of another. */
 export function resetLocalStudyMaterials(): void {
   queues.clear();
   pendingSaves.clear();
@@ -95,7 +96,6 @@ async function runSave({ subjectId, fromServer, save }: RunParams): Promise<void
   }
 }
 
-/** Shows the confirmed record with every pending save applied on top, in the order they started. */
 function refresh(subjectId: number, fromServer: LocalStudyMaterial | null): void {
   const saves = pendingSaves.get(subjectId) ?? [];
   if (saves.length === 0 && !confirmed.has(subjectId)) {
@@ -122,7 +122,7 @@ function serverRecordChanged(subjectId: number, fromServer: LocalStudyMaterial |
   return origin !== undefined && origin !== recordKey(fromServer);
 }
 
-/** Compares two records by value, so the key order of a hand-edited file makes no difference. */
+/** By value, so the key order of a hand-edited file makes no difference. */
 function recordKey(record: LocalStudyMaterial | null): string {
   if (!record) return "";
   return JSON.stringify([

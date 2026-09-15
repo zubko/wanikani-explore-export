@@ -1,18 +1,10 @@
-import { describe, expect, it, beforeEach, afterEach, afterAll } from "bun:test";
+import { describe, expect, it } from "bun:test";
 import type { Radical, StudyMaterial } from "@/model/wanikani.ts";
-import { click, mount, pressKey, settle, typeInto } from "@/test/render.ts";
+import { click, mountCard, pressKey, settle, typeInto } from "@/test/render.tsx";
 import { installApiMock, type ApiMock } from "@/test/api-mock.ts";
 import { RadicalCard } from "@client/components/RadicalCard.tsx";
-import { SearchContext } from "@client/context/SearchContext.tsx";
-import { resetLocalStudyMaterials } from "@client/hooks/useLocalStudyMaterial.ts";
 
 const apiMock: ApiMock = installApiMock();
-
-function mountCard(element: React.ReactElement) {
-  return mount(
-    <SearchContext.Provider value={{ navigateTo: () => {} }}>{element}</SearchContext.Provider>
-  );
-}
 
 const studyMaterial: StudyMaterial = {
   id: 100,
@@ -48,19 +40,6 @@ const radical: Radical = {
   foundInKanji: [],
 };
 
-beforeEach(() => {
-  apiMock.reset();
-  resetLocalStudyMaterials();
-});
-
-afterEach(() => {
-  resetLocalStudyMaterials();
-});
-
-afterAll(() => {
-  apiMock.restore();
-});
-
 describe("RadicalCard editors", () => {
   it("shows the WaniKani note and synonym of the radical", () => {
     const view = mountCard(<RadicalCard radical={radical} />);
@@ -68,7 +47,6 @@ describe("RadicalCard editors", () => {
     expect(view.html()).toContain("From WaniKani");
     expect(view.html()).toContain("floor");
     expect(view.findAllByLabel("Edit note")).toHaveLength(1);
-    view.unmount();
   });
 
   it("saves the meaning note under the radical id", async () => {
@@ -81,7 +59,6 @@ describe("RadicalCard editors", () => {
     await settle();
 
     expect(apiMock.requests).toEqual([{ id: 1, meaning_note: "My own" }]);
-    view.unmount();
   });
 
   it("saves a synonym under the radical id", async () => {
@@ -90,10 +67,9 @@ describe("RadicalCard editors", () => {
 
     click(view.findByLabel("+ Add Synonym"));
     typeInto(view.find("input"), "flat");
-    pressKey(view.find("input"), "Enter");
+    pressKey({ node: view.find("input"), key: "Enter" });
     await settle();
 
     expect(apiMock.requests).toEqual([{ id: 1, meaning_synonyms: ["flat"] }]);
-    view.unmount();
   });
 });

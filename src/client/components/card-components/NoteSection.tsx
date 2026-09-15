@@ -1,16 +1,18 @@
 import { useState } from "react";
 import toast from "react-hot-toast";
 import { Cancel01Icon, CheckmarkCircle01Icon, PencilEdit01Icon } from "@hugeicons/core-free-icons";
-import type { LocalStudyMaterial } from "@/model/wanikani.ts";
+import type { LocalStudyMaterial, LocalStudyMaterialNoteField } from "@/model/wanikani.ts";
 import {
   saveLocalStudyMaterial,
   useLocalStudyMaterial,
 } from "../../hooks/useLocalStudyMaterial.ts";
+import { saveErrorMessage } from "../../utils/request-error.ts";
+import { AddButton } from "./AddButton.tsx";
 import { IconButton } from "./IconButton.tsx";
 
 export type NoteSectionProps = {
   subjectId: number;
-  field: "meaning_note" | "reading_note";
+  field: LocalStudyMaterialNoteField;
   wanikaniNote: string;
   localStudyMaterial: LocalStudyMaterial | null;
 };
@@ -50,7 +52,7 @@ export function NoteSection({
       });
     } catch (err) {
       setMode("edit");
-      toast.error(err instanceof Error ? err.message : String(err));
+      toast.error(saveErrorMessage(err));
     }
   };
 
@@ -81,13 +83,7 @@ export function NoteSection({
     return (
       <div>
         <NoteHeader />
-        <button
-          type="button"
-          onClick={startEdit}
-          className="cursor-pointer text-sm text-gray-400 hover:text-gray-600"
-        >
-          + Add Note
-        </button>
+        <AddButton label="+ Add Note" onClick={startEdit} />
       </div>
     );
   }

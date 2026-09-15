@@ -1,6 +1,6 @@
 import type { LocalStudyMaterial, StudyMaterial } from "@/model/wanikani.ts";
-import type { NoteSectionProps } from "../components/card-components/NoteSection.tsx";
-import type { UserSynonymsRowProps } from "../components/card-components/UserSynonymsRow.tsx";
+import type { NoteSectionProps } from "./NoteSection.tsx";
+import type { UserSynonymsRowProps } from "./UserSynonymsRow.tsx";
 
 type SubjectWithStudyMaterial = {
   id: number;

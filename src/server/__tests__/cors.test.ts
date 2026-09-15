@@ -1,5 +1,8 @@
 import { describe, test, expect } from "bun:test";
-import app from "../index.ts";
+import { createApp } from "../app.ts";
+
+// not `../index.ts`: that module runs `initRepository()` at import time
+const app = createApp();
 
 async function allowedOriginFor(origin: string): Promise<string | null> {
   const response = await app.request("/api/study-materials", {

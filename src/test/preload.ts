@@ -13,7 +13,8 @@ const fsErrors: Partial<Record<FsOp, Error>> = {};
 // Holds the written files, so a read after a write sees the new content like a real disk does
 const files = new Map<string, string>();
 
-export function resetWriteCalls() {
+/** Drops the recorded writes, the written files and the injected errors. */
+export function resetFsMock() {
   writeCalls.length = 0;
   files.clear();
   delete fsErrors.writeFile;

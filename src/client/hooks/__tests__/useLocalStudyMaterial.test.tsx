@@ -1,9 +1,8 @@
-import { describe, expect, it, beforeEach, afterEach, afterAll } from "bun:test";
+import { describe, expect, it } from "bun:test";
 import type { LocalStudyMaterial } from "@/model/wanikani.ts";
 import { installApiMock, type ApiMock } from "@/test/api-mock.ts";
-import { mount, settle, type Mounted } from "@/test/render.ts";
+import { mount, settle, type Mounted } from "@/test/render.tsx";
 import {
-  resetLocalStudyMaterials,
   saveLocalStudyMaterial,
   useLocalStudyMaterial,
 } from "@client/hooks/useLocalStudyMaterial.ts";
@@ -20,19 +19,6 @@ function Probe({ subjectId, fromServer = null }: ProbeProps) {
 function shownRecord(view: Mounted): LocalStudyMaterial | null {
   return JSON.parse(view.container.textContent || "null") as LocalStudyMaterial | null;
 }
-
-beforeEach(() => {
-  apiMock.reset();
-  resetLocalStudyMaterials();
-});
-
-afterEach(() => {
-  resetLocalStudyMaterials();
-});
-
-afterAll(() => {
-  apiMock.restore();
-});
 
 describe("saveLocalStudyMaterial with two subjects at once", () => {
   it("keeps the entry of the subject that answered first", async () => {
@@ -59,8 +45,6 @@ describe("saveLocalStudyMaterial with two subjects at once", () => {
 
     expect(shownRecord(second)).toEqual({ meaning_note: "Note of two" });
     expect(shownRecord(first)).toEqual({ meaning_note: "Note of one" });
-    first.unmount();
-    second.unmount();
   });
 
   it("a failed save stays rolled back when the other subject answers later", async () => {
@@ -88,12 +72,10 @@ describe("saveLocalStudyMaterial with two subjects at once", () => {
 
     expect(shownRecord(second)).toEqual({ meaning_note: "Note of two" });
     expect(shownRecord(first)).toEqual({ meaning_note: "From server" });
-    first.unmount();
-    second.unmount();
   });
 
   it("keeps the confirmed record of the other subject when the slower save answers", async () => {
-    const first = mount(<Probe subjectId={1} />);
+    mount(<Probe subjectId={1} />);
     const second = mount(<Probe subjectId={2} />);
     const slow = apiMock.answerLater(1, { meaning_note: "Note of one" });
     const fast = apiMock.answerLater(2, { meaning_synonyms: ["alpha"] });
@@ -124,8 +106,6 @@ describe("saveLocalStudyMaterial with two subjects at once", () => {
 
     expect(apiMock.requests.at(-1)).toEqual({ id: 2, meaning_synonyms: ["alpha", "beta"] });
     expect(shownRecord(second)).toEqual({ meaning_synonyms: ["alpha", "beta"] });
-    first.unmount();
-    second.unmount();
   });
 });
 
@@ -161,7 +141,6 @@ describe("saveLocalStudyMaterial with a changed server record", () => {
       meaning_synonyms: ["alpha", "by hand", "beta"],
     });
     expect(shownRecord(view)).toEqual({ meaning_synonyms: ["alpha", "by hand", "beta"] });
-    view.unmount();
   });
 
   it("keeps the session record while the server record stays the same", async () => {
@@ -179,7 +158,6 @@ describe("saveLocalStudyMaterial with a changed server record", () => {
     await settle();
 
     expect(shownRecord(view)).toEqual({ meaning_note: "Saved note" });
-    view.unmount();
   });
 });
 
@@ -220,7 +198,6 @@ describe("saveLocalStudyMaterial with two saves for one subject", () => {
       meaning_note: "From server",
       meaning_synonyms: ["beta"],
     });
-    view.unmount();
   });
 
   it("shows the second save at once while the first request is still in flight", async () => {
@@ -248,7 +225,6 @@ describe("saveLocalStudyMaterial with two saves for one subject", () => {
     await settle();
 
     expect(shownRecord(view)).toEqual({ meaning_note: "First", reading_note: "Second" });
-    view.unmount();
   });
 
   it("builds a queued payload from the confirmed record, not from the shown one", async () => {
@@ -283,7 +259,6 @@ describe("saveLocalStudyMaterial with two saves for one subject", () => {
       { id: 1, meaning_synonyms: [] },
     ]);
     expect(shownRecord(view)).toBeNull();
-    view.unmount();
   });
 
   it("the second save starts from the value the first one stored", async () => {
@@ -313,6 +288,5 @@ describe("saveLocalStudyMaterial with two saves for one subject", () => {
       meaning_note: "Saved note",
       meaning_synonyms: ["beta"],
     });
-    view.unmount();
   });
 });

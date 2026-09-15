@@ -81,11 +81,18 @@ export type StudyMaterial = {
   data: StudyMaterialData;
 };
 
-export type LocalStudyMaterial = {
-  meaning_note?: string;
-  reading_note?: string;
-  meaning_synonyms?: string[];
-};
+export const LOCAL_STUDY_MATERIAL_NOTE_FIELDS = ["meaning_note", "reading_note"] as const;
+const LOCAL_STUDY_MATERIAL_LIST_FIELDS = ["meaning_synonyms"] as const;
+export const LOCAL_STUDY_MATERIAL_FIELDS = [
+  ...LOCAL_STUDY_MATERIAL_NOTE_FIELDS,
+  ...LOCAL_STUDY_MATERIAL_LIST_FIELDS,
+] as const;
+
+export type LocalStudyMaterialNoteField = (typeof LOCAL_STUDY_MATERIAL_NOTE_FIELDS)[number];
+
+// Built from the field lists, so a new field reaches the type, the editors and the PATCH route
+export type LocalStudyMaterial = Partial<Record<LocalStudyMaterialNoteField, string>> &
+  Partial<Record<(typeof LOCAL_STUDY_MATERIAL_LIST_FIELDS)[number], string[]>>;
 
 export type MergedStudyMaterial = {
   meaningNote: string;

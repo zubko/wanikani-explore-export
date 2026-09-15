@@ -1,12 +1,11 @@
-import { describe, expect, it, beforeEach, afterEach, afterAll } from "bun:test";
+import { describe, expect, it } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
-import { click, mount, pressKey, settle, typeInto } from "@/test/render.ts";
+import { click, mount, pressKey, settle, typeInto, type Mounted } from "@/test/render.tsx";
 import { installApiMock, type ApiMock } from "@/test/api-mock.ts";
 import {
   UserSynonymsRow,
   type UserSynonymsRowProps,
 } from "@client/components/card-components/UserSynonymsRow.tsx";
-import { resetLocalStudyMaterials } from "@client/hooks/useLocalStudyMaterial.ts";
 
 const apiMock: ApiMock = installApiMock();
 
@@ -23,24 +22,11 @@ function renderStatic(overrides: Partial<UserSynonymsRowProps> = {}): string {
   return renderToStaticMarkup(<UserSynonymsRow {...props(overrides)} />);
 }
 
-function addSynonym(view: ReturnType<typeof mount>, word: string): void {
+function addSynonym(view: Mounted, word: string): void {
   click(view.findByLabel("+ Add Synonym"));
   typeInto(view.find("input"), word);
-  pressKey(view.find("input"), "Enter");
+  pressKey({ node: view.find("input"), key: "Enter" });
 }
-
-beforeEach(() => {
-  apiMock.reset();
-  resetLocalStudyMaterials();
-});
-
-afterEach(() => {
-  resetLocalStudyMaterials();
-});
-
-afterAll(() => {
-  apiMock.restore();
-});
 
 describe("UserSynonymsRow view state", () => {
   it("shows a WaniKani synonym without a remove button", () => {
@@ -102,7 +88,6 @@ describe("UserSynonymsRow editing", () => {
 
     expect(apiMock.requests).toEqual([{ id: 2478, meaning_synonyms: ["american", "yank"] }]);
     expect(view.html()).toContain("Remove yank");
-    view.unmount();
   });
 
   it("closes the input on Esc without sending anything", () => {
@@ -110,12 +95,11 @@ describe("UserSynonymsRow editing", () => {
 
     click(view.findByLabel("+ Add Synonym"));
     typeInto(view.find("input"), "yank");
-    pressKey(view.find("input"), "Escape");
+    pressKey({ node: view.find("input"), key: "Escape" });
 
     expect(apiMock.requests).toEqual([]);
     expect(view.html()).toContain("+ Add Synonym");
     expect(view.html()).not.toContain("yank");
-    view.unmount();
   });
 
   it("refuses a word that is already a synonym", () => {
@@ -132,7 +116,6 @@ describe("UserSynonymsRow editing", () => {
     addSynonym(view, "usa person");
 
     expect(apiMock.requests).toEqual([]);
-    view.unmount();
   });
 
   it("removes only the clicked synonym", async () => {
@@ -149,7 +132,6 @@ describe("UserSynonymsRow editing", () => {
     expect(apiMock.requests).toEqual([{ id: 2478, meaning_synonyms: ["yank"] }]);
     expect(view.html()).toContain("Remove yank");
     expect(view.html()).not.toContain("Remove american");
-    view.unmount();
   });
 
   it("puts the old list back when the save fails", async () => {
@@ -163,7 +145,6 @@ describe("UserSynonymsRow editing", () => {
 
     expect(view.html()).toContain("Remove american");
     expect(view.html()).not.toContain("Remove yank");
-    view.unmount();
   });
 
   it("never sends a word again that the save before it failed with", async () => {
@@ -189,7 +170,6 @@ describe("UserSynonymsRow editing", () => {
     ]);
     expect(view.html()).not.toContain("Remove yank");
     expect(view.html()).not.toContain("Remove american");
-    view.unmount();
   });
 
   it("keeps two cards of one subject on the same list", async () => {
@@ -213,7 +193,5 @@ describe("UserSynonymsRow editing", () => {
       { id: 2478, meaning_synonyms: ["american", "yank", "statesider"] },
     ]);
     expect(first.html()).toContain("Remove statesider");
-    first.unmount();
-    second.unmount();
   });
 });

@@ -6,6 +6,8 @@ import {
   saveLocalStudyMaterial,
   useLocalStudyMaterial,
 } from "../../hooks/useLocalStudyMaterial.ts";
+import { saveErrorMessage } from "../../utils/request-error.ts";
+import { AddButton } from "./AddButton.tsx";
 import { IconButton } from "./IconButton.tsx";
 
 export type UserSynonymsRowProps = {
@@ -38,7 +40,7 @@ export function UserSynonymsRow({
         patch: (current) => ({ meaning_synonyms: nextList(current?.meaning_synonyms ?? []) }),
       });
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : String(err));
+      toast.error(saveErrorMessage(err));
     }
   };
 
@@ -95,16 +97,13 @@ export function UserSynonymsRow({
           className="w-32 rounded border border-gray-300 px-1.5 text-sm text-gray-900"
         />
       ) : (
-        <button
-          type="button"
+        <AddButton
+          label="+ Add Synonym"
           onClick={() => {
             setDraft("");
             setMode("add");
           }}
-          className="cursor-pointer text-sm text-gray-400 hover:text-gray-600"
-        >
-          + Add Synonym
-        </button>
+        />
       )}
       {hint && <span className="text-xs text-gray-400">{hint}</span>}
     </div>

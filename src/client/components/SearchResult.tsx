@@ -44,6 +44,8 @@ export function SearchResult({ type, result, onRetry }: SearchResultProps) {
     );
   }
 
+  // The `key` on a top-level card is not decoration. Without it React keeps the same instance on
+  // the next search, and an open editor keeps the draft of the subject before it.
   switch (type) {
     case "radicals":
       return <RadicalCard key={result.item.id} radical={result.item as Radical} />;
