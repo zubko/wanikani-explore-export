@@ -1,21 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { Window } from "happy-dom";
-
-const window = new Window();
-Object.assign(globalThis, {
-  window,
-  document: window.document,
-  DocumentFragment: window.DocumentFragment,
-  HTMLTemplateElement: window.HTMLTemplateElement,
-  Node: window.Node,
-  Element: window.Element,
-  NodeFilter: window.NodeFilter,
-  NamedNodeMap: window.NamedNodeMap,
-  HTMLFormElement: window.HTMLFormElement,
-  DOMParser: window.DOMParser,
-});
-
-const { sanitizeHtml } = await import("@client/utils/sanitize-html.ts");
+import { sanitizeHtml } from "@client/utils/sanitize-html.ts";
 
 describe("sanitizeHtml", () => {
   it("preserves mnemonic tags", () => {

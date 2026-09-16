@@ -66,7 +66,7 @@ export type PronunciationAudio = {
 export type StudyMaterialData = {
   created_at: string;
   subject_id: number;
-  subject_type: "radical" | "kanji" | "vocabulary";
+  subject_type: "radical" | "kanji" | "vocabulary" | "kana_vocabulary";
   meaning_note: string;
   reading_note: string;
   meaning_synonyms: string[];
@@ -79,6 +79,36 @@ export type StudyMaterial = {
   url: string;
   data_updated_at: string;
   data: StudyMaterialData;
+};
+
+export const LOCAL_STUDY_MATERIAL_NOTE_FIELDS = ["meaning_note", "reading_note"] as const;
+const LOCAL_STUDY_MATERIAL_LIST_FIELDS = ["meaning_synonyms"] as const;
+/** The fields a stored record can hold. */
+export const LOCAL_STUDY_MATERIAL_FIELDS = [
+  ...LOCAL_STUDY_MATERIAL_NOTE_FIELDS,
+  ...LOCAL_STUDY_MATERIAL_LIST_FIELDS,
+] as const;
+const LOCAL_STUDY_MATERIAL_SYNONYM_FIELDS = ["add_synonym", "remove_synonym"] as const;
+/** The fields a patch can hold. The synonym list is never sent, one word is added or removed. */
+export const LOCAL_STUDY_MATERIAL_PATCH_FIELDS = [
+  ...LOCAL_STUDY_MATERIAL_NOTE_FIELDS,
+  ...LOCAL_STUDY_MATERIAL_SYNONYM_FIELDS,
+] as const;
+
+export type LocalStudyMaterialNoteField = (typeof LOCAL_STUDY_MATERIAL_NOTE_FIELDS)[number];
+
+// Built from the field lists, so a new field reaches the type, the editors and the PATCH route
+export type LocalStudyMaterial = Partial<Record<LocalStudyMaterialNoteField, string>> &
+  Partial<Record<(typeof LOCAL_STUDY_MATERIAL_LIST_FIELDS)[number], string[]>>;
+
+export type LocalStudyMaterialPatch = Partial<
+  Record<(typeof LOCAL_STUDY_MATERIAL_PATCH_FIELDS)[number], string>
+>;
+
+export type MergedStudyMaterial = {
+  meaningNote: string;
+  readingNote: string;
+  meaningSynonyms: string[];
 };
 
 export type VerbConjugations = {
@@ -174,6 +204,7 @@ export type Radical = {
   meaningMnemonic: string;
   amalgamationSubjectIds: number[];
   studyMaterial: StudyMaterial | null;
+  localStudyMaterial: LocalStudyMaterial | null;
   mnemonicImageUrl: string | null;
   foundInKanji: SubjectReference[];
 };
@@ -196,6 +227,7 @@ export type Kanji = {
   amalgamationSubjectIds: number[];
   visuallySimilarSubjectIds: number[];
   studyMaterial: StudyMaterial | null;
+  localStudyMaterial: LocalStudyMaterial | null;
   componentRadicals: Radical[];
   visuallySimilarKanji: SubjectReference[];
   foundInVocabulary: SubjectReference[];
@@ -218,6 +250,7 @@ export type Vocabulary = {
   contextSentences: ContextSentence[];
   pronunciationAudios: PronunciationAudio[];
   studyMaterial: StudyMaterial | null;
+  localStudyMaterial: LocalStudyMaterial | null;
   componentKanji: Kanji[];
   conjugations: Conjugations | null;
 };
@@ -235,7 +268,8 @@ export type KanaVocabulary = {
   partsOfSpeech: string[];
   contextSentences: ContextSentence[];
   pronunciationAudios: PronunciationAudio[];
-  studyMaterial: null;
+  studyMaterial: StudyMaterial | null;
+  localStudyMaterial: LocalStudyMaterial | null;
 };
 
 export type Subject = Radical | Kanji | Vocabulary | KanaVocabulary;

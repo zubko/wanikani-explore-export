@@ -57,7 +57,7 @@ Configure these templates in Anki: Tools → Manage Note Types → Japanese Radi
     {{#note}}
     <div class="section">
       <h2>Note</h2>
-      <div>{{note}}</div>
+      <div class="note">{{note}}</div>
     </div>
     {{/note}}
   </div>
@@ -236,6 +236,11 @@ h2 {
 
 .mnemonic {
   line-height: 1.6;
+}
+
+.note {
+  /* a note field holds raw line breaks */
+  white-space: pre-wrap;
 }
 
 .mnemonic-img {
