@@ -3,8 +3,10 @@ import type { LocalStudyMaterial } from "@/model/wanikani.ts";
 import { installApiMock, type ApiMock } from "@/test/api-mock.ts";
 import { mount, settle, type Mounted } from "@/test/render.tsx";
 import {
+  SAVE_FAILED_MESSAGE,
   saveLocalStudyMaterial,
   useLocalStudyMaterial,
+  waitForLocalStudyMaterialSaves,
 } from "@client/hooks/useLocalStudyMaterial.ts";
 
 const apiMock: ApiMock = installApiMock();
@@ -40,7 +42,7 @@ describe("saveLocalStudyMaterial with two subjects at once", () => {
     fast.resolve();
     await settle();
     slow.resolve();
-    await Promise.all([saveOne, saveTwo]);
+    await Promise.all([saveOne.done, saveTwo.done]);
     await settle();
 
     expect(shownRecord(second)).toEqual({ meaning_note: "Note of two" });
@@ -64,10 +66,10 @@ describe("saveLocalStudyMaterial with two subjects at once", () => {
       patch: { meaning_note: "Note of two" },
     });
     failing.resolve();
-    await expect(saveOne).rejects.toThrow("Server error (500)");
+    await expect(saveOne.done).rejects.toThrow("Server error (500)");
     await settle();
     working.resolve();
-    await saveTwo;
+    await saveTwo.done;
     await settle();
 
     expect(shownRecord(second)).toEqual({ meaning_note: "Note of two" });
@@ -88,23 +90,23 @@ describe("saveLocalStudyMaterial with two subjects at once", () => {
     const saveTwo = saveLocalStudyMaterial({
       subjectId: 2,
       fromServer: null,
-      patch: (current) => ({ meaning_synonyms: [...(current?.meaning_synonyms ?? []), "alpha"] }),
+      patch: { add_synonym: "alpha" },
     });
     fast.resolve();
-    await saveTwo;
+    await saveTwo.done;
     slow.resolve();
-    await saveOne;
+    await saveOne.done;
     await settle();
 
     apiMock.answerWith({ meaning_synonyms: ["alpha", "beta"] });
     await saveLocalStudyMaterial({
       subjectId: 2,
       fromServer: null,
-      patch: (current) => ({ meaning_synonyms: [...(current?.meaning_synonyms ?? []), "beta"] }),
-    });
+      patch: { add_synonym: "beta" },
+    }).done;
     await settle();
 
-    expect(apiMock.requests.at(-1)).toEqual({ id: 2, meaning_synonyms: ["alpha", "beta"] });
+    expect(apiMock.requests.at(-1)).toEqual({ id: 2, add_synonym: "beta" });
     expect(shownRecord(second)).toEqual({ meaning_synonyms: ["alpha", "beta"] });
   });
 });
@@ -117,8 +119,8 @@ describe("saveLocalStudyMaterial with a changed server record", () => {
     await saveLocalStudyMaterial({
       subjectId: 1,
       fromServer: null,
-      patch: (current) => ({ meaning_synonyms: [...(current?.meaning_synonyms ?? []), "alpha"] }),
-    });
+      patch: { add_synonym: "alpha" },
+    }).done;
     await settle();
     expect(shownRecord(view)).toEqual({ meaning_synonyms: ["alpha"] });
 
@@ -132,48 +134,75 @@ describe("saveLocalStudyMaterial with a changed server record", () => {
     await saveLocalStudyMaterial({
       subjectId: 1,
       fromServer: fresh,
-      patch: (current) => ({ meaning_synonyms: [...(current?.meaning_synonyms ?? []), "beta"] }),
-    });
+      patch: { add_synonym: "beta" },
+    }).done;
     await settle();
 
-    expect(apiMock.requests.at(-1)).toEqual({
-      id: 1,
-      meaning_synonyms: ["alpha", "by hand", "beta"],
-    });
+    expect(apiMock.requests.at(-1)).toEqual({ id: 1, add_synonym: "beta" });
     expect(shownRecord(view)).toEqual({ meaning_synonyms: ["alpha", "by hand", "beta"] });
   });
 
-  it("keeps the confirmed result when the new server record lands while the save runs", async () => {
+  it("sends an operation and no list when a record lands while the save runs", async () => {
     const view = mount(<Probe subjectId={1} />);
     const held = apiMock.answerLater(1, { meaning_synonyms: ["alpha"] });
 
     const save = saveLocalStudyMaterial({
       subjectId: 1,
       fromServer: null,
-      patch: (current) => ({ meaning_synonyms: [...(current?.meaning_synonyms ?? []), "alpha"] }),
+      patch: { add_synonym: "alpha" },
     });
 
-    // a search answer that was already on its way carries the record from before the save
-    const older = { meaning_note: "From the search" };
-    view.rerender(<Probe subjectId={1} fromServer={older} />);
+    // a record the tab never saw: a search answer from before the save, or a hand edit
+    const outside = { meaning_synonyms: ["by hand"] };
+    view.rerender(<Probe subjectId={1} fromServer={outside} />);
     await settle();
 
     held.resolve();
-    await save;
+    await save.done;
     await settle();
 
-    expect(shownRecord(view)).toEqual({ meaning_synonyms: ["alpha"] });
-
-    apiMock.answerWith({ meaning_synonyms: ["alpha", "beta"] });
+    // the page record wins on screen, and the next save still only names its own word
+    apiMock.answerWith({ meaning_synonyms: ["by hand", "alpha", "beta"] });
     await saveLocalStudyMaterial({
       subjectId: 1,
-      fromServer: older,
-      patch: (current) => ({ meaning_synonyms: [...(current?.meaning_synonyms ?? []), "beta"] }),
-    });
+      fromServer: outside,
+      patch: { add_synonym: "beta" },
+    }).done;
     await settle();
 
-    expect(apiMock.requests.at(-1)).toEqual({ id: 1, meaning_synonyms: ["alpha", "beta"] });
-    expect(shownRecord(view)).toEqual({ meaning_synonyms: ["alpha", "beta"] });
+    expect(apiMock.requests).toEqual([
+      { id: 1, add_synonym: "alpha" },
+      { id: 1, add_synonym: "beta" },
+    ]);
+    expect(shownRecord(view)).toEqual({ meaning_synonyms: ["by hand", "alpha", "beta"] });
+  });
+
+  it("follows the outside record when the save that ran meanwhile failed", async () => {
+    const view = mount(<Probe subjectId={1} />);
+    apiMock.answerWith({ meaning_note: "Saved" });
+    await saveLocalStudyMaterial({
+      subjectId: 1,
+      fromServer: null,
+      patch: { meaning_note: "Saved" },
+    }).done;
+    await settle();
+
+    const failing = apiMock.failLater(1, "Server error (500)");
+    const save = saveLocalStudyMaterial({
+      subjectId: 1,
+      fromServer: null,
+      patch: { meaning_note: "Never saved" },
+    });
+
+    const outside = { meaning_note: "Typed into the file" };
+    view.rerender(<Probe subjectId={1} fromServer={outside} />);
+    await settle();
+
+    failing.resolve();
+    await expect(save.done).rejects.toThrow("Server error (500)");
+    await settle();
+
+    expect(shownRecord(view)).toEqual(outside);
   });
 
   it("keeps the session record while the server record stays the same", async () => {
@@ -184,7 +213,7 @@ describe("saveLocalStudyMaterial with a changed server record", () => {
       subjectId: 1,
       fromServer: null,
       patch: { meaning_note: "Saved note" },
-    });
+    }).done;
     await settle();
 
     view.rerender(<Probe subjectId={1} />);
@@ -198,7 +227,7 @@ describe("saveLocalStudyMaterial with two saves for one subject", () => {
   it("sends the second save only after the first one answered", async () => {
     const view = mount(<Probe subjectId={1} fromServer={{ meaning_note: "From server" }} />);
     const failingNote = apiMock.failLater(1, "Server error (500)");
-    const workingSynonyms = apiMock.answerLater(1, {
+    const workingSynonym = apiMock.answerLater(1, {
       meaning_note: "From server",
       meaning_synonyms: ["beta"],
     });
@@ -208,24 +237,24 @@ describe("saveLocalStudyMaterial with two saves for one subject", () => {
       fromServer: { meaning_note: "From server" },
       patch: { meaning_note: "Never saved" },
     });
-    const saveSynonyms = saveLocalStudyMaterial({
+    const saveSynonym = saveLocalStudyMaterial({
       subjectId: 1,
       fromServer: { meaning_note: "From server" },
-      patch: { meaning_synonyms: ["beta"] },
+      patch: { add_synonym: "beta" },
     });
-    workingSynonyms.resolve();
+    workingSynonym.resolve();
     await settle();
 
     expect(apiMock.requests).toEqual([{ id: 1, meaning_note: "Never saved" }]);
 
     failingNote.resolve();
-    await expect(saveNote).rejects.toThrow("Server error (500)");
-    await saveSynonyms;
+    await expect(saveNote.done).rejects.toThrow("Server error (500)");
+    await saveSynonym.done;
     await settle();
 
     expect(apiMock.requests).toEqual([
       { id: 1, meaning_note: "Never saved" },
-      { id: 1, meaning_synonyms: ["beta"] },
+      { id: 1, add_synonym: "beta" },
     ]);
     expect(shownRecord(view)).toEqual({
       meaning_note: "From server",
@@ -254,42 +283,40 @@ describe("saveLocalStudyMaterial with two saves for one subject", () => {
 
     apiMock.answerWith({ meaning_note: "First", reading_note: "Second" });
     heldNote.resolve();
-    await Promise.all([saveNote, saveReading]);
+    await Promise.all([saveNote.done, saveReading.done]);
     await settle();
 
     expect(shownRecord(view)).toEqual({ meaning_note: "First", reading_note: "Second" });
   });
 
-  it("builds a queued payload from the confirmed record, not from the shown one", async () => {
+  it("never carries the word of a failed save into the next payload", async () => {
     const view = mount(<Probe subjectId={1} fromServer={{ meaning_synonyms: ["american"] }} />);
     const failingAdd = apiMock.failLater(1, "Server error (500)");
 
     const saveAdd = saveLocalStudyMaterial({
       subjectId: 1,
       fromServer: { meaning_synonyms: ["american"] },
-      patch: (current) => ({ meaning_synonyms: [...(current?.meaning_synonyms ?? []), "yank"] }),
+      patch: { add_synonym: "yank" },
     });
     const saveRemove = saveLocalStudyMaterial({
       subjectId: 1,
       fromServer: { meaning_synonyms: ["american"] },
-      patch: (current) => ({
-        meaning_synonyms: (current?.meaning_synonyms ?? []).filter((item) => item !== "american"),
-      }),
+      patch: { remove_synonym: "american" },
     });
     await settle();
 
     expect(shownRecord(view)).toEqual({ meaning_synonyms: ["yank"] });
-    expect(apiMock.requests).toEqual([{ id: 1, meaning_synonyms: ["american", "yank"] }]);
+    expect(apiMock.requests).toEqual([{ id: 1, add_synonym: "yank" }]);
 
     apiMock.answerWith(null);
     failingAdd.resolve();
-    await expect(saveAdd).rejects.toThrow("Server error (500)");
-    await saveRemove;
+    await expect(saveAdd.done).rejects.toThrow("Server error (500)");
+    await saveRemove.done;
     await settle();
 
     expect(apiMock.requests).toEqual([
-      { id: 1, meaning_synonyms: ["american", "yank"] },
-      { id: 1, meaning_synonyms: [] },
+      { id: 1, add_synonym: "yank" },
+      { id: 1, remove_synonym: "american" },
     ]);
     expect(shownRecord(view)).toBeNull();
   });
@@ -297,7 +324,7 @@ describe("saveLocalStudyMaterial with two saves for one subject", () => {
   it("the second save starts from the value the first one stored", async () => {
     const view = mount(<Probe subjectId={1} />);
     const note = apiMock.answerLater(1, { meaning_note: "Saved note" });
-    const synonyms = apiMock.answerLater(1, {
+    const synonym = apiMock.answerLater(1, {
       meaning_note: "Saved note",
       meaning_synonyms: ["beta"],
     });
@@ -307,19 +334,134 @@ describe("saveLocalStudyMaterial with two saves for one subject", () => {
       fromServer: null,
       patch: { meaning_note: "Saved note" },
     });
-    const saveSynonyms = saveLocalStudyMaterial({
+    const saveSynonym = saveLocalStudyMaterial({
       subjectId: 1,
       fromServer: null,
-      patch: { meaning_synonyms: ["beta"] },
+      patch: { add_synonym: "beta" },
     });
     note.resolve();
-    synonyms.resolve();
-    await Promise.all([saveNote, saveSynonyms]);
+    synonym.resolve();
+    await Promise.all([saveNote.done, saveSynonym.done]);
     await settle();
 
     expect(shownRecord(view)).toEqual({
       meaning_note: "Saved note",
       meaning_synonyms: ["beta"],
     });
+  });
+});
+
+describe("isLatest of a save handle", () => {
+  it("is false for a save another card of the same field started later", async () => {
+    const failing = apiMock.failLater(1, "Server error (500)");
+
+    const first = saveLocalStudyMaterial({
+      subjectId: 1,
+      fromServer: null,
+      patch: { meaning_note: "First" },
+    });
+    apiMock.answerWith({ meaning_note: "Second" });
+    const second = saveLocalStudyMaterial({
+      subjectId: 1,
+      fromServer: null,
+      patch: { meaning_note: "Second" },
+    });
+
+    failing.resolve();
+    await expect(first.done).rejects.toThrow("Server error (500)");
+    await second.done;
+
+    expect(first.isLatest()).toBe(false);
+    expect(second.isLatest()).toBe(true);
+  });
+
+  it("stays true when the later save is of another field", async () => {
+    const failing = apiMock.failLater(1, "Server error (500)");
+
+    const note = saveLocalStudyMaterial({
+      subjectId: 1,
+      fromServer: null,
+      patch: { meaning_note: "Note" },
+    });
+    apiMock.answerWith({ reading_note: "Reading" });
+    const reading = saveLocalStudyMaterial({
+      subjectId: 1,
+      fromServer: null,
+      patch: { reading_note: "Reading" },
+    });
+
+    failing.resolve();
+    await expect(note.done).rejects.toThrow("Server error (500)");
+    await reading.done;
+
+    expect(note.isLatest()).toBe(true);
+  });
+
+  it("stays true when the later save is of another subject", async () => {
+    const failing = apiMock.failLater(1, "Server error (500)");
+
+    const first = saveLocalStudyMaterial({
+      subjectId: 1,
+      fromServer: null,
+      patch: { meaning_note: "First" },
+    });
+    apiMock.answerWith({ meaning_note: "Second" });
+    const second = saveLocalStudyMaterial({
+      subjectId: 2,
+      fromServer: null,
+      patch: { meaning_note: "Second" },
+    });
+
+    failing.resolve();
+    await expect(first.done).rejects.toThrow("Server error (500)");
+    await second.done;
+
+    expect(first.isLatest()).toBe(true);
+  });
+});
+
+describe("waitForLocalStudyMaterialSaves", () => {
+  it("waits for the saves of every subject, not only of one", async () => {
+    const held = apiMock.answerLater(2, { meaning_note: "Of another subject" });
+    const save = saveLocalStudyMaterial({
+      subjectId: 2,
+      fromServer: null,
+      patch: { meaning_note: "Of another subject" },
+    });
+
+    let waited = false;
+    const wait = waitForLocalStudyMaterialSaves().then(() => {
+      waited = true;
+    });
+    await settle();
+    expect(waited).toBe(false);
+
+    held.resolve();
+    await save.done;
+    await wait;
+
+    expect(waited).toBe(true);
+  });
+
+  it("rejects when a save failed", async () => {
+    const failing = apiMock.failLater(1, "Server error (500)");
+    const save = saveLocalStudyMaterial({
+      subjectId: 1,
+      fromServer: null,
+      patch: { meaning_note: "Never saved" },
+    });
+
+    const wait = waitForLocalStudyMaterialSaves().then(
+      () => "no error",
+      (error: unknown) => String(error)
+    );
+    failing.resolve();
+    await expect(save.done).rejects.toThrow("Server error (500)");
+
+    expect(await wait).toContain(SAVE_FAILED_MESSAGE);
+  });
+
+  it("resolves at once when no save is running", async () => {
+    await waitForLocalStudyMaterialSaves();
   });
 });

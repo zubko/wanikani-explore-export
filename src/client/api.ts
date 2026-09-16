@@ -1,6 +1,6 @@
 import { hc } from "hono/client";
 import type { ApiType } from "@server/api.ts";
-import type { LocalStudyMaterial, SubjectType } from "@/model/wanikani.ts";
+import type { LocalStudyMaterialPatch, SubjectType } from "@/model/wanikani.ts";
 import { HttpStatusError } from "./utils/http-error.ts";
 
 type OkOrErrorResponse<T> = {
@@ -20,7 +20,7 @@ export const api = {
   addToAnki: async (id: number, type: SubjectType) => {
     return unwrapJson(await client["add-to-anki"].$post({ json: { id, type } }));
   },
-  saveStudyMaterial: async (id: number, patch: LocalStudyMaterial) => {
+  saveStudyMaterial: async (id: number, patch: LocalStudyMaterialPatch) => {
     return unwrapJson(await client["study-materials"].$patch({ json: { id, ...patch } }));
   },
 };

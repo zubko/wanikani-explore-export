@@ -70,6 +70,6 @@ describe("RadicalCard editors", () => {
     pressKey({ node: view.find("input"), key: "Enter" });
     await settle();
 
-    expect(apiMock.requests).toEqual([{ id: 1, meaning_synonyms: ["flat"] }]);
+    expect(apiMock.requests).toEqual([{ id: 1, add_synonym: "flat" }]);
   });
 });

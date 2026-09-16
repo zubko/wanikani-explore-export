@@ -1,7 +1,7 @@
 import { useState } from "react";
 import toast from "react-hot-toast";
 import { Cancel01Icon } from "@hugeicons/core-free-icons";
-import type { LocalStudyMaterial } from "@/model/wanikani.ts";
+import type { LocalStudyMaterial, LocalStudyMaterialPatch } from "@/model/wanikani.ts";
 import {
   saveLocalStudyMaterial,
   useLocalStudyMaterial,
@@ -30,15 +30,9 @@ export function UserSynonymsRow({
   const localSynonyms = record?.meaning_synonyms ?? [];
   const ownSynonyms = localSynonyms.filter((synonym) => !wanikaniSynonyms.includes(synonym));
 
-  // The whole list is sent, so it is built from the confirmed list when the request starts.
-  // Built at click time it would carry a change of an earlier save that failed meanwhile.
-  const save = async (nextList: (confirmed: string[]) => string[]) => {
+  const save = async (patch: LocalStudyMaterialPatch) => {
     try {
-      await saveLocalStudyMaterial({
-        subjectId,
-        fromServer: localStudyMaterial,
-        patch: (current) => ({ meaning_synonyms: nextList(current?.meaning_synonyms ?? []) }),
-      });
+      await saveLocalStudyMaterial({ subjectId, fromServer: localStudyMaterial, patch }).done;
     } catch (err) {
       toast.error(saveErrorMessage(err));
     }
@@ -53,11 +47,11 @@ export function UserSynonymsRow({
       toast.error(`"${trimmed}" is already a synonym`);
       return;
     }
-    void save((list) => (list.includes(trimmed) ? list : [...list, trimmed]));
+    void save({ add_synonym: trimmed });
   };
 
   const remove = (synonym: string) => {
-    void save((list) => list.filter((item) => item !== synonym));
+    void save({ remove_synonym: synonym });
   };
 
   return (

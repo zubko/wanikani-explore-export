@@ -1,11 +1,7 @@
-import type { LocalStudyMaterial, SubjectType } from "@/model/wanikani.ts";
+import type { LocalStudyMaterial, LocalStudyMaterialPatch } from "@/model/wanikani.ts";
 import { applyLocalStudyMaterialPatch } from "@/model/subject-utils.ts";
 import { saveJsonAtomic } from "@server/utils/json-utils.ts";
 import {
-  radicals,
-  kanji,
-  vocabulary,
-  kanaVocabulary,
   readLocalStudyMaterials,
   setLocalStudyMaterials,
   LOCAL_STUDY_MATERIALS_PATH,
@@ -13,17 +9,9 @@ import {
 
 let queue: Promise<unknown> = Promise.resolve();
 
-export function findSubjectTypeById(id: number): SubjectType | null {
-  if (radicals.some((item) => item.id === id)) return "radical";
-  if (kanji.some((item) => item.id === id)) return "kanji";
-  if (vocabulary.some((item) => item.id === id)) return "vocabulary";
-  if (kanaVocabulary.some((item) => item.id === id)) return "kana_vocabulary";
-  return null;
-}
-
 export function upsertLocalStudyMaterial(
   subjectId: number,
-  patch: LocalStudyMaterial
+  patch: LocalStudyMaterialPatch
 ): Promise<LocalStudyMaterial | null> {
   // The caller's promise stays out of the chain, so a rejection reaches the caller
   // and the next save still starts from the last good state
@@ -34,7 +22,7 @@ export function upsertLocalStudyMaterial(
 
 async function saveLocalStudyMaterial(
   subjectId: number,
-  patch: LocalStudyMaterial
+  patch: LocalStudyMaterialPatch
 ): Promise<LocalStudyMaterial | null> {
   const key = String(subjectId);
   // The user also edits this file by hand and pulls it from git, so the memory copy can be

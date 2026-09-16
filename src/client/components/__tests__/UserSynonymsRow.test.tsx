@@ -77,7 +77,7 @@ describe("UserSynonymsRow view state", () => {
 });
 
 describe("UserSynonymsRow editing", () => {
-  it("adds a synonym and sends the whole list", async () => {
+  it("adds a synonym and sends only that word", async () => {
     apiMock.answerWith({ meaning_synonyms: ["american", "yank"] });
     const view = mount(
       <UserSynonymsRow {...props({ localStudyMaterial: { meaning_synonyms: ["american"] } })} />
@@ -86,7 +86,7 @@ describe("UserSynonymsRow editing", () => {
     addSynonym(view, "  yank  ");
     await settle();
 
-    expect(apiMock.requests).toEqual([{ id: 2478, meaning_synonyms: ["american", "yank"] }]);
+    expect(apiMock.requests).toEqual([{ id: 2478, add_synonym: "yank" }]);
     expect(view.html()).toContain("Remove yank");
   });
 
@@ -129,7 +129,7 @@ describe("UserSynonymsRow editing", () => {
     click(view.findByLabel("Remove american"));
     await settle();
 
-    expect(apiMock.requests).toEqual([{ id: 2478, meaning_synonyms: ["yank"] }]);
+    expect(apiMock.requests).toEqual([{ id: 2478, remove_synonym: "american" }]);
     expect(view.html()).toContain("Remove yank");
     expect(view.html()).not.toContain("Remove american");
   });
@@ -147,7 +147,7 @@ describe("UserSynonymsRow editing", () => {
     expect(view.html()).not.toContain("Remove yank");
   });
 
-  it("never sends a word again that the save before it failed with", async () => {
+  it("keeps the word of a failed add out of the next save", async () => {
     const failingAdd = apiMock.failLater(2478, "Server error (500)");
     const view = mount(
       <UserSynonymsRow {...props({ localStudyMaterial: { meaning_synonyms: ["american"] } })} />
@@ -165,8 +165,8 @@ describe("UserSynonymsRow editing", () => {
     await settle();
 
     expect(apiMock.requests).toEqual([
-      { id: 2478, meaning_synonyms: ["american", "yank"] },
-      { id: 2478, meaning_synonyms: [] },
+      { id: 2478, add_synonym: "yank" },
+      { id: 2478, remove_synonym: "american" },
     ]);
     expect(view.html()).not.toContain("Remove yank");
     expect(view.html()).not.toContain("Remove american");
@@ -189,8 +189,8 @@ describe("UserSynonymsRow editing", () => {
     await settle();
 
     expect(apiMock.requests).toEqual([
-      { id: 2478, meaning_synonyms: ["american", "yank"] },
-      { id: 2478, meaning_synonyms: ["american", "yank", "statesider"] },
+      { id: 2478, add_synonym: "yank" },
+      { id: 2478, add_synonym: "statesider" },
     ]);
     expect(first.html()).toContain("Remove statesider");
   });

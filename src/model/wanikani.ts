@@ -83,9 +83,16 @@ export type StudyMaterial = {
 
 export const LOCAL_STUDY_MATERIAL_NOTE_FIELDS = ["meaning_note", "reading_note"] as const;
 const LOCAL_STUDY_MATERIAL_LIST_FIELDS = ["meaning_synonyms"] as const;
+/** The fields a stored record can hold. */
 export const LOCAL_STUDY_MATERIAL_FIELDS = [
   ...LOCAL_STUDY_MATERIAL_NOTE_FIELDS,
   ...LOCAL_STUDY_MATERIAL_LIST_FIELDS,
+] as const;
+const LOCAL_STUDY_MATERIAL_SYNONYM_FIELDS = ["add_synonym", "remove_synonym"] as const;
+/** The fields a patch can hold. The synonym list is never sent, one word is added or removed. */
+export const LOCAL_STUDY_MATERIAL_PATCH_FIELDS = [
+  ...LOCAL_STUDY_MATERIAL_NOTE_FIELDS,
+  ...LOCAL_STUDY_MATERIAL_SYNONYM_FIELDS,
 ] as const;
 
 export type LocalStudyMaterialNoteField = (typeof LOCAL_STUDY_MATERIAL_NOTE_FIELDS)[number];
@@ -93,6 +100,10 @@ export type LocalStudyMaterialNoteField = (typeof LOCAL_STUDY_MATERIAL_NOTE_FIEL
 // Built from the field lists, so a new field reaches the type, the editors and the PATCH route
 export type LocalStudyMaterial = Partial<Record<LocalStudyMaterialNoteField, string>> &
   Partial<Record<(typeof LOCAL_STUDY_MATERIAL_LIST_FIELDS)[number], string[]>>;
+
+export type LocalStudyMaterialPatch = Partial<
+  Record<(typeof LOCAL_STUDY_MATERIAL_PATCH_FIELDS)[number], string>
+>;
 
 export type MergedStudyMaterial = {
   meaningNote: string;

@@ -5,9 +5,11 @@ import type {
   KanaVocabularyData,
   StudyMaterial,
   LocalStudyMaterial,
+  SubjectType,
   VerbConjugations,
 } from "@/model/wanikani.ts";
-import { LOCAL_STUDY_MATERIAL_NOTE_FIELDS } from "@/model/wanikani.ts";
+import { LOCAL_STUDY_MATERIAL_FIELDS } from "@/model/wanikani.ts";
+import { localStudyMaterialValueProblem, readingNoteProblem } from "@/model/subject-utils.ts";
 import type { MnemonicImageFetcher } from "./mnemonic-image-fetcher.ts";
 import { createMnemonicImageFetcher } from "./mnemonic-image-fetcher.ts";
 import { readJson } from "@server/utils/json-utils.ts";
@@ -50,6 +52,29 @@ export async function initRepository(): Promise<void> {
     readJson<Record<string, SentenceReadingEntry>>("./data/sentence_readings.json"),
     createMnemonicImageFetcher(),
   ]);
+  checkLocalStudyMaterialSubjects(localStudyMaterials);
+}
+
+export function findSubjectTypeById(id: number): SubjectType | null {
+  if (radicals.some((item) => item.id === id)) return "radical";
+  if (kanji.some((item) => item.id === id)) return "kanji";
+  if (vocabulary.some((item) => item.id === id)) return "vocabulary";
+  if (kanaVocabulary.some((item) => item.id === id)) return "kana_vocabulary";
+  return null;
+}
+
+/**
+ * The rules that need the subject arrays, so they run after the whole load. `readLocalStudyMaterials`
+ * also runs on every save, where a hand-written record of another subject must not fail the write.
+ */
+export function checkLocalStudyMaterialSubjects(records: Record<string, LocalStudyMaterial>): void {
+  for (const [subjectId, record] of Object.entries(records)) {
+    const type = findSubjectTypeById(Number(subjectId));
+    if (!type) throw invalidFile(`subject ${subjectId} is not a WaniKani subject`);
+
+    const problem = "reading_note" in record ? readingNoteProblem(type) : null;
+    if (problem) throw invalidFile(`subject ${subjectId} field reading_note ${problem}`);
+  }
 }
 
 export function setLocalStudyMaterials(next: Record<string, LocalStudyMaterial>): void {
@@ -78,27 +103,23 @@ export async function readLocalStudyMaterials(): Promise<Record<string, LocalStu
 function parseLocalStudyMaterials(value: unknown): Record<string, LocalStudyMaterial> {
   if (!isRecord(value)) throw invalidFile("the root must be a JSON object");
 
+  const knownFields: readonly string[] = LOCAL_STUDY_MATERIAL_FIELDS;
   for (const [subjectId, record] of Object.entries(value)) {
     if (!isRecord(record)) throw invalidFile(`subject ${subjectId} must be a JSON object`);
-    for (const [field, fieldValue] of Object.entries(record)) {
-      const problem = fieldProblem(field, fieldValue);
+
+    const fields = Object.entries(record);
+    // the app deletes an entry that has no field left, so an empty one would sit there unused
+    if (fields.length === 0) throw invalidFile(`subject ${subjectId} has no field`);
+
+    for (const [field, fieldValue] of fields) {
+      if (!knownFields.includes(field)) {
+        throw invalidFile(`subject ${subjectId} field ${field} is not a known field`);
+      }
+      const problem = localStudyMaterialValueProblem(field, fieldValue);
       if (problem) throw invalidFile(`subject ${subjectId} field ${field} ${problem}`);
     }
   }
   return value as Record<string, LocalStudyMaterial>;
-}
-
-/** The same fields the PATCH route takes, so a hand edit cannot store what the app refuses. */
-function fieldProblem(field: string, value: unknown): string | null {
-  const noteFields: readonly string[] = LOCAL_STUDY_MATERIAL_NOTE_FIELDS;
-  if (noteFields.includes(field)) {
-    return typeof value === "string" ? null : "must be a string";
-  }
-  if (field === "meaning_synonyms") {
-    const isStringList = Array.isArray(value) && value.every((item) => typeof item === "string");
-    return isStringList ? null : "must be an array of strings";
-  }
-  return "is not a known field";
 }
 
 function invalidFile(problem: string): Error {

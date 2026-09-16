@@ -1,16 +1,12 @@
 import { Hono } from "hono";
 import type { Context } from "hono";
-import {
-  isSubjectType,
-  LOCAL_STUDY_MATERIAL_FIELDS,
-  LOCAL_STUDY_MATERIAL_NOTE_FIELDS,
-} from "@/model/wanikani.ts";
+import { isSubjectType, LOCAL_STUDY_MATERIAL_PATCH_FIELDS } from "@/model/wanikani.ts";
 import type {
   AnkiAddResult,
   AnkiNoteItem,
   Kanji,
   KanaVocabulary,
-  LocalStudyMaterial,
+  LocalStudyMaterialPatch,
   Radical,
   SubjectType,
   Vocabulary,
@@ -31,8 +27,13 @@ import {
   kanaVocabulary as kanaVocabularyData,
 } from "./repository/data-loader.ts";
 import { saveCache } from "./repository/data-loader.ts";
-import { findSubjectTypeById, upsertLocalStudyMaterial } from "./repository/study-material.ts";
-import { getPrimaryMeaning } from "@/model/subject-utils.ts";
+import { findSubjectTypeById } from "./repository/data-loader.ts";
+import { upsertLocalStudyMaterial } from "./repository/study-material.ts";
+import {
+  getPrimaryMeaning,
+  localStudyMaterialValueProblem,
+  readingNoteProblem,
+} from "@/model/subject-utils.ts";
 import type { AnkiDeckType } from "./services/anki-connect.ts";
 import {
   addOrUpdateRadical,
@@ -77,21 +78,13 @@ function validateStudyMaterialPatch(patch: Record<string, unknown>): string | nu
   const fields = Object.keys(patch);
   if (fields.length === 0) return "Missing required parameter: at least one field besides id";
 
-  const knownFields: readonly string[] = LOCAL_STUDY_MATERIAL_FIELDS;
+  const knownFields: readonly string[] = LOCAL_STUDY_MATERIAL_PATCH_FIELDS;
   const unknown = fields.find((key) => !knownFields.includes(key));
   if (unknown !== undefined) return `Invalid field: ${unknown}`;
 
-  for (const field of LOCAL_STUDY_MATERIAL_NOTE_FIELDS) {
-    if (field in patch && typeof patch[field] !== "string") {
-      return `Invalid ${field}: must be a string`;
-    }
-  }
-
-  if ("meaning_synonyms" in patch) {
-    const value = patch.meaning_synonyms;
-    if (!Array.isArray(value) || value.some((item) => typeof item !== "string")) {
-      return "Invalid meaning_synonyms: must be an array of strings";
-    }
+  for (const field of fields) {
+    const problem = localStudyMaterialValueProblem(field, patch[field]);
+    if (problem) return `Invalid ${field}: ${problem}`;
   }
 
   return null;
@@ -271,17 +264,15 @@ const app = new Hono()
       return c.json({ ok: false as const, error: "Subject not found" }, 404);
     }
 
-    if ("reading_note" in patch && (type === "radical" || type === "kana_vocabulary")) {
-      return c.json(
-        { ok: false as const, error: `Invalid reading_note: a ${type} has no reading` },
-        400
-      );
+    const readingProblem = "reading_note" in patch ? readingNoteProblem(type) : null;
+    if (readingProblem) {
+      return c.json({ ok: false as const, error: `Invalid reading_note: ${readingProblem}` }, 400);
     }
 
     console.log(`[API] Study material ${type} id=${id}: ${Object.keys(patch).join(", ")}`);
 
     try {
-      const data = await upsertLocalStudyMaterial(id, patch as LocalStudyMaterial);
+      const data = await upsertLocalStudyMaterial(id, patch as LocalStudyMaterialPatch);
       console.log(`[API] Study material ${type} id=${id} — ${data ? "saved" : "removed"}`);
       return c.json({ ok: true as const, data });
     } catch (err) {

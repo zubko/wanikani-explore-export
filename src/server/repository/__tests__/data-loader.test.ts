@@ -1,6 +1,12 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
+import type { LocalStudyMaterial } from "@/model/wanikani.ts";
 import { resetFsMock, setFileContent, setFsError } from "@/test/preload.ts";
-import { LOCAL_STUDY_MATERIALS_PATH, readLocalStudyMaterials } from "../data-loader.ts";
+import {
+  checkLocalStudyMaterialSubjects,
+  LOCAL_STUDY_MATERIALS_PATH,
+  readLocalStudyMaterials,
+} from "../data-loader.ts";
+import { ensureRepositoryInitialized } from "./setup.ts";
 
 function setFile(content: unknown): void {
   setFileContent(
@@ -24,7 +30,6 @@ describe("readLocalStudyMaterials", () => {
     const file = {
       "1": { meaning_note: "Flat ground", meaning_synonyms: ["ground"] },
       "456": { reading_note: "Kawa like a river bank" },
-      "958": {},
     };
     setFile(file);
 
@@ -67,6 +72,12 @@ describe("readLocalStudyMaterials", () => {
     expect(await readError()).toContain("subject 1 must be a JSON object");
   });
 
+  test("an entry with no field is refused", async () => {
+    setFile({ "958": {} });
+
+    expect(await readError()).toContain("subject 958 has no field");
+  });
+
   test("a missing file tells the user to create it", async () => {
     setFsError("readFile", Object.assign(new Error("no such file"), { code: "ENOENT" }));
 
@@ -80,5 +91,53 @@ describe("readLocalStudyMaterials", () => {
     expect(error).toContain(`Cannot read ${LOCAL_STUDY_MATERIALS_PATH}`);
     expect(error).toContain("JSON");
     expect(error).not.toContain("Create it with");
+  });
+});
+
+describe("checkLocalStudyMaterialSubjects", () => {
+  beforeAll(ensureRepositoryInitialized);
+
+  function subjectError(records: Record<string, LocalStudyMaterial>): string {
+    try {
+      checkLocalStudyMaterialSubjects(records);
+      return "no error";
+    } catch (error) {
+      return String(error);
+    }
+  }
+
+  test("takes a record for every subject type", () => {
+    expect(
+      subjectError({
+        "1": { meaning_note: "Flat ground" },
+        "456": { reading_note: "Kawa" },
+        "3766": { reading_note: "Maiban" },
+        "9176": { meaning_note: "Here" },
+      })
+    ).toBe("no error");
+  });
+
+  test("an id that is no WaniKani subject is refused", () => {
+    expect(subjectError({ "999999": { meaning_note: "Typo" } })).toContain(
+      "subject 999999 is not a WaniKani subject"
+    );
+  });
+
+  test("a key that is not a number is refused", () => {
+    expect(subjectError({ ground: { meaning_note: "Typo" } })).toContain(
+      "subject ground is not a WaniKani subject"
+    );
+  });
+
+  test("a reading note on a radical is refused", () => {
+    expect(subjectError({ "1": { reading_note: "Ichi" } })).toContain(
+      "subject 1 field reading_note a radical has no reading"
+    );
+  });
+
+  test("a reading note on kana vocabulary is refused", () => {
+    expect(subjectError({ "9176": { reading_note: "Koko" } })).toContain(
+      "subject 9176 field reading_note a kana_vocabulary has no reading"
+    );
   });
 });

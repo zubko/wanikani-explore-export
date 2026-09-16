@@ -8,9 +8,13 @@ import {
   setStudyMaterialFile,
   studyMaterialFixture as fixture,
 } from "@/test/study-material-fixture.ts";
-import { localStudyMaterials, LOCAL_STUDY_MATERIALS_PATH } from "../data-loader.ts";
+import {
+  findSubjectTypeById,
+  localStudyMaterials,
+  LOCAL_STUDY_MATERIALS_PATH,
+} from "../data-loader.ts";
 import { getKanji } from "../kanji.ts";
-import { findSubjectTypeById, upsertLocalStudyMaterial } from "../study-material.ts";
+import { upsertLocalStudyMaterial } from "../study-material.ts";
 import { ensureRepositoryInitialized, installFetchMock } from "./setup.ts";
 
 installFetchMock();
@@ -77,8 +81,8 @@ describe("upsertLocalStudyMaterial", () => {
     expect(lastWrite()["958"]).toEqual(saved!);
   });
 
-  test("an empty list clears the synonyms", async () => {
-    const saved = await upsertLocalStudyMaterial(3766, { meaning_synonyms: [] });
+  test("removing the last synonym clears the field", async () => {
+    const saved = await upsertLocalStudyMaterial(3766, { remove_synonym: "nightly" });
 
     expect(saved).toEqual({ meaning_note: "Every evening, the same routine" });
     expect(lastWrite()["3766"]).toEqual(saved!);
@@ -100,12 +104,14 @@ describe("upsertLocalStudyMaterial", () => {
   });
 
   test("blank values never reach the file", async () => {
-    await upsertLocalStudyMaterial(2478, {
-      meaning_note: "   ",
-      meaning_synonyms: ["", "  ", " yank "],
-    });
+    await upsertLocalStudyMaterial(2478, { meaning_note: "   ", remove_synonym: "american" });
+    await upsertLocalStudyMaterial(2478, { add_synonym: " yank " });
     await upsertLocalStudyMaterial(958, { reading_note: " \n " });
-    await upsertLocalStudyMaterial(1, { meaning_note: "", meaning_synonyms: [" "] });
+    await upsertLocalStudyMaterial(1, {
+      meaning_note: "",
+      remove_synonym: "flat ground",
+      add_synonym: " ",
+    });
 
     expect(localStudyMaterials["2478"]).toEqual({ meaning_synonyms: ["yank"] });
     expect(localStudyMaterials["958"]).toEqual({
@@ -181,6 +187,14 @@ describe("upsertLocalStudyMaterial with the file changed outside the app", () =>
     expect(file["2484"]).toEqual({ meaning_note: "Typed by hand" });
     expect(file["958"]).toEqual(saved!);
     expect(localStudyMaterials["2484"]).toEqual({ meaning_note: "Typed by hand" });
+  });
+
+  test("a synonym added outside survives an add from a client with an old list", async () => {
+    setStudyMaterialFile({ ...fixture, "2478": { meaning_synonyms: ["american", "by hand"] } });
+
+    const saved = await upsertLocalStudyMaterial(2478, { add_synonym: "yank" });
+
+    expect(saved).toEqual({ meaning_synonyms: ["american", "by hand", "yank"] });
   });
 
   test("a change outside to the saved subject is the base of the patch", async () => {

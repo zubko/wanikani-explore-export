@@ -173,6 +173,27 @@ describe("NoteSection editing", () => {
     expect(view.html()).toContain("Second");
   });
 
+  it("keeps the editor closed when another card of the same note saved later", async () => {
+    const failingFirst = apiMock.failLater(456, "Server error (500)");
+    const first = mount(<NoteSection {...props()} />);
+    const second = mount(<NoteSection {...props()} />);
+
+    click(first.findByLabel("+ Add Note"));
+    typeInto(first.find("textarea"), "First");
+    click(first.findByLabel("Save note"));
+
+    apiMock.answerWith({ reading_note: "Second" });
+    click(second.findByLabel("Edit note"));
+    typeInto(second.find("textarea"), "Second");
+    click(second.findByLabel("Save note"));
+
+    failingFirst.resolve();
+    await settle();
+
+    expect(first.html()).not.toContain("textarea");
+    expect(first.html()).toContain("Second");
+  });
+
   it("shows the second note while the first save is still in flight", async () => {
     const heldMeaning = apiMock.answerLater(456, { meaning_note: "Meaning note" });
     const meaning = mount(<NoteSection {...props({ field: "meaning_note" })} />);

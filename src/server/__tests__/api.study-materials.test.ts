@@ -88,22 +88,16 @@ describe("study-materials API validation", () => {
     expect(json).toEqual({ ok: false, error: "Invalid reading_note: must be a string" });
   });
 
-  test("synonyms that are not an array return 400", async () => {
-    const { status, json } = await patchJson({ id: 1, meaning_synonyms: "one" });
+  test("a whole synonym list returns 400", async () => {
+    const { status, json } = await patchJson({ id: 1, meaning_synonyms: ["one"] });
     expect(status).toBe(400);
-    expect(json).toEqual({
-      ok: false,
-      error: "Invalid meaning_synonyms: must be an array of strings",
-    });
+    expect(json).toEqual({ ok: false, error: "Invalid field: meaning_synonyms" });
   });
 
-  test("synonyms that hold a non-string return 400", async () => {
-    const { status, json } = await patchJson({ id: 1, meaning_synonyms: ["one", 2] });
+  test("a synonym operation that is not a string returns 400", async () => {
+    const { status, json } = await patchJson({ id: 1, add_synonym: ["one"] });
     expect(status).toBe(400);
-    expect(json).toEqual({
-      ok: false,
-      error: "Invalid meaning_synonyms: must be an array of strings",
-    });
+    expect(json).toEqual({ ok: false, error: "Invalid add_synonym: must be a string" });
   });
 
   test("a reading note on a radical returns 400", async () => {
@@ -174,11 +168,19 @@ describe("study-materials API upsert", () => {
   });
 
   test("adds a synonym next to the WaniKani one", async () => {
-    const { status, json } = await patchJson({ id: 2478, meaning_synonyms: ["american", "yank"] });
+    const { status, json } = await patchJson({ id: 2478, add_synonym: "yank" });
 
     expect(status).toBe(200);
     expect(json).toMatchSnapshot("response");
     expect(lastWrite()).toMatchSnapshot("file");
+  });
+
+  test("removes one synonym and keeps the others", async () => {
+    await patchJson({ id: 2478, add_synonym: "yank" });
+    const { status, json } = await patchJson({ id: 2478, remove_synonym: "american" });
+
+    expect(status).toBe(200);
+    expect(json).toEqual({ ok: true, data: { meaning_synonyms: ["yank"] } });
   });
 
   test("an empty string clears one note", async () => {

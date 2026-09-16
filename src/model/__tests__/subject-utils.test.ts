@@ -2,7 +2,9 @@ import { describe, expect, it } from "bun:test";
 import {
   applyLocalStudyMaterialPatch,
   findStudyMaterial,
+  localStudyMaterialValueProblem,
   mergeStudyMaterial,
+  readingNoteProblem,
 } from "../subject-utils.ts";
 import type { StudyMaterial, StudyMaterialData } from "../wanikani.ts";
 
@@ -139,13 +141,53 @@ describe("applyLocalStudyMaterialPatch", () => {
     });
   });
 
-  it("trims the notes and drops blank synonyms", () => {
-    const patch = { meaning_note: "  mine  ", meaning_synonyms: ["", " one ", "  "] };
+  it("trims the note and the added synonym", () => {
+    const patch = { meaning_note: "  mine  ", add_synonym: " one " };
 
     expect(applyLocalStudyMaterialPatch(null, patch)).toEqual({
       meaning_note: "mine",
       meaning_synonyms: ["one"],
     });
+  });
+
+  it("adds a synonym to the list of the record", () => {
+    const current = { meaning_synonyms: ["one"] };
+
+    expect(applyLocalStudyMaterialPatch(current, { add_synonym: "two" })).toEqual({
+      meaning_synonyms: ["one", "two"],
+    });
+  });
+
+  it("adds a synonym the record already has only once", () => {
+    const current = { meaning_synonyms: ["one"] };
+
+    expect(applyLocalStudyMaterialPatch(current, { add_synonym: "one" })).toEqual(current);
+  });
+
+  it("removes only the named synonym", () => {
+    const current = { meaning_synonyms: ["one", "two"] };
+
+    expect(applyLocalStudyMaterialPatch(current, { remove_synonym: "one" })).toEqual({
+      meaning_synonyms: ["two"],
+    });
+  });
+
+  it("removes a synonym that is not in the list without a change", () => {
+    const current = { meaning_synonyms: ["one"] };
+
+    expect(applyLocalStudyMaterialPatch(current, { remove_synonym: "three" })).toEqual(current);
+  });
+
+  it("removes before it adds when the patch holds both", () => {
+    const current = { meaning_synonyms: ["one", "two"] };
+
+    expect(
+      applyLocalStudyMaterialPatch(current, { remove_synonym: "one", add_synonym: "one" })
+    ).toEqual({ meaning_synonyms: ["two", "one"] });
+  });
+
+  it("keeps a blank added synonym out of the list", () => {
+    expect(applyLocalStudyMaterialPatch(null, { add_synonym: "   " })).toBeNull();
   });
 
   it("cleans a value that is already in the record", () => {
@@ -167,6 +209,35 @@ describe("applyLocalStudyMaterialPatch", () => {
 
   it("returns null when no field is left", () => {
     expect(applyLocalStudyMaterialPatch({ meaning_note: "mine" }, { meaning_note: "" })).toBeNull();
-    expect(applyLocalStudyMaterialPatch(null, { meaning_synonyms: [] })).toBeNull();
+    expect(
+      applyLocalStudyMaterialPatch({ meaning_synonyms: ["one"] }, { remove_synonym: "one" })
+    ).toBeNull();
+  });
+});
+
+describe("localStudyMaterialValueProblem", () => {
+  it("takes a string for a note and for a synonym operation", () => {
+    expect(localStudyMaterialValueProblem("meaning_note", "text")).toBeNull();
+    expect(localStudyMaterialValueProblem("add_synonym", "word")).toBeNull();
+    expect(localStudyMaterialValueProblem("reading_note", 5)).toBe("must be a string");
+  });
+
+  it("takes a list of strings for the stored synonyms", () => {
+    expect(localStudyMaterialValueProblem("meaning_synonyms", ["one"])).toBeNull();
+    expect(localStudyMaterialValueProblem("meaning_synonyms", "one")).toBe(
+      "must be an array of strings"
+    );
+    expect(localStudyMaterialValueProblem("meaning_synonyms", ["one", 2])).toBe(
+      "must be an array of strings"
+    );
+  });
+});
+
+describe("readingNoteProblem", () => {
+  it("names the types that have no reading", () => {
+    expect(readingNoteProblem("radical")).toBe("a radical has no reading");
+    expect(readingNoteProblem("kana_vocabulary")).toBe("a kana_vocabulary has no reading");
+    expect(readingNoteProblem("kanji")).toBeNull();
+    expect(readingNoteProblem("vocabulary")).toBeNull();
   });
 });
