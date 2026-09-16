@@ -47,6 +47,9 @@ const listeners = new Set<() => void>();
 const queues = new Map<number, Promise<unknown>>();
 // Every save that has not answered yet, of every subject. Add to Anki waits for all of them.
 const running = new Set<Promise<void>>();
+// One entry per open wait. A save leaves `running` the moment it fails, so a save that starts
+// and fails while a wait is already inside its `await` would be gone before the wait looks again.
+const waiters = new Set<{ failed: boolean }>();
 
 export function useLocalStudyMaterial(
   subjectId: number,
@@ -85,18 +88,23 @@ export function saveLocalStudyMaterial({ subjectId, fromServer, patch }: SavePar
  * Adding one subject to Anki rewrites its components too, so waiting for one id is not enough.
  */
 export async function waitForLocalStudyMaterialSaves(): Promise<void> {
-  while (running.size > 0) {
-    const results = await Promise.allSettled([...running]);
-    if (results.some((result) => result.status === "rejected")) {
-      throw new Error(SAVE_FAILED_MESSAGE);
+  const waiter = { failed: false };
+  waiters.add(waiter);
+  try {
+    while (running.size > 0) {
+      await Promise.allSettled([...running]);
     }
+  } finally {
+    waiters.delete(waiter);
   }
+  if (waiter.failed) throw new Error(SAVE_FAILED_MESSAGE);
 }
 
 /** Test hook: drops the whole store, so one test file cannot see the records of another. */
 export function resetLocalStudyMaterials(): void {
   queues.clear();
   running.clear();
+  waiters.clear();
   pendingSaves.clear();
   saveNumbers.clear();
   confirmed.clear();
@@ -160,10 +168,13 @@ function countSave(subjectId: number, patch: LocalStudyMaterialPatch): () => boo
 
 function track(done: Promise<void>): void {
   running.add(done);
-  const forget = () => {
-    running.delete(done);
-  };
-  done.then(forget, forget);
+  done.then(
+    () => running.delete(done),
+    () => {
+      for (const waiter of waiters) waiter.failed = true;
+      running.delete(done);
+    }
+  );
 }
 
 function dropPending(subjectId: number, save: PendingSave): void {

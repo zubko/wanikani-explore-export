@@ -125,8 +125,17 @@ describe("checkLocalStudyMaterialSubjects", () => {
 
   test("a key that is not a number is refused", () => {
     expect(subjectError({ ground: { meaning_note: "Typo" } })).toContain(
-      "subject ground is not a WaniKani subject"
+      "key ground is not a subject id"
     );
+  });
+
+  // every lookup uses `String(id)`, so a record under another spelling of the number sits unused
+  test("a key that is not the plain number is refused", () => {
+    for (const key of ["01", " 1", "1e0", "+1", "1.0"]) {
+      expect(subjectError({ [key]: { meaning_note: "Flat ground" } })).toContain(
+        `key ${key} is not a subject id`
+      );
+    }
   });
 
   test("a reading note on a radical is refused", () => {

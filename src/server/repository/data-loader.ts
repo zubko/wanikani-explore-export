@@ -69,7 +69,10 @@ export function findSubjectTypeById(id: number): SubjectType | null {
  */
 export function checkLocalStudyMaterialSubjects(records: Record<string, LocalStudyMaterial>): void {
   for (const [subjectId, record] of Object.entries(records)) {
-    const type = findSubjectTypeById(Number(subjectId));
+    const id = subjectIdOfKey(subjectId);
+    if (id === null) throw invalidFile(`key ${subjectId} is not a subject id`);
+
+    const type = findSubjectTypeById(id);
     if (!type) throw invalidFile(`subject ${subjectId} is not a WaniKani subject`);
 
     const problem = "reading_note" in record ? readingNoteProblem(type) : null;
@@ -120,6 +123,16 @@ function parseLocalStudyMaterials(value: unknown): Record<string, LocalStudyMate
     }
   }
   return value as Record<string, LocalStudyMaterial>;
+}
+
+/**
+ * The id of a record key, or null when the key is not the plain number. Every lookup uses
+ * `String(id)`, so a record under `"01"` or `" 1"` would never be found again.
+ */
+function subjectIdOfKey(key: string): number | null {
+  const id = Number(key);
+  if (!Number.isInteger(id) || id <= 0) return null;
+  return String(id) === key ? id : null;
 }
 
 function invalidFile(problem: string): Error {
