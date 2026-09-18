@@ -1,4 +1,4 @@
-import { writeCalls, resetWriteCalls, ensureRepositoryInitialized } from "@/test/preload.ts";
+import { writeCalls, resetFsMock, ensureRepositoryInitialized } from "@/test/preload.ts";
 import { createFetchMock, resolveUrl } from "@/test/fetch-utils.ts";
 
 type MockState = {
@@ -15,7 +15,7 @@ export const mockState: MockState = {
 
 export function resetMockState() {
   mockState.fetchCalls = [];
-  resetWriteCalls();
+  resetFsMock();
   mockState.fetchResponses.clear();
 }
 

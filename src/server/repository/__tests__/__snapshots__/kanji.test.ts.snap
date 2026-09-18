@@ -894,6 +894,7 @@ exports[`getKanji returns enriched kanji for known id (校, id=658) 1`] = `
       ],
       "id": 23,
       "level": 1,
+      "localStudyMaterial": null,
       "meaningMnemonic": "Do you see the <radical>tree</radical> in here? It has branches, and then it has the foliage coming down diagonally from it, spreading out like a tree would. That's why this radical is a tree.",
       "meanings": [
         {
@@ -1143,6 +1144,7 @@ exports[`getKanji returns enriched kanji for known id (校, id=658) 1`] = `
       ],
       "id": 8,
       "level": 1,
+      "localStudyMaterial": null,
       "meaningMnemonic": "This looks like something you'd put on a kettle or a pot, right? It even has a little handle to make sure you don't burn yourself. This is some kind of <radical>lid</radical>.",
       "meanings": [
         {
@@ -1268,6 +1270,7 @@ exports[`getKanji returns enriched kanji for known id (校, id=658) 1`] = `
       ],
       "id": 68,
       "level": 3,
+      "localStudyMaterial": null,
       "meaningMnemonic": "This is the <radical>father</radical> radical, since you can see a very fatherly face in it — two droopy eyes at the top, a big nose in the middle, and a mustache flaring out at the bottom. Sort of a generic older gentleman father-type face, isn't it?",
       "meanings": [
         {
@@ -1334,6 +1337,9 @@ exports[`getKanji returns enriched kanji for known id (校, id=658) 1`] = `
   ],
   "id": 658,
   "level": 7,
+  "localStudyMaterial": {
+    "reading_note": "Kou sounds like a school bell",
+  },
   "meaningHint": "He goes on to explain that he changed your school to here because there is a tree to block the satellite's view. Also, he wears a tin foil lid on his head so they can't track him. The regular school was no good because "they were watching." So now you have this new school, taught under a tree by your father who's wearing a lid on his head.",
   "meaningMnemonic": "Next to the <radical>tree</radical>, a <radical>lid</radical> is put on your <radical>father</radical>. "Hello child," he says. "This is your new <kanji>school</kanji>." ",
   "meanings": [

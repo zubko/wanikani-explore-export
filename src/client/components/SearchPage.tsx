@@ -6,7 +6,7 @@ import {
   searchableTypeToSubjectType,
 } from "../types.ts";
 import { api } from "../api.ts";
-import { searchErrorMessage } from "../utils/search-error.ts";
+import { searchErrorMessage } from "../utils/request-error.ts";
 import { useSearchUrl, type UrlSearchParams } from "../hooks/useSearchUrl.ts";
 import { SearchContext } from "../context/SearchContext.tsx";
 import { TypeDropdown } from "./TypeDropdown.tsx";

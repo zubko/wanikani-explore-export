@@ -1,5 +1,6 @@
 import toast from "react-hot-toast";
 import type { Kanji, Radical } from "@/model/wanikani.ts";
+import { KANJI_EXPECTED_FIELDS } from "@/model/anki-models.ts";
 import { getPrimaryMeaning } from "@/model/subject-utils.ts";
 import { getRadicalSvgUrl } from "@/model/radical-utils.ts";
 import { getReadingsByType, type ReadingWithPrimary } from "@/model/kanji-utils.ts";
@@ -9,24 +10,28 @@ import { CardHeader } from "./card-components/CardHeader.tsx";
 import { HintBox } from "./card-components/HintBox.tsx";
 import { LabeledRow } from "./card-components/LabeledRow.tsx";
 import { MnemonicText } from "./card-components/MnemonicText.tsx";
-import { NoteSection } from "./card-components/NoteSection.tsx";
+import { NoteSection, type NoteSectionProps } from "./card-components/NoteSection.tsx";
 import { RelatedSubjectsSection } from "./card-components/RelatedSubjectsSection.tsx";
 import { scrollToElement } from "../utils/scroll-to-element.ts";
 import { SectionTitle } from "./card-components/SectionTitle.tsx";
-import { UserSynonymsRow } from "./card-components/UserSynonymsRow.tsx";
-import { api } from "../api.ts";
+import { UserSynonymsRow, type UserSynonymsRowProps } from "./card-components/UserSynonymsRow.tsx";
+import { addToAnkiAfterSaves } from "../utils/add-to-anki.ts";
 import { formatAnkiResult } from "../utils/format-anki-result.ts";
+import { noteProps, synonymProps } from "./card-components/study-material-props.ts";
 
 type KanjiCardProps = {
   kanji: Kanji;
 };
+
+// The hint goes away on its own once the kanji note type gets the field
+const SYNONYM_HINT = KANJI_EXPECTED_FIELDS.includes("user_synonyms") ? undefined : "not in Anki";
 
 export function KanjiCard({ kanji }: KanjiCardProps) {
   const primaryMeaning = getPrimaryMeaning(kanji.meanings);
 
   const handleAddToAnki = () => {
     const radicalCount = kanji.componentRadicals.length;
-    toast.promise(api.addToAnki(kanji.id, kanji.object), {
+    toast.promise(addToAnkiAfterSaves(kanji.id, kanji.object), {
       loading:
         radicalCount > 0
           ? `Adding ${kanji.characters} with ${radicalCount} radical(s)...`
@@ -49,16 +54,16 @@ export function KanjiCard({ kanji }: KanjiCardProps) {
         <RadicalCombinationSection componentRadicals={kanji.componentRadicals} />
         <MeaningSection
           meanings={kanji.meanings}
-          userSynonyms={kanji.studyMaterial?.data.meaning_synonyms ?? []}
+          synonyms={{ ...synonymProps(kanji), hint: SYNONYM_HINT }}
           mnemonic={kanji.meaningMnemonic}
           hint={kanji.meaningHint}
-          note={kanji.studyMaterial?.data.meaning_note ?? null}
+          note={noteProps(kanji, "meaning_note")}
         />
         <ReadingsSection
           readings={kanji.readings}
           mnemonic={kanji.readingMnemonic}
           hint={kanji.readingHint}
-          note={kanji.studyMaterial?.data.reading_note ?? null}
+          note={noteProps(kanji, "reading_note")}
         />
         <RelatedSubjectsSection
           title="Visually Similar Kanji"
@@ -120,16 +125,16 @@ function RadicalItem({ radical, onClick }: { radical: Radical; onClick: () => vo
 
 function MeaningSection({
   meanings,
-  userSynonyms,
+  synonyms,
   mnemonic,
   hint,
   note,
 }: {
   meanings: Kanji["meanings"];
-  userSynonyms: string[];
+  synonyms: UserSynonymsRowProps;
   mnemonic: string;
   hint: string;
-  note: string | null;
+  note: NoteSectionProps;
 }) {
   const primaryMeaning = getPrimaryMeaning(meanings);
   const alternativeMeanings = meanings
@@ -144,7 +149,7 @@ function MeaningSection({
         {alternativeMeanings.length > 0 && (
           <LabeledRow label="Alternative" value={alternativeMeanings.join(", ")} />
         )}
-        <UserSynonymsRow synonyms={userSynonyms} />
+        <UserSynonymsRow {...synonyms} />
         <MnemonicBlock mnemonic={mnemonic} hint={hint} note={note} />
       </div>
     </div>
@@ -160,7 +165,7 @@ function ReadingsSection({
   readings: Kanji["readings"];
   mnemonic: string;
   hint: string;
-  note: string | null;
+  note: NoteSectionProps;
 }) {
   return (
     <div className="p-4">
@@ -206,7 +211,7 @@ function MnemonicBlock({
 }: {
   mnemonic: string;
   hint: string;
-  note: string | null;
+  note: NoteSectionProps;
 }) {
   return (
     <>
@@ -215,7 +220,7 @@ function MnemonicBlock({
         <MnemonicText html={mnemonic} />
       </div>
       {hint && <HintBox hint={hint} />}
-      <NoteSection note={note} />
+      <NoteSection {...note} />
     </>
   );
 }
