@@ -13,6 +13,7 @@ function props(overrides: Partial<UserSynonymsRowProps> = {}): UserSynonymsRowPr
   return {
     subjectId: 2478,
     wanikaniSynonyms: [],
+    subjectMeanings: [],
     localStudyMaterial: null,
     ...overrides,
   };
@@ -22,10 +23,11 @@ function renderStatic(overrides: Partial<UserSynonymsRowProps> = {}): string {
   return renderToStaticMarkup(<UserSynonymsRow {...props(overrides)} />);
 }
 
-function addSynonym(view: Mounted, word: string): void {
+async function addSynonym(view: Mounted, word: string): Promise<void> {
   click(view.findByLabel("+ Add Synonym"));
   typeInto(view.find("input"), word);
   pressKey({ node: view.find("input"), key: "Enter" });
+  await settle();
 }
 
 describe("UserSynonymsRow view state", () => {
@@ -83,8 +85,7 @@ describe("UserSynonymsRow editing", () => {
       <UserSynonymsRow {...props({ localStudyMaterial: { meaning_synonyms: ["american"] } })} />
     );
 
-    addSynonym(view, "  yank  ");
-    await settle();
+    await addSynonym(view, "  yank  ");
 
     expect(apiMock.requests).toEqual([{ id: 2478, add_synonym: "yank" }]);
     expect(view.html()).toContain("Remove yank");
@@ -102,7 +103,7 @@ describe("UserSynonymsRow editing", () => {
     expect(view.html()).not.toContain("yank");
   });
 
-  it("refuses a word that is already a synonym", () => {
+  it("refuses a word that is already a synonym", async () => {
     const view = mount(
       <UserSynonymsRow
         {...props({
@@ -112,10 +113,75 @@ describe("UserSynonymsRow editing", () => {
       />
     );
 
-    addSynonym(view, "american");
-    addSynonym(view, "usa person");
+    await addSynonym(view, "american");
+    await addSynonym(view, "usa person");
 
     expect(apiMock.requests).toEqual([]);
+  });
+
+  it("refuses a synonym that differs only in case", async () => {
+    const view = mount(
+      <UserSynonymsRow
+        {...props({
+          wanikaniSynonyms: ["usa person"],
+          localStudyMaterial: { meaning_synonyms: ["american"] },
+        })}
+      />
+    );
+
+    await addSynonym(view, "American");
+    await addSynonym(view, "USA Person");
+
+    expect(apiMock.requests).toEqual([]);
+  });
+
+  it("refuses a word that is already a meaning", async () => {
+    const view = mount(
+      <UserSynonymsRow
+        {...props({ subjectMeanings: ["American Person", "Person From The USA"] })}
+      />
+    );
+
+    await addSynonym(view, "american person");
+    await addSynonym(view, "Person From The USA");
+
+    expect(apiMock.requests).toEqual([]);
+  });
+
+  // WaniKani stores the meaning of 旧姓 decomposed: an e plus a combining accent.
+  // Lowercasing alone does not match the precomposed form a user types.
+  it("refuses a word that WaniKani stores with a combining accent", async () => {
+    const decomposed = "Ne\u0301e";
+    const precomposed = "n\u00e9e";
+    const view = mount(<UserSynonymsRow {...props({ subjectMeanings: [decomposed] })} />);
+
+    await addSynonym(view, precomposed);
+
+    expect(decomposed.toLowerCase()).not.toBe(precomposed);
+    expect(apiMock.requests).toEqual([]);
+  });
+
+  it("refuses a word that is an auxiliary meaning", async () => {
+    const view = mount(
+      <UserSynonymsRow {...props({ subjectMeanings: ["American Person", "US Citizen"] })} />
+    );
+
+    await addSynonym(view, "us citizen");
+
+    expect(apiMock.requests).toEqual([]);
+  });
+
+  it("adds a word that is neither a synonym nor a meaning", async () => {
+    apiMock.answerWith({ meaning_synonyms: ["yank"] });
+    const view = mount(
+      <UserSynonymsRow
+        {...props({ wanikaniSynonyms: ["usa person"], subjectMeanings: ["American Person"] })}
+      />
+    );
+
+    await addSynonym(view, "yank");
+
+    expect(apiMock.requests).toEqual([{ id: 2478, add_synonym: "yank" }]);
   });
 
   it("removes only the clicked synonym", async () => {
@@ -140,8 +206,7 @@ describe("UserSynonymsRow editing", () => {
       <UserSynonymsRow {...props({ localStudyMaterial: { meaning_synonyms: ["american"] } })} />
     );
 
-    addSynonym(view, "yank");
-    await settle();
+    await addSynonym(view, "yank");
 
     expect(view.html()).toContain("Remove american");
     expect(view.html()).not.toContain("Remove yank");
@@ -153,7 +218,7 @@ describe("UserSynonymsRow editing", () => {
       <UserSynonymsRow {...props({ localStudyMaterial: { meaning_synonyms: ["american"] } })} />
     );
 
-    addSynonym(view, "yank");
+    await addSynonym(view, "yank");
     click(view.findByLabel("Remove american"));
     await settle();
 
@@ -181,12 +246,10 @@ describe("UserSynonymsRow editing", () => {
       <UserSynonymsRow {...props({ localStudyMaterial: { meaning_synonyms: ["american"] } })} />
     );
 
-    addSynonym(first, "yank");
-    await settle();
+    await addSynonym(first, "yank");
 
     apiMock.answerWith({ meaning_synonyms: ["american", "yank", "statesider"] });
-    addSynonym(second, "statesider");
-    await settle();
+    await addSynonym(second, "statesider");
 
     expect(apiMock.requests).toEqual([
       { id: 2478, add_synonym: "yank" },

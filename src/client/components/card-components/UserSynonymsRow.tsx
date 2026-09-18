@@ -13,6 +13,7 @@ import { IconButton } from "./IconButton.tsx";
 export type UserSynonymsRowProps = {
   subjectId: number;
   wanikaniSynonyms: string[];
+  subjectMeanings: string[];
   localStudyMaterial: LocalStudyMaterial | null;
   hint?: string;
 };
@@ -20,6 +21,7 @@ export type UserSynonymsRowProps = {
 export function UserSynonymsRow({
   subjectId,
   wanikaniSynonyms,
+  subjectMeanings,
   localStudyMaterial,
   hint,
 }: UserSynonymsRowProps) {
@@ -43,8 +45,14 @@ export function UserSynonymsRow({
     setDraft("");
     setMode("view");
     if (trimmed === "") return;
-    if (wanikaniSynonyms.includes(trimmed) || localSynonyms.includes(trimmed)) {
+    if (hasWord([...wanikaniSynonyms, ...localSynonyms], trimmed)) {
       toast.error(`"${trimmed}" is already a synonym`);
+      return;
+    }
+    // subjectMeanings also holds blacklist auxiliary meanings, which are wrong answers,
+    // so the message must not call them meanings.
+    if (hasWord(subjectMeanings, trimmed)) {
+      toast.error(`"${trimmed}" is already listed on WaniKani`);
       return;
     }
     void save({ add_synonym: trimmed });
@@ -102,4 +110,15 @@ export function UserSynonymsRow({
       {hint && <span className="text-xs text-gray-400">{hint}</span>}
     </div>
   );
+}
+
+// WaniKani stores some meanings decomposed, so 旧姓 has "Née" with a combining accent.
+// Without NFC the same word typed precomposed looks different and slips through.
+function hasWord(words: string[], word: string): boolean {
+  const wanted = plainForm(word);
+  return words.some((item) => plainForm(item) === wanted);
+}
+
+function plainForm(word: string): string {
+  return word.trim().toLowerCase().normalize("NFC");
 }
