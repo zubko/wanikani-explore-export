@@ -12,7 +12,7 @@ import { LOCAL_STUDY_MATERIAL_FIELDS } from "@/model/wanikani.ts";
 import { localStudyMaterialValueProblem, readingNoteProblem } from "@/model/subject-utils.ts";
 import type { MnemonicImageFetcher } from "./mnemonic-image-fetcher.ts";
 import { createMnemonicImageFetcher } from "./mnemonic-image-fetcher.ts";
-import { readJson } from "@server/utils/json-utils.ts";
+import { readJson, saveJsonAtomic } from "@server/utils/json-utils.ts";
 
 type RawVerbConjugations = Omit<VerbConjugations, "type">;
 
@@ -93,13 +93,17 @@ export async function readLocalStudyMaterials(): Promise<Record<string, LocalStu
   try {
     parsed = await readJson<unknown>(LOCAL_STUDY_MATERIALS_PATH);
   } catch (error) {
-    // No script creates this file, so a fresh checkout has to be told about it
-    if (isMissingFile(error)) {
-      throw new Error(`Cannot read ${LOCAL_STUDY_MATERIALS_PATH}. Create it with {} inside.`);
-    }
+    // No script creates this file, so a fresh checkout starts without it
+    if (isMissingFile(error)) return await createEmptyLocalStudyMaterials();
     throw new Error(`Cannot read ${LOCAL_STUDY_MATERIALS_PATH}. ${String(error)}`);
   }
   return parseLocalStudyMaterials(parsed);
+}
+
+async function createEmptyLocalStudyMaterials(): Promise<Record<string, LocalStudyMaterial>> {
+  console.log(`[Repository] ${LOCAL_STUDY_MATERIALS_PATH} is missing — creating it`);
+  await saveJsonAtomic(LOCAL_STUDY_MATERIALS_PATH, {});
+  return {};
 }
 
 // The user writes this file by hand, so a wrong shape must stop the start and not the browser

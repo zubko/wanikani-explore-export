@@ -1,6 +1,6 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import type { LocalStudyMaterial } from "@/model/wanikani.ts";
-import { resetFsMock, setFileContent, setFsError } from "@/test/preload.ts";
+import { resetFsMock, setFileContent, setFsError, writeCalls } from "@/test/preload.ts";
 import {
   checkLocalStudyMaterialSubjects,
   LOCAL_STUDY_MATERIALS_PATH,
@@ -78,10 +78,11 @@ describe("readLocalStudyMaterials", () => {
     expect(await readError()).toContain("subject 958 has no field");
   });
 
-  test("a missing file tells the user to create it", async () => {
+  test("a missing file is created with an empty object", async () => {
     setFsError("readFile", Object.assign(new Error("no such file"), { code: "ENOENT" }));
 
-    expect(await readError()).toContain("Create it with {} inside");
+    expect(await readLocalStudyMaterials()).toEqual({});
+    expect(writeCalls).toEqual([{ path: LOCAL_STUDY_MATERIALS_PATH, data: "{}\n" }]);
   });
 
   test("broken JSON reports the parse error and not the create hint", async () => {
