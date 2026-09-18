@@ -6,11 +6,16 @@ import type {
   ContextSentence,
   Conjugations,
 } from "@/model/wanikani.ts";
-import { findStudyMaterial, getPrimaryMeaning } from "@/model/subject-utils.ts";
+import {
+  findStudyMaterial,
+  findLocalStudyMaterial,
+  getPrimaryMeaning,
+} from "@/model/subject-utils.ts";
 import {
   vocabulary,
   kanaVocabulary,
   studyMaterials,
+  localStudyMaterials,
   verbConjugations,
   sentenceReadings,
 } from "./data-loader.ts";
@@ -50,6 +55,7 @@ async function mapVocabularyDataToVocabulary(data: VocabularyData): Promise<Voca
     contextSentences: enrichContextSentencesWithReadings(data.id, data.data.context_sentences),
     pronunciationAudios: data.data.pronunciation_audios,
     studyMaterial: findStudyMaterial(studyMaterials, data.id, "vocabulary"),
+    localStudyMaterial: findLocalStudyMaterial(localStudyMaterials, data.id),
     componentKanji,
     conjugations: getConjugations(data.id),
   };
@@ -69,7 +75,8 @@ function mapKanaVocabularyDataToKanaVocabulary(data: KanaVocabularyData): KanaVo
     partsOfSpeech: data.data.parts_of_speech,
     contextSentences: enrichContextSentencesWithReadings(data.id, data.data.context_sentences),
     pronunciationAudios: data.data.pronunciation_audios,
-    studyMaterial: null,
+    studyMaterial: findStudyMaterial(studyMaterials, data.id, "kana_vocabulary"),
+    localStudyMaterial: findLocalStudyMaterial(localStudyMaterials, data.id),
   };
 }
 

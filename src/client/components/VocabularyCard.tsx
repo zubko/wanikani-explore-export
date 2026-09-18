@@ -15,13 +15,14 @@ import { AddToAnkiButton } from "./card-components/AddToAnkiButton.tsx";
 import { CardHeader } from "./card-components/CardHeader.tsx";
 import { ExplanationBlock } from "./card-components/ExplanationBlock.tsx";
 import { LabeledRow } from "./card-components/LabeledRow.tsx";
-import { NoteSection } from "./card-components/NoteSection.tsx";
+import { NoteSection, type NoteSectionProps } from "./card-components/NoteSection.tsx";
 import { scrollToElement } from "../utils/scroll-to-element.ts";
 import { SectionTitle } from "./card-components/SectionTitle.tsx";
 import { SubjectTile } from "./card-components/SubjectTile.tsx";
-import { UserSynonymsRow } from "./card-components/UserSynonymsRow.tsx";
-import { api } from "../api.ts";
+import { UserSynonymsRow, type UserSynonymsRowProps } from "./card-components/UserSynonymsRow.tsx";
+import { addToAnkiAfterSaves } from "../utils/add-to-anki.ts";
 import { formatAnkiResult } from "../utils/format-anki-result.ts";
+import { noteProps, synonymProps } from "./card-components/study-material-props.ts";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { VolumeHighIcon } from "@hugeicons/core-free-icons";
 
@@ -36,7 +37,7 @@ export function VocabularyCard({ vocabulary }: VocabularyCardProps) {
 
   const handleAddToAnki = () => {
     const kanjiCount = vocabData ? vocabData.componentKanji.length : 0;
-    toast.promise(api.addToAnki(vocabulary.id, vocabulary.object), {
+    toast.promise(addToAnkiAfterSaves(vocabulary.id, vocabulary.object), {
       loading:
         kanjiCount > 0
           ? `Adding ${vocabulary.characters} with ${kanjiCount} kanji...`
@@ -59,18 +60,18 @@ export function VocabularyCard({ vocabulary }: VocabularyCardProps) {
         {vocabData && <KanjiCompositionSection componentKanji={vocabData.componentKanji} />}
         <MeaningSection
           meanings={vocabulary.meanings}
-          userSynonyms={vocabulary.studyMaterial?.data.meaning_synonyms ?? []}
+          synonyms={synonymProps(vocabulary)}
           partsOfSpeech={vocabulary.partsOfSpeech}
           conjugations={vocabData?.conjugations ?? null}
           mnemonic={vocabulary.meaningMnemonic}
-          note={vocabulary.studyMaterial?.data.meaning_note ?? null}
+          note={noteProps(vocabulary, "meaning_note")}
         />
         {vocabData && (
           <ReadingSection
             readings={vocabData.readings}
             audios={vocabulary.pronunciationAudios}
             mnemonic={vocabData.readingMnemonic}
-            note={vocabulary.studyMaterial?.data.reading_note ?? null}
+            note={noteProps(vocabulary, "reading_note")}
           />
         )}
         <ContextSentencesSection sentences={vocabulary.contextSentences} />
@@ -81,18 +82,18 @@ export function VocabularyCard({ vocabulary }: VocabularyCardProps) {
 
 function MeaningSection({
   meanings,
-  userSynonyms,
+  synonyms,
   partsOfSpeech,
   conjugations,
   mnemonic,
   note,
 }: {
   meanings: { meaning: string; primary: boolean; accepted_answer: boolean }[];
-  userSynonyms: string[];
+  synonyms: UserSynonymsRowProps;
   partsOfSpeech: string[];
   conjugations: Conjugations | null;
   mnemonic: string;
-  note: string | null;
+  note: NoteSectionProps;
 }) {
   const primaryMeaning = getPrimaryMeaning(meanings);
   const alternativeMeanings = meanings
@@ -107,11 +108,11 @@ function MeaningSection({
         {alternativeMeanings.length > 0 && (
           <LabeledRow label="Alternative" value={alternativeMeanings.join(", ")} />
         )}
-        <UserSynonymsRow synonyms={userSynonyms} />
+        <UserSynonymsRow {...synonyms} />
         <LabeledRow label="Word Type" value={partsOfSpeech.join(", ")} />
         {conjugations && <ConjugationsRow conjugations={conjugations} />}
         <ExplanationBlock mnemonic={mnemonic} />
-        <NoteSection note={note} />
+        <NoteSection {...note} />
       </div>
     </div>
   );
@@ -126,7 +127,7 @@ function ReadingSection({
   readings: VocabularyReading[];
   audios: PronunciationAudio[];
   mnemonic: string;
-  note: string | null;
+  note: NoteSectionProps;
 }) {
   const primaryReading = getPrimaryReading(readings);
 
@@ -137,7 +138,7 @@ function ReadingSection({
         <p className="text-2xl">{primaryReading}</p>
         <AudioButtons audios={audios} />
         <ExplanationBlock mnemonic={mnemonic} />
-        <NoteSection note={note} />
+        <NoteSection {...note} />
       </div>
     </div>
   );

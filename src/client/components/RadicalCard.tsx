@@ -3,7 +3,7 @@ import toast from "react-hot-toast";
 import { getPrimaryMeaning } from "@/model/subject-utils.ts";
 import { getRadicalSvgUrl } from "@/model/radical-utils.ts";
 import { subjectColors } from "@/config/theme.ts";
-import { api } from "../api.ts";
+import { addToAnkiAfterSaves } from "../utils/add-to-anki.ts";
 import { formatAnkiResult } from "../utils/format-anki-result.ts";
 import { AddToAnkiButton } from "./card-components/AddToAnkiButton.tsx";
 import { CardHeader } from "./card-components/CardHeader.tsx";
@@ -11,7 +11,8 @@ import { LabeledRow } from "./card-components/LabeledRow.tsx";
 import { MnemonicText } from "./card-components/MnemonicText.tsx";
 import { NoteSection } from "./card-components/NoteSection.tsx";
 import { RelatedSubjectsSection } from "./card-components/RelatedSubjectsSection.tsx";
-import { UserSynonymsRow } from "./card-components/UserSynonymsRow.tsx";
+import { UserSynonymsRow, type UserSynonymsRowProps } from "./card-components/UserSynonymsRow.tsx";
+import { noteProps, synonymProps } from "./card-components/study-material-props.ts";
 
 type RadicalCardProps = {
   radical: Radical;
@@ -23,7 +24,7 @@ export function RadicalCard({ radical }: RadicalCardProps) {
   const characterImage = svgUrl ? <img src={svgUrl} alt="" className="h-8 w-8 invert" /> : null;
 
   const handleAddToAnki = () => {
-    toast.promise(api.addToAnki(radical.id, radical.object), {
+    toast.promise(addToAnkiAfterSaves(radical.id, radical.object), {
       loading: "Saving to Anki...",
       success: (result) => formatAnkiResult(result),
       error: (err) => `Failed: ${err.message}`,
@@ -41,13 +42,10 @@ export function RadicalCard({ radical }: RadicalCardProps) {
         actions={<AddToAnkiButton onClick={handleAddToAnki} />}
       />
       <div className="divide-y divide-gray-200">
-        <NameSection
-          meanings={radical.meanings}
-          userSynonyms={radical.studyMaterial?.data.meaning_synonyms ?? []}
-        />
+        <NameSection meanings={radical.meanings} synonyms={synonymProps(radical)} />
         <MnemonicSection mnemonic={radical.meaningMnemonic} imageUrl={radical.mnemonicImageUrl} />
         <div className="p-4">
-          <NoteSection note={radical.studyMaterial?.data.meaning_note ?? null} />
+          <NoteSection {...noteProps(radical, "meaning_note")} />
         </div>
         <RelatedSubjectsSection
           title="Found In Kanji"
@@ -62,10 +60,10 @@ export function RadicalCard({ radical }: RadicalCardProps) {
 
 function NameSection({
   meanings,
-  userSynonyms,
+  synonyms,
 }: {
   meanings: Radical["meanings"];
-  userSynonyms: string[];
+  synonyms: UserSynonymsRowProps;
 }) {
   const primaryMeaning = getPrimaryMeaning(meanings);
   const alternativeMeanings = meanings
@@ -80,7 +78,7 @@ function NameSection({
         {alternativeMeanings.length > 0 && (
           <LabeledRow label="Alternative" value={alternativeMeanings.join(", ")} />
         )}
-        <UserSynonymsRow synonyms={userSynonyms} />
+        <UserSynonymsRow {...synonyms} />
       </div>
     </div>
   );

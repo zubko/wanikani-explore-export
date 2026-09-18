@@ -1,11 +1,12 @@
 import type { Kanji, KanjiData } from "@/model/wanikani.ts";
 import {
   findStudyMaterial,
+  findLocalStudyMaterial,
   findByIds,
   buildSubjectReferences,
   getPrimaryMeaning,
 } from "@/model/subject-utils.ts";
-import { kanji, vocabulary, studyMaterials } from "./data-loader.ts";
+import { kanji, vocabulary, studyMaterials, localStudyMaterials } from "./data-loader.ts";
 import { getRadicals } from "./radical.ts";
 
 async function mapKanjiDataToKanji(data: KanjiData): Promise<Kanji> {
@@ -35,6 +36,7 @@ async function mapKanjiDataToKanji(data: KanjiData): Promise<Kanji> {
     amalgamationSubjectIds: data.data.amalgamation_subject_ids,
     visuallySimilarSubjectIds: data.data.visually_similar_subject_ids,
     studyMaterial: findStudyMaterial(studyMaterials, data.id, "kanji"),
+    localStudyMaterial: findLocalStudyMaterial(localStudyMaterials, data.id),
     componentRadicals,
     visuallySimilarKanji,
     foundInVocabulary,
