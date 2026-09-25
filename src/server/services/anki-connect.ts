@@ -412,13 +412,13 @@ async function buildKanjiNoteFields(kanji: Kanji): Promise<KanjiNoteFields> {
     primary_reading: getPrimaryReading(kanji.readings),
     extra_meanings: getExtraMeanings(kanji.meanings),
     meaning_mnemonic: styleMnemonicHtml(kanji.meaningMnemonic),
-    meaning_hint: styleMnemonicHtml(kanji.meaningHint),
+    meaning_hint: styleMnemonicHtml(kanji.meaningHint ?? ""),
     meaning_note: studyMaterial.meaningNote,
     readings_onyomi: formatReadingsHtml(kanji.readings, "onyomi"),
     readings_kunyomi: formatReadingsHtml(kanji.readings, "kunyomi"),
     readings_nanori: formatReadingsHtml(kanji.readings, "nanori"),
     reading_mnemonic: styleMnemonicHtml(kanji.readingMnemonic),
-    reading_hint: styleMnemonicHtml(kanji.readingHint),
+    reading_hint: styleMnemonicHtml(kanji.readingHint ?? ""),
     reading_note: studyMaterial.readingNote,
   };
 }

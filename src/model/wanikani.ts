@@ -154,9 +154,9 @@ type KanjiDataFields = BaseSubjectDataFields & {
   component_subject_ids: number[];
   amalgamation_subject_ids: number[];
   visually_similar_subject_ids: number[];
-  meaning_hint: string;
+  meaning_hint: string | null;
   reading_mnemonic: string;
-  reading_hint: string;
+  reading_hint: string | null;
 };
 
 type VocabularyDataFields = BaseSubjectDataFields & {
@@ -219,10 +219,10 @@ export type Kanji = {
   meanings: Meaning[];
   auxiliaryMeanings: AuxiliaryMeaning[];
   meaningMnemonic: string;
-  meaningHint: string;
+  meaningHint: string | null;
   readings: KanjiReading[];
   readingMnemonic: string;
-  readingHint: string;
+  readingHint: string | null;
   componentSubjectIds: number[];
   amalgamationSubjectIds: number[];
   visuallySimilarSubjectIds: number[];

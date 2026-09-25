@@ -133,7 +133,7 @@ function MeaningSection({
   meanings: Kanji["meanings"];
   synonyms: UserSynonymsRowProps;
   mnemonic: string;
-  hint: string;
+  hint: string | null;
   note: NoteSectionProps;
 }) {
   const primaryMeaning = getPrimaryMeaning(meanings);
@@ -164,7 +164,7 @@ function ReadingsSection({
 }: {
   readings: Kanji["readings"];
   mnemonic: string;
-  hint: string;
+  hint: string | null;
   note: NoteSectionProps;
 }) {
   return (
@@ -210,7 +210,7 @@ function MnemonicBlock({
   note,
 }: {
   mnemonic: string;
-  hint: string;
+  hint: string | null;
   note: NoteSectionProps;
 }) {
   return (
