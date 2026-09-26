@@ -7,6 +7,9 @@ export const RADICAL_DECK_NAME = RADICAL_MODEL_NAME;
 export const KANJI_DECK_NAME = KANJI_MODEL_NAME;
 export const VOCABULARY_DECK_NAME = VOCABULARY_MODEL_NAME;
 
+// add-iknow-vocab matches this text to stop the run instead of recording every word as a problem
+export const UNEXPECTED_FIELDS_ERROR = "has unexpected fields";
+
 export const RADICAL_EXPECTED_FIELDS = [
   "character",
   "primary_name",

@@ -2,6 +2,7 @@ import { parseArgs } from "util";
 import { readFile } from "fs/promises";
 import { join } from "path";
 
+import { UNEXPECTED_FIELDS_ERROR } from "../src/model/anki-models.ts";
 import { formatError } from "./lib/format-error.ts";
 import { saveJsonAtomic } from "./lib/llm-utils.ts";
 import {
@@ -261,17 +262,26 @@ async function processItem(params: {
     return "added";
   }
 
+  let result: AddToAnkiResponse;
   try {
     // the search answers vocabulary and kana_vocabulary from one pool, so take the type it reports
-    const result = await addToAnki(args.baseUrl, found.data.id, found.data.object);
-    if (!result.ok) {
-      console.log(`${label} — ERROR ${result.error}`);
-      addProblem("error", result.error);
-      return "error";
-    }
+    result = await addToAnki(args.baseUrl, found.data.id, found.data.object);
   } catch (err) {
     console.log(`${label} — ERROR ${formatError(err)}`);
     addProblem("error", formatError(err));
+    return "error";
+  }
+
+  if (!result.ok) {
+    // every later word would fail the same way, and a problem entry is never revisited
+    if (result.error.includes(UNEXPECTED_FIELDS_ERROR)) {
+      throw new Error(
+        `${result.error}\nStopped at ${item.word}, it is not recorded as a problem. ` +
+          "Fix the note type fields (bun run sync-anki-fields, then bun run sync-anki-templates), then run again."
+      );
+    }
+    console.log(`${label} — ERROR ${result.error}`);
+    addProblem("error", result.error);
     return "error";
   }
 

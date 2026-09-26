@@ -198,6 +198,8 @@ The limit counts words really added. A word already in Anki, or already in `prob
 
 A word in `problems` is never revisited — the saved index has already moved past it. Resolve one by adding it directly, then drop its entry by hand.
 
+An add that fails with a note type field mismatch (`UNEXPECTED_FIELDS_ERROR` from `validateModelFields`) stops the run. The word is not recorded and the saved index stays on it. Every later word would fail the same way, so recording them would burn a whole course file into `problems`. This happens after a change to `*_EXPECTED_FIELDS` until the user runs `bun run sync-anki-fields` and `bun run sync-anki-templates`.
+
 The search endpoint answers `vocabulary` and `kana_vocabulary` from one pool, so the script sends the type the search reports in `data.object`, never a literal.
 
 The `.claude/skills/add-iknow-vocab/` skill runs the script and triages the new `problems` entries — grammar words WaniKani does not teach vs a different WaniKani spelling (直ぐ for すぐ). It asks before adding an alternative spelling.
