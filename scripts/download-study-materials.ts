@@ -1,3 +1,5 @@
+import { saveJsonAtomic } from "./lib/llm-utils.ts";
+
 const BASE_URL = "https://api.wanikani.com/v2";
 const API_REVISION = "20170710";
 const RATE_LIMIT_MS = 1000;
@@ -90,7 +92,7 @@ async function main(): Promise<void> {
   const materials = await fetchAllStudyMaterials(token);
   console.log(`\nDownloaded ${materials.length} study materials total\n`);
 
-  await Bun.write(OUTPUT_FILE, JSON.stringify(materials, null, 2));
+  await saveJsonAtomic(OUTPUT_FILE, materials);
   console.log(`Saved to ${OUTPUT_FILE}`);
 
   console.log("\nDone!");

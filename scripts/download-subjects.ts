@@ -1,3 +1,5 @@
+import { saveJsonAtomic } from "./lib/llm-utils.ts";
+
 const BASE_URL = "https://api.wanikani.com/v2";
 const API_REVISION = "20170710";
 const RATE_LIMIT_MS = 1000;
@@ -100,7 +102,7 @@ async function saveToFiles(grouped: Record<SubjectType, WanikaniSubject[]>): Pro
   for (const [type, subjects] of Object.entries(grouped)) {
     const fileName = fileNames[type as SubjectType];
     const filePath = `${DATA_DIR}/${fileName}`;
-    await Bun.write(filePath, JSON.stringify(subjects, null, 2));
+    await saveJsonAtomic(filePath, subjects);
     console.log(`Saved ${subjects.length} ${type} subjects to ${filePath}`);
   }
 }

@@ -1,5 +1,4 @@
-import { writeFile } from "fs/promises";
-import { readJson } from "@server/utils/json-utils.ts";
+import { readJson, saveJsonAtomic } from "@server/utils/json-utils.ts";
 
 type MnemonicImageCache = Record<string, string | null>;
 
@@ -13,8 +12,10 @@ async function loadMnemonicImageCache(): Promise<MnemonicImageCache> {
   }
 }
 
+// Atomic, because the data folder is a git repo that a sync job commits on its own
+// schedule: a plain write could be committed half-written.
 async function saveMnemonicImageCache(cache: MnemonicImageCache): Promise<void> {
-  await writeFile(MNEMONIC_IMAGES_CACHE_PATH, JSON.stringify(cache, null, 2) + "\n");
+  await saveJsonAtomic(MNEMONIC_IMAGES_CACHE_PATH, cache);
 }
 
 async function fetchMnemonicImageUrl(documentUrl: string): Promise<string | null> {

@@ -1,5 +1,6 @@
 import { parseArgs } from "util";
 import { formatError } from "./lib/format-error.ts";
+import { saveJsonAtomic } from "./lib/llm-utils.ts";
 import {
   formatStatusLine,
   parsePatches,
@@ -79,7 +80,7 @@ async function main(): Promise<void> {
   }
 
   for (const file of result.writes) {
-    await Bun.write(file.path, JSON.stringify(file.subjects, null, 2));
+    await saveJsonAtomic(file.path, file.subjects);
     console.log(`Wrote ${file.path}`);
   }
 }
