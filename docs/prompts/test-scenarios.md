@@ -61,7 +61,7 @@ Edited in place on every card. The values are stored in `data/userdata/study_mat
 - Edit a note on a kanji card shown under a vocabulary word, then search that kanji on its own: the note is there
 - Search a word whose two kanji share a radical (`一万`, `毎年`, `土地`): the radical gets one card under each kanji. Add a synonym on the first card, then add another one on the second card. Both cards show both words, and nothing is lost
 - Stop the dev server, then save a note: a red toast shows the fetch error and the editor opens again with the text. Cancel after that shows the last saved value, not the draft
-- Run "Add to Anki" for a word with a local note and a local synonym, then check the fields in Anki. Kanji synonyms are the one thing that does not reach Anki, the kanji note type has no field for them
+- Run "Add to Anki" for a word with a local note and a local synonym, then check the fields in Anki. The kanji note also gets its local synonyms in `user_synonyms`, and both the kanji and the word get them in `alternative_meanings`
 
 ## Empty/No Results
 
@@ -84,3 +84,8 @@ Checked in Anki after `bun run sync-anki-templates`.
 - Same card in light mode and in dark mode: the masu form stays readable in both
 - Answer side of a non-verb card (`毎晩`) and a kana card (`ここ`): no extra line under the badge
 - Answer side of a long verb (`生まれる`): the badge and the masu form still fit on one line after the font scaling runs
+- Answer side of a kanji with several alternatives (`万`): a muted line under the header shows them, centered. It wraps on a narrow window
+- Answer side of a word with a long list of alternatives: the main meaning keeps its size and the line wraps. Resize the window to several widths: the header never shrinks to a tiny font
+- Answer side of a subject with no alternatives and no synonyms: no empty line, no extra gap
+- The alternatives line stays readable in light and dark mode, on both card types
+- Details view of a kanji with a local synonym: it shows a Synonyms row

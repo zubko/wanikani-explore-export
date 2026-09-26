@@ -296,6 +296,26 @@ describe("getAlternativeMeanings", () => {
     expect(getAlternativeMeanings(withRejected, ["Nights"])).toEqual(["Nights"]);
   });
 
+  it("keeps a synonym that equals a meaning which is not an accepted answer", () => {
+    const withRejected: Meaning[] = [
+      ...primaryOnly,
+      { meaning: "Tonight", primary: false, accepted_answer: false },
+    ];
+    expect(getAlternativeMeanings(withRejected, ["tonight"])).toEqual(["tonight"]);
+  });
+
+  it("matches a decomposed meaning with the same word typed precomposed", () => {
+    const withAccent: Meaning[] = [
+      ...primaryOnly,
+      { meaning: "Ne\u0301e", primary: false, accepted_answer: true },
+    ];
+    expect(getAlternativeMeanings(withAccent, ["N\u00e9e"])).toEqual(["Ne\u0301e"]);
+  });
+
+  it("returns a kept synonym trimmed", () => {
+    expect(getAlternativeMeanings(primaryOnly, ["  Nights  "])).toEqual(["Nights"]);
+  });
+
   it("compares the raw text, so a synonym with & matches a meaning with &", () => {
     const withAmpersand: Meaning[] = [
       ...primaryOnly,

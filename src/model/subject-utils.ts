@@ -25,17 +25,12 @@ export function findByIds<T extends { id: number }>(items: T[], ids: number[]): 
 }
 
 export function getExtraMeanings(meanings: Meaning[]): string {
-  return meanings
-    .filter((m) => !m.primary && m.accepted_answer)
-    .map((m) => m.meaning)
-    .join(", ");
+  return acceptedAlternatives(meanings).join(", ");
 }
 
 export function getAlternativeMeanings(meanings: Meaning[], synonyms: string[]): string[] {
-  const alternatives = meanings
-    .filter((m) => !m.primary && m.accepted_answer)
-    .map((m) => m.meaning);
-  const seen = new Set(meanings.map((m) => synonymKey(m.meaning)));
+  const alternatives = acceptedAlternatives(meanings);
+  const seen = new Set([getPrimaryMeaning(meanings), ...alternatives].map(synonymKey));
   const extraSynonyms: string[] = [];
   for (const synonym of synonyms) {
     const key = synonymKey(synonym);
@@ -148,6 +143,10 @@ export function buildSubjectReferences(
       meanings: item.data.meanings,
     })
   );
+}
+
+function acceptedAlternatives(meanings: Meaning[]): string[] {
+  return meanings.filter((m) => !m.primary && m.accepted_answer).map((m) => m.meaning);
 }
 
 // A patch names one word to add or to remove, never the whole list. So a client that holds an

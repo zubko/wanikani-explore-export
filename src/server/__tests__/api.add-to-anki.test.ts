@@ -52,29 +52,12 @@ function findNoteFields(params: {
   value: string;
 }): Record<string, string> {
   const { action, field, value } = params;
-  return findFieldsWhere(action, value, (fields) => fields[field] === value);
-}
-
-/** A radical note like 入 holds the same `character`, only the kanji note has `radicals`. */
-function findKanjiFields(action: string, character: string): Record<string, string> {
-  return findFieldsWhere(
-    action,
-    character,
-    (fields) => fields.character === character && "radicals" in fields
-  );
-}
-
-function findFieldsWhere(
-  action: string,
-  label: string,
-  matches: (fields: Record<string, string>) => boolean
-): Record<string, string> {
   const call = ankiCalls.find((c) => {
     if (c.action !== action) return false;
     const note = c.params.note as { fields?: Record<string, string> } | undefined;
-    return note?.fields !== undefined && matches(note.fields);
+    return note?.fields?.[field] === value;
   });
-  if (!call) throw new Error(`No ${action} call for ${label}`);
+  if (!call) throw new Error(`No ${action} call for ${value}`);
   return (call.params.note as { fields: Record<string, string> }).fields;
 }
 
@@ -144,17 +127,6 @@ describe("add-to-anki API", () => {
 
     expect(findVocabularyFields("addNote", "毎晩").masu_form).toBe("");
     expect(ankiCalls).toMatchSnapshot();
-  });
-
-  test("add vocabulary (毎晩) lists a synonym equal to a WaniKani meaning once", async () => {
-    const result = await addToAnkiJson({ id: 3766, type: "vocabulary" });
-    expect(result.ok).toBe(true);
-
-    const fields = findVocabularyFields("addNote", "毎晩");
-    const nightly = fields
-      .alternative_meanings!.split(", ")
-      .filter((m) => m.toLowerCase() === "nightly");
-    expect(nightly).toEqual(["Nightly"]);
   });
 
   test("add kana vocabulary (ここ, id=9209)", async () => {
@@ -257,14 +229,6 @@ describe("add-to-anki API", () => {
     expect(fields.masu_form).toBe("入ります");
     expect(fields.conjugations).toBe("入る, 入ります, 入って, 入らない");
     expect(fields.alternative_meanings).toMatchInlineSnapshot(`"To Go In"`);
-
-    const kanjiFields = findKanjiFields("updateNoteFields", "入");
-    expect([kanjiFields.user_synonyms, kanjiFields.alternative_meanings]).toMatchInlineSnapshot(`
-      [
-        "",
-        "",
-      ]
-    `);
   });
 
   test("note type without masu_form returns an error", async () => {
@@ -294,6 +258,58 @@ describe("add-to-anki API", () => {
     const response = await api.request("/anki-sync", { method: "POST" });
     expect(await response.json()).toEqual({ ok: true });
     expect(ankiCalls.map((c) => c.action)).toEqual(["sync"]);
+  });
+});
+
+describe("alternative_meanings", () => {
+  beforeEach(resetStudyMaterialState);
+  afterEach(resetStudyMaterialState);
+
+  test("a local synonym equal to a WaniKani meaning is listed once (毎晩)", async () => {
+    setLocalStudyMaterials({ ...fixture, "3766": { meaning_synonyms: ["nightly", "Nights"] } });
+
+    const result = await addToAnkiJson({ id: 3766, type: "vocabulary" });
+    expect(result.ok).toBe(true);
+
+    const fields = findVocabularyFields("addNote", "毎晩");
+    expect([fields.user_synonyms, fields.alternative_meanings]).toMatchInlineSnapshot(`
+      [
+        "nightly, Nights",
+        "Nightly, Nights",
+      ]
+    `);
+  });
+
+  test("WaniKani and local synonyms are joined, a case variant is listed once (アメリカ人)", async () => {
+    setLocalStudyMaterials({ ...fixture, "2478": { meaning_synonyms: ["USA Person", "yankee"] } });
+
+    const result = await addToAnkiJson({ id: 2478, type: "vocabulary" });
+    expect(result.ok).toBe(true);
+
+    const fields = findVocabularyFields("addNote", "アメリカ人");
+    expect([fields.user_synonyms, fields.alternative_meanings]).toMatchInlineSnapshot(`
+      [
+        "usa person, USA Person, yankee",
+        "Person From The USA, usa person, yankee",
+      ]
+    `);
+  });
+
+  test("an updated kanji note gets its synonyms (晩)", async () => {
+    setAnkiResponse("findNotes", [1]);
+    setLocalStudyMaterials({ ...fixture, "958": { meaning_synonyms: ["dusk"] } });
+
+    const result = await addToAnkiJson({ id: 958, type: "kanji" });
+    expect(result.ok).toBe(true);
+    expect(result.data.subject.created).toBe(false);
+
+    const fields = findNoteFields({ action: "updateNoteFields", field: "character", value: "晩" });
+    expect([fields.user_synonyms, fields.alternative_meanings]).toMatchInlineSnapshot(`
+      [
+        "dusk",
+        "Evening, dusk",
+      ]
+    `);
   });
 });
 

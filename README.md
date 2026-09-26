@@ -8,6 +8,7 @@ A web app for creating Anki flashcards from WaniKani data. Search for radicals, 
 - Rich card display with mnemonics, readings, audio, context sentences, and related items
 - One-click add to Anki — automatically creates component cards (radicals for kanji, kanji for vocabulary)
 - Verb conjugations for vocabulary cards, with the masu form on the answer side
+- Alternative meanings and your own synonyms on the answer side of kanji and vocabulary cards
 - TTS audio for context sentences (optional, via Azure TTS)
 - Dark mode support in Anki cards
 
