@@ -1,7 +1,7 @@
 import { useState } from "react";
 import toast from "react-hot-toast";
 import { Cancel01Icon } from "@hugeicons/core-free-icons";
-import { synonymKey } from "@/model/subject-utils.ts";
+import { meaningKey } from "@/model/subject-utils.ts";
 import type { LocalStudyMaterial, LocalStudyMaterialPatch } from "@/model/wanikani.ts";
 import {
   saveLocalStudyMaterial,
@@ -111,6 +111,6 @@ export function UserSynonymsRow({
 }
 
 function hasWord(words: string[], word: string): boolean {
-  const wanted = synonymKey(word);
-  return words.some((item) => synonymKey(item) === wanted);
+  const wanted = meaningKey(word);
+  return words.some((item) => meaningKey(item) === wanted);
 }

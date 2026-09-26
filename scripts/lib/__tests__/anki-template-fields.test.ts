@@ -241,16 +241,23 @@ function collectTemplateTokens(content: string): string[] {
 function findSectionProblems(content: string): string[] {
   const problems: string[] = [];
   for (const block of content.matchAll(HTML_CODE_BLOCK)) {
-    const open: string[] = [];
+    const open: { kind: string; name: string }[] = [];
     for (const [, kind, name] of (block[1] ?? "").matchAll(SECTION_TAG)) {
+      if (!kind || !name) continue;
       if (kind !== "/") {
-        open.push(name!);
+        open.push({ kind, name });
         continue;
       }
       const expected = open.pop();
-      if (expected !== name) problems.push(`{{/${name}}} closes ${expected ?? "nothing"}`);
+      if (expected?.name !== name) {
+        problems.push(`{{/${name}}} closes ${expected ? openingTag(expected) : "nothing"}`);
+      }
     }
-    problems.push(...open.map((name) => `{{#${name}}} is never closed`));
+    problems.push(...open.map((section) => `${openingTag(section)} is never closed`));
   }
   return problems;
+}
+
+function openingTag(section: { kind: string; name: string }): string {
+  return `{{${section.kind}${section.name}}}`;
 }

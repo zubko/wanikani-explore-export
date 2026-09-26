@@ -231,7 +231,7 @@ describe("add-to-anki API", () => {
     expect(fields.alternative_meanings).toMatchInlineSnapshot(`"To Go In"`);
   });
 
-  test("note type without masu_form returns an error", async () => {
+  test("note type without masu_form returns a field mismatch", async () => {
     setModelFields(
       VOCABULARY_MODEL_NAME,
       VOCABULARY_EXPECTED_FIELDS.filter((f) => f !== "masu_form")
@@ -240,6 +240,14 @@ describe("add-to-anki API", () => {
     const result = await addToAnkiJson({ id: 2480, type: "vocabulary" });
     expect(result.ok).toBe(false);
     expect(result.error).toContain("masu_form");
+    expect(result.reason).toBe("fields");
+  });
+
+  test("an error that is no field mismatch has no reason", async () => {
+    setMediaStatus(404);
+    const result = await addToAnkiJson({ id: 3766, type: "vocabulary" });
+    expect(result.ok).toBe(false);
+    expect(result.reason).toBeUndefined();
   });
 
   test("add with a non-boolean sync returns 400", async () => {
@@ -352,7 +360,6 @@ describe("HTML in a local note", () => {
     expect(fields.alternative_meanings).toMatchInlineSnapshot(
       `"Evening, dusk &amp; dark, x &lt; y"`
     );
-    expect(fields.alternative_meanings).not.toContain("&amp;amp;");
   });
 
   test("a vocabulary note and its synonyms reach Anki escaped", async () => {

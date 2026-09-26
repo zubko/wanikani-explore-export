@@ -32,7 +32,6 @@ import {
   VOCABULARY_DECK_NAME,
   VOCABULARY_MODEL_NAME,
   VOCABULARY_EXPECTED_FIELDS,
-  UNEXPECTED_FIELDS_ERROR,
 } from "@/model/anki-models.ts";
 import { generateSentenceAudio } from "@/server/services/azure-tts.ts";
 import { createHash } from "crypto";
@@ -144,7 +143,7 @@ async function validateModelFields(modelName: string, expectedFields: string[]):
   const extraFields = actualFields.filter((f) => !expectedFields.includes(f));
 
   if (missingFields.length > 0 || extraFields.length > 0) {
-    const parts: string[] = [`Note type "${modelName}" ${UNEXPECTED_FIELDS_ERROR}.`];
+    const parts: string[] = [`Note type "${modelName}" has unexpected fields.`];
     if (missingFields.length > 0) {
       parts.push(`Missing: ${missingFields.join(", ")}`);
     }
@@ -285,6 +284,17 @@ export async function getDeckNotes(type: AnkiDeckType): Promise<DeckNoteInfo[]> 
 export async function syncAnkiWeb(): Promise<void> {
   console.log("[Anki] Syncing with AnkiWeb...");
   await ankiInvoke("sync");
+}
+
+// === Errors ===
+
+export function isFieldMismatchError(err: unknown): boolean {
+  return (
+    typeof err === "object" &&
+    err !== null &&
+    "action" in err &&
+    err.action === "validateModelFields"
+  );
 }
 
 // === Study material ===

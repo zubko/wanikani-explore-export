@@ -2,7 +2,6 @@ import { parseArgs } from "util";
 import { readFile } from "fs/promises";
 import { join } from "path";
 
-import { UNEXPECTED_FIELDS_ERROR } from "../src/model/anki-models.ts";
 import { formatError } from "./lib/format-error.ts";
 import { saveJsonAtomic } from "./lib/llm-utils.ts";
 import {
@@ -26,7 +25,9 @@ type AnkiNotesResponse =
   | { ok: true; data: { characters: string }[] }
   | { ok: false; error: string };
 
-type AddToAnkiResponse = { ok: true; data: unknown } | { ok: false; error: string };
+type AddToAnkiResponse =
+  | { ok: true; data: unknown }
+  | { ok: false; error: string; reason?: "fields" };
 
 type AnkiSyncResponse = { ok: true } | { ok: false; error: string };
 
@@ -151,6 +152,7 @@ async function main(): Promise<void> {
   let alreadyInAnki = 0;
   let notFound = 0;
   let errors = 0;
+  let stopped = false;
 
   const save = async () => {
     if (args.dryRun) return;
@@ -169,6 +171,10 @@ async function main(): Promise<void> {
       console.log(`${label} — already a known problem`);
     } else {
       const outcome = await processItem({ args, item, index, current, status, inAnki, label });
+      if (outcome === "stop") {
+        stopped = true;
+        break;
+      }
       problemWords.add(item.word);
       if (outcome === "added") added++;
       if (outcome === "not_found") notFound++;
@@ -217,7 +223,14 @@ async function main(): Promise<void> {
   if (args.dryRun) console.log("\n[DRY RUN] No words added, status file untouched.");
   console.log("=".repeat(50));
 
-  if (added > 0 && !synced && !args.dryRun) process.exit(1);
+  if (stopped) {
+    console.log(`\nStopped at ${items[index]!.word}, it is not recorded as a problem.`);
+    console.log("The Anki note type fields do not match the code. Fix them, then run again:");
+    console.log("  bun run sync-anki-fields     (interactive, needs a terminal)");
+    console.log("  bun run sync-anki-templates");
+  }
+
+  if (stopped || (added > 0 && !synced && !args.dryRun)) process.exit(1);
 }
 
 async function processItem(params: {
@@ -228,7 +241,7 @@ async function processItem(params: {
   status: VocabStatus;
   inAnki: Set<string>;
   label: string;
-}): Promise<"added" | "not_found" | "error"> {
+}): Promise<"added" | "not_found" | "error" | "stop"> {
   const { args, item, index, current, status, inAnki, label } = params;
 
   const addProblem = (reason: "not_found" | "error", error?: string) => {
@@ -274,11 +287,9 @@ async function processItem(params: {
 
   if (!result.ok) {
     // every later word would fail the same way, and a problem entry is never revisited
-    if (result.error.includes(UNEXPECTED_FIELDS_ERROR)) {
-      throw new Error(
-        `${result.error}\nStopped at ${item.word}, it is not recorded as a problem. ` +
-          "Fix the note type fields (bun run sync-anki-fields, then bun run sync-anki-templates), then run again."
-      );
+    if (result.reason === "fields") {
+      console.log(`${label} — STOPPED ${result.error}`);
+      return "stop";
     }
     console.log(`${label} — ERROR ${result.error}`);
     addProblem("error", result.error);

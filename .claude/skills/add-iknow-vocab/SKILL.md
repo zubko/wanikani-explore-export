@@ -44,10 +44,9 @@ Use `--dry-run` first only when the user asks to preview. The script saves
 Adding a word downloads media and syncs to AnkiWeb, so a run of 15 takes a few minutes. Give it a
 long timeout.
 
-When the script stops with `Note type "..." has unexpected fields`, the Anki note types do not match
-the code. Nothing was recorded for that word. Do not retry and do not add words by hand. Ask the user
-to run `bun run sync-anki-fields` (interactive, needs a TTY), then run `bun run sync-anki-templates`,
-then run the script again.
+When the script stops with a note type field mismatch, nothing was recorded for that word. Do not
+retry and do not add words by hand. Pass on the fix steps the script prints. The field step needs a
+real terminal, so the user must run it.
 
 ## 4. Report
 
