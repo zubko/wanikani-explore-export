@@ -264,6 +264,7 @@ Get your WaniKani token from: https://www.wanikani.com/settings/personal_access_
 - `docs/anki-connect-typescript-api.md` - AnkiConnect API for Anki deck operations
 - `docs/anki-decks-fields.md` - Anki deck field definitions for each subject type
 - `docs/backlog.md` - To-dos stashed for the future. Pick from it when choosing what to work on next
+- `docs/hosting-on-linux.md` - Running the app with a headless Anki on a Linux box, so cards can be added from a phone
 
 ## Anki Integration
 
