@@ -25,10 +25,26 @@ export function findByIds<T extends { id: number }>(items: T[], ids: number[]): 
 }
 
 export function getExtraMeanings(meanings: Meaning[]): string {
-  return meanings
-    .filter((m) => !m.primary && m.accepted_answer)
-    .map((m) => m.meaning)
-    .join(", ");
+  return acceptedAlternatives(meanings).join(", ");
+}
+
+export function getAlternativeMeanings(meanings: Meaning[], synonyms: string[]): string[] {
+  const alternatives = acceptedAlternatives(meanings);
+  const seen = new Set([getPrimaryMeaning(meanings), ...alternatives].map(meaningKey));
+  const extraSynonyms: string[] = [];
+  for (const synonym of synonyms) {
+    const key = meaningKey(synonym);
+    if (key === "" || seen.has(key)) continue;
+    seen.add(key);
+    extraSynonyms.push(synonym.trim());
+  }
+  return [...alternatives, ...extraSynonyms];
+}
+
+// WaniKani stores some meanings decomposed, so 旧姓 has "Née" with a combining accent.
+// Without NFC the same word typed precomposed looks different and slips through.
+export function meaningKey(word: string): string {
+  return word.trim().toLowerCase().normalize("NFC");
 }
 
 export function findStudyMaterial(
@@ -127,6 +143,10 @@ export function buildSubjectReferences(
       meanings: item.data.meanings,
     })
   );
+}
+
+function acceptedAlternatives(meanings: Meaning[]): string[] {
+  return meanings.filter((m) => !m.primary && m.accepted_answer).map((m) => m.meaning);
 }
 
 // A patch names one word to add or to remove, never the whole list. So a client that holds an

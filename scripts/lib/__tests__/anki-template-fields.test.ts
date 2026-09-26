@@ -28,6 +28,7 @@ const NON_FIELD_TOKENS = ["FrontSide", "Tags", "Type", "Deck", "Subdeck", "Card"
 const HTML_CODE_BLOCK = /```html\n([\s\S]*?)```/g;
 // Anki allows filters before the field name: {{text:field}}, {{furigana:text:field}}
 const TEMPLATE_TOKEN = /\{\{[#^/]?(?:[a-zA-Z][a-zA-Z0-9_-]*:)*([a-zA-Z_][a-zA-Z0-9_-]*)\}\}/g;
+const SECTION_TAG = /\{\{([#^/])([a-zA-Z_][a-zA-Z0-9_-]*)\}\}/g;
 
 describe("parseTemplateFields", () => {
   it("returns the vocabulary fields in file order", async () => {
@@ -212,6 +213,16 @@ describe("template markup only references declared fields", () => {
   }
 });
 
+describe("template sections are closed in order", () => {
+  for (const { file } of TEMPLATES) {
+    it(`${file} closes every {{#x}} and {{^x}} with a matching {{/x}}`, async () => {
+      const content = await readTemplate(file);
+
+      expect(findSectionProblems(content)).toEqual([]);
+    });
+  }
+});
+
 async function readTemplate(file: string): Promise<string> {
   return readFile(join(TEMPLATES_DIR, file), "utf-8");
 }
@@ -225,4 +236,28 @@ function collectTemplateTokens(content: string): string[] {
     }
   }
   return [...tokens];
+}
+
+function findSectionProblems(content: string): string[] {
+  const problems: string[] = [];
+  for (const block of content.matchAll(HTML_CODE_BLOCK)) {
+    const open: { kind: string; name: string }[] = [];
+    for (const [, kind, name] of (block[1] ?? "").matchAll(SECTION_TAG)) {
+      if (!kind || !name) continue;
+      if (kind !== "/") {
+        open.push({ kind, name });
+        continue;
+      }
+      const expected = open.pop();
+      if (expected?.name !== name) {
+        problems.push(`{{/${name}}} closes ${expected ? openingTag(expected) : "nothing"}`);
+      }
+    }
+    problems.push(...open.map((section) => `${openingTag(section)} is never closed`));
+  }
+  return problems;
+}
+
+function openingTag(section: { kind: string; name: string }): string {
+  return `{{${section.kind}${section.name}}}`;
 }

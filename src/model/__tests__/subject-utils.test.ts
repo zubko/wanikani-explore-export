@@ -2,11 +2,12 @@ import { describe, expect, it } from "bun:test";
 import {
   applyLocalStudyMaterialPatch,
   findStudyMaterial,
+  getAlternativeMeanings,
   localStudyMaterialValueProblem,
   mergeStudyMaterial,
   readingNoteProblem,
 } from "../subject-utils.ts";
-import type { StudyMaterial, StudyMaterialData } from "../wanikani.ts";
+import type { Meaning, StudyMaterial, StudyMaterialData } from "../wanikani.ts";
 
 function studyMaterial(data: Partial<StudyMaterialData>): StudyMaterial {
   return {
@@ -239,5 +240,96 @@ describe("readingNoteProblem", () => {
     expect(readingNoteProblem("kana_vocabulary")).toBe("a kana_vocabulary has no reading");
     expect(readingNoteProblem("kanji")).toBeNull();
     expect(readingNoteProblem("vocabulary")).toBeNull();
+  });
+});
+
+describe("getAlternativeMeanings", () => {
+  const meanings: Meaning[] = [
+    { meaning: "Every Night", primary: true, accepted_answer: true },
+    { meaning: "Nightly", primary: false, accepted_answer: true },
+    { meaning: "Each Night", primary: false, accepted_answer: true },
+  ];
+  const primaryOnly: Meaning[] = [{ meaning: "Every Night", primary: true, accepted_answer: true }];
+
+  it("returns the WaniKani alternatives when there are no synonyms", () => {
+    expect(getAlternativeMeanings(meanings, [])).toEqual(["Nightly", "Each Night"]);
+  });
+
+  it("returns the synonyms when there are no alternatives", () => {
+    expect(getAlternativeMeanings(primaryOnly, ["Nights", "Evenings"])).toEqual([
+      "Nights",
+      "Evenings",
+    ]);
+  });
+
+  it("puts the alternatives first and the synonyms after them", () => {
+    expect(getAlternativeMeanings(meanings, ["Nights"])).toEqual([
+      "Nightly",
+      "Each Night",
+      "Nights",
+    ]);
+  });
+
+  it("returns an empty list when there is nothing besides the primary meaning", () => {
+    expect(getAlternativeMeanings(primaryOnly, [])).toEqual([]);
+  });
+
+  it("drops a synonym that equals an alternative or the primary meaning in another case or with spaces", () => {
+    expect(getAlternativeMeanings(meanings, ["nightly", "  EVERY NIGHT ", "Nights"])).toEqual([
+      "Nightly",
+      "Each Night",
+      "Nights",
+    ]);
+  });
+
+  it("keeps a repeated synonym once", () => {
+    expect(getAlternativeMeanings(primaryOnly, ["Nights", "nights", " Nights "])).toEqual([
+      "Nights",
+    ]);
+  });
+
+  it("leaves out the meanings that are not accepted answers", () => {
+    const withRejected: Meaning[] = [
+      ...primaryOnly,
+      { meaning: "Tonight", primary: false, accepted_answer: false },
+    ];
+    expect(getAlternativeMeanings(withRejected, ["Nights"])).toEqual(["Nights"]);
+  });
+
+  it("keeps a synonym that equals a meaning which is not an accepted answer", () => {
+    const withRejected: Meaning[] = [
+      ...primaryOnly,
+      { meaning: "Tonight", primary: false, accepted_answer: false },
+    ];
+    expect(getAlternativeMeanings(withRejected, ["tonight"])).toEqual(["tonight"]);
+  });
+
+  it("matches a decomposed meaning with the same word typed precomposed", () => {
+    const withAccent: Meaning[] = [
+      ...primaryOnly,
+      { meaning: "Ne\u0301e", primary: false, accepted_answer: true },
+    ];
+    expect(getAlternativeMeanings(withAccent, ["N\u00e9e"])).toEqual(["Ne\u0301e"]);
+  });
+
+  it("returns a kept synonym trimmed", () => {
+    expect(getAlternativeMeanings(primaryOnly, ["  Nights  "])).toEqual(["Nights"]);
+  });
+
+  it("compares the raw text, so a synonym with & matches a meaning with &", () => {
+    const withAmpersand: Meaning[] = [
+      ...primaryOnly,
+      { meaning: "a & b", primary: false, accepted_answer: true },
+    ];
+    expect(getAlternativeMeanings(withAmpersand, ["A & B"])).toEqual(["a & b"]);
+  });
+
+  it("drops blank synonyms", () => {
+    expect(getAlternativeMeanings(primaryOnly, ["", "   "])).toEqual([]);
+    expect(getAlternativeMeanings(meanings, ["", "Nights", "   "])).toEqual([
+      "Nightly",
+      "Each Night",
+      "Nights",
+    ]);
   });
 });

@@ -15,6 +15,7 @@ import {
   getPrimaryMeaning,
   getPrimaryReading,
   getExtraMeanings,
+  getAlternativeMeanings,
   mergeStudyMaterial,
 } from "@/model/subject-utils.ts";
 import { getRadicalSvgUrl } from "@/model/radical-utils.ts";
@@ -63,6 +64,8 @@ type KanjiNoteFields = {
   primary_meaning: string;
   primary_reading: string;
   extra_meanings: string;
+  user_synonyms: string;
+  alternative_meanings: string;
   meaning_mnemonic: string;
   meaning_hint: string;
   meaning_note: string;
@@ -80,6 +83,7 @@ type VocabularyNoteFields = {
   primary_meaning: string;
   extra_meanings: string;
   user_synonyms: string;
+  alternative_meanings: string;
   word_type: string;
   conjugations: string;
   masu_form: string;
@@ -282,6 +286,17 @@ export async function syncAnkiWeb(): Promise<void> {
   await ankiInvoke("sync");
 }
 
+// === Errors ===
+
+export function isFieldMismatchError(err: unknown): boolean {
+  return (
+    typeof err === "object" &&
+    err !== null &&
+    "action" in err &&
+    err.action === "validateModelFields"
+  );
+}
+
 // === Study material ===
 
 /**
@@ -298,6 +313,14 @@ function mergeStudyMaterialForAnki(
     readingNote: escapeHtml(merged.readingNote),
     meaningSynonyms: merged.meaningSynonyms.map(escapeHtml),
   };
+}
+
+/**
+ * Dedups on the raw synonyms: an escaped `a &amp; b` would never match a raw `a & b` meaning.
+ */
+function formatAlternativeMeanings(subject: Kanji | Vocabulary | KanaVocabulary): string {
+  const { meaningSynonyms } = mergeStudyMaterial(subject.studyMaterial, subject.localStudyMaterial);
+  return getAlternativeMeanings(subject.meanings, meaningSynonyms).map(escapeHtml).join(", ");
 }
 
 function escapeHtml(text: string): string {
@@ -411,6 +434,8 @@ async function buildKanjiNoteFields(kanji: Kanji): Promise<KanjiNoteFields> {
     primary_meaning: getPrimaryMeaning(kanji.meanings),
     primary_reading: getPrimaryReading(kanji.readings),
     extra_meanings: getExtraMeanings(kanji.meanings),
+    user_synonyms: studyMaterial.meaningSynonyms.join(", "),
+    alternative_meanings: formatAlternativeMeanings(kanji),
     meaning_mnemonic: styleMnemonicHtml(kanji.meaningMnemonic),
     meaning_hint: styleMnemonicHtml(kanji.meaningHint ?? ""),
     meaning_note: studyMaterial.meaningNote,
@@ -556,6 +581,7 @@ function buildVocabularyNoteFields(params: {
     primary_meaning: getPrimaryMeaning(vocabulary.meanings),
     extra_meanings: getExtraMeanings(vocabulary.meanings),
     user_synonyms: studyMaterial.meaningSynonyms.join(", "),
+    alternative_meanings: formatAlternativeMeanings(vocabulary),
     word_type: vocabulary.partsOfSpeech.join(", "),
     conjugations: conjugationsStr,
     masu_form: conjugations?.masu ?? "",

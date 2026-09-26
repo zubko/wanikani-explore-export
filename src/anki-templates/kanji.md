@@ -9,6 +9,8 @@ Configure these templates in Anki: Tools → Manage Note Types → Japanese Kanj
 - `primary_meaning` - Primary meaning
 - `primary_reading` - Primary reading (the one marked primary in Wanikani)
 - `extra_meanings` - Alternative meanings (comma-separated)
+- `user_synonyms` - User synonyms (comma-separated)
+- `alternative_meanings` - Alternative meanings and user synonyms joined, without duplicates (comma-separated)
 - `meaning_mnemonic` - Styled HTML mnemonic with colored tags
 - `meaning_hint` - Styled HTML hint
 - `meaning_note` - User note
@@ -39,6 +41,9 @@ Configure these templates in Anki: Tools → Manage Note Types → Japanese Kanj
       {{/primary_reading}}
     </div>
   </div>
+  {{#alternative_meanings}}
+  <div class="alt-meanings">({{alternative_meanings}})</div>
+  {{/alternative_meanings}}
   <button id="details-btn" class="details-btn">Details</button>
 </div>
 
@@ -65,7 +70,9 @@ Configure these templates in Anki: Tools → Manage Note Types → Japanese Kanj
       <div class="row"><span class="label">Primary</span> <b>{{primary_meaning}}</b></div>
       {{#extra_meanings}}
       <div class="row"><span class="label">Alternative</span> {{extra_meanings}}</div>
-      {{/extra_meanings}}
+      {{/extra_meanings}} {{#user_synonyms}}
+      <div class="row"><span class="label">Synonyms</span> {{user_synonyms}}</div>
+      {{/user_synonyms}}
       <div class="mnemonic">{{meaning_mnemonic}}</div>
       {{#meaning_hint}}
       <div class="hint">{{meaning_hint}}</div>
@@ -188,6 +195,13 @@ Configure these templates in Anki: Tools → Manage Note Types → Japanese Kanj
 
 .header-scaled .reading-top {
   font-size: 1em;
+}
+
+.alt-meanings {
+  max-width: 75%;
+  margin-top: 24px;
+  color: #888;
+  font-size: 1.6rem;
 }
 
 .details-btn {
@@ -350,6 +364,10 @@ h2 {
   }
 
   .reading-top {
+    color: #aaa;
+  }
+
+  .alt-meanings {
     color: #aaa;
   }
 

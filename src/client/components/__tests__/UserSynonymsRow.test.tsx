@@ -71,11 +71,6 @@ describe("UserSynonymsRow view state", () => {
     expect(html).toContain("+ Add Synonym");
     expect(html).not.toContain("Remove");
   });
-
-  it("shows the hint when one is given", () => {
-    expect(renderStatic({ hint: "not in Anki" })).toContain("not in Anki");
-    expect(renderStatic()).not.toContain("not in Anki");
-  });
 });
 
 describe("UserSynonymsRow editing", () => {

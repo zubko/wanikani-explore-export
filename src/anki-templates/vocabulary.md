@@ -9,6 +9,7 @@ Configure these templates in Anki: Tools → Manage Note Types → Japanese Voca
 - `primary_meaning` - Primary meaning
 - `extra_meanings` - Alternative meanings (comma-separated)
 - `user_synonyms` - User synonyms (comma-separated)
+- `alternative_meanings` - Alternative meanings and user synonyms joined, without duplicates (comma-separated)
 - `word_type` - Parts of speech (comma-separated)
 - `conjugations` - Verb conjugations: dictionary, masu, te, nai (or empty)
 - `masu_form` - Polite (masu) form for verbs, empty otherwise
@@ -59,7 +60,9 @@ Configure these templates in Anki: Tools → Manage Note Types → Japanese Voca
     {{/masu_form}}
     <div class="header-text">
       <h1>{{primary_meaning}}</h1>
-      {{#reading}}
+      {{#alternative_meanings}}
+      <div class="alt-meanings" id="alt-meanings">({{alternative_meanings}})</div>
+      {{/alternative_meanings}} {{#reading}}
       <div class="reading-top">{{reading}}</div>
       {{/reading}}
     </div>
@@ -163,7 +166,11 @@ Configure these templates in Anki: Tools → Manage Note Types → Japanese Voca
        Anki limits the card container width and centers it, so the container
        can be narrower than the viewport. Using vw units would overshoot. */
     var container = header.parentElement;
-    var maxWidth = container.offsetWidth * 0.85;
+    /* offsetWidth is an integer, so a full-width alt line can measure 512
+       against a fractional limit of 511.7 */
+    var maxWidth = Math.floor(container.offsetWidth * 0.85);
+    var alt = document.getElementById("alt-meanings");
+    if (alt) alt.style.maxWidth = maxWidth + "px";
     var fontSize = maxWidth * 0.15;
     header.style.fontSize = fontSize + "px";
     while (header.offsetWidth > maxWidth && fontSize > 1) {
@@ -199,6 +206,9 @@ Configure these templates in Anki: Tools → Manage Note Types → Japanese Voca
 
 /* Back Short - centered display */
 .back-short {
+  /* A text line has empty space above its capitals and below its baseline that
+     grows with the font size, so equal margins alone look uneven */
+  --gap: 30px;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -211,7 +221,7 @@ Configure these templates in Anki: Tools → Manage Note Types → Japanese Voca
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.75em;
+  gap: var(--gap);
   font-size: 15vw;
 }
 
@@ -223,27 +233,38 @@ Configure these templates in Anki: Tools → Manage Note Types → Japanese Voca
 .header-scaled .masu-form {
   font-size: 1em;
   color: #888;
-  /* The flex column gap is 0.75em of the parent above and below this element.
-     -0.5em leaves 0.25em above, tight under the badge. */
-  margin-top: -0.5em;
+  /* Tight under the badge, not a full gap */
+  margin-top: calc(0.25em - var(--gap));
+  margin-bottom: -0.15em;
 }
 
 .header-scaled h1 {
   font-size: 1.5em;
+  line-height: 1;
+  margin: -0.17em 0 -0.12em;
 }
 
 .header-scaled .header-text {
   display: flex;
   flex-direction: column;
+  gap: var(--gap);
   text-align: center;
 }
 
 .header-scaled .reading-top {
   font-size: 1em;
+  line-height: 1;
+  margin: -0.14em 0 -0.09em;
+}
+
+.alt-meanings {
+  margin: -0.27em 0 -0.2em;
+  color: #888;
+  font-size: 1.6rem;
 }
 
 .details-btn {
-  margin-top: 24px;
+  margin-top: var(--gap);
   min-height: 44px;
   padding: 0 24px;
   font-size: 1rem;
@@ -368,11 +389,12 @@ h2 {
 /* Extra margin to visually balance the space above the button,
    where .header-scaled's line-height adds invisible trailing space */
 .short-sentence {
-  margin-top: 28px;
+  margin-top: var(--gap);
   text-align: center;
 }
 
 .short-sentence-jap {
+  margin-top: -0.22em;
   color: #888;
   font-size: 1.2rem;
 }
@@ -420,6 +442,10 @@ h2 {
   }
 
   .header-scaled .masu-form {
+    color: #aaa;
+  }
+
+  .alt-meanings {
     color: #aaa;
   }
 

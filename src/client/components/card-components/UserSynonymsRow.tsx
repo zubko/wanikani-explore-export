@@ -1,6 +1,7 @@
 import { useState } from "react";
 import toast from "react-hot-toast";
 import { Cancel01Icon } from "@hugeicons/core-free-icons";
+import { meaningKey } from "@/model/subject-utils.ts";
 import type { LocalStudyMaterial, LocalStudyMaterialPatch } from "@/model/wanikani.ts";
 import {
   saveLocalStudyMaterial,
@@ -15,7 +16,6 @@ export type UserSynonymsRowProps = {
   wanikaniSynonyms: string[];
   subjectMeanings: string[];
   localStudyMaterial: LocalStudyMaterial | null;
-  hint?: string;
 };
 
 export function UserSynonymsRow({
@@ -23,7 +23,6 @@ export function UserSynonymsRow({
   wanikaniSynonyms,
   subjectMeanings,
   localStudyMaterial,
-  hint,
 }: UserSynonymsRowProps) {
   const record = useLocalStudyMaterial(subjectId, localStudyMaterial);
   const [mode, setMode] = useState<"view" | "add">("view");
@@ -107,18 +106,11 @@ export function UserSynonymsRow({
           }}
         />
       )}
-      {hint && <span className="text-xs text-gray-400">{hint}</span>}
     </div>
   );
 }
 
-// WaniKani stores some meanings decomposed, so 旧姓 has "Née" with a combining accent.
-// Without NFC the same word typed precomposed looks different and slips through.
 function hasWord(words: string[], word: string): boolean {
-  const wanted = plainForm(word);
-  return words.some((item) => plainForm(item) === wanted);
-}
-
-function plainForm(word: string): string {
-  return word.trim().toLowerCase().normalize("NFC");
+  const wanted = meaningKey(word);
+  return words.some((item) => meaningKey(item) === wanted);
 }

@@ -86,10 +86,4 @@ describe("KanjiCard editors", () => {
       { id: 456, type: "kanji" },
     ]);
   });
-
-  it("says that kanji synonyms do not reach Anki", () => {
-    const view = mountKanjiCard();
-
-    expect(view.html()).toContain("not in Anki");
-  });
 });

@@ -40,6 +40,7 @@ import {
   addKanjiWithRadicals,
   addVocabularyWithKanjiAndRadicals,
   getDeckNotes,
+  isFieldMismatchError,
   syncAnkiWeb,
 } from "./services/anki-connect.ts";
 
@@ -238,6 +239,9 @@ const app = new Hono()
     } catch (err) {
       const message = getErrorMessage(err);
       console.error(`[API] Add to Anki: ${type} id=${id} — error: ${message}`);
+      if (isFieldMismatchError(err)) {
+        return c.json({ ok: false as const, error: message, reason: "fields" as const });
+      }
       return c.json({ ok: false as const, error: message });
     }
   })

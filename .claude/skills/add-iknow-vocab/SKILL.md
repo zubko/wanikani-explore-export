@@ -44,6 +44,10 @@ Use `--dry-run` first only when the user asks to preview. The script saves
 Adding a word downloads media and syncs to AnkiWeb, so a run of 15 takes a few minutes. Give it a
 long timeout.
 
+When the script stops with a note type field mismatch, nothing was recorded for that word. Do not
+retry and do not add words by hand. Pass on the fix steps the script prints. The field step needs a
+real terminal, so the user must run it.
+
 ## 4. Report
 
 Pass on the script summary: added, already in Anki, not found, errors, and where the next run starts.
