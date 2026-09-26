@@ -147,9 +147,9 @@
 
 ### Task 4: Verify acceptance criteria
 
-- [ ] both templates render `alternative_meanings` on the short back, kanji renders `user_synonyms` on the Details view
-- [ ] run full test suite: `bun test`
-- [ ] run `bun run tsc`, `bun run lint:fix`, `bun run format`
+- [x] both templates render `alternative_meanings` on the short back, kanji renders `user_synonyms` on the Details view
+- [x] run full test suite: `bun test`
+- [x] run `bun run tsc`, `bun run lint:fix`, `bun run format`
 
 ### Task 5: [Final] Update documentation
 
