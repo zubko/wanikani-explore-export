@@ -139,11 +139,11 @@
 - Modify: `src/anki-templates/kanji.md`
 - Modify: `src/anki-templates/vocabulary.md`
 
-- [ ] kanji: add the `.alt-meanings` div after `#header-scaled`, before the Details button; CSS: centered, `max-width: 75%`, small top margin, `1.2rem`, `#888`, dark mode `#aaa`
-- [ ] kanji: add the Synonyms row after the Alternative row in `#back-full`
-- [ ] vocabulary: add the `.alt-meanings` div in `.header-text` between `<h1>` and the reading; same size and colors, no `max-width` in CSS (the JS sets it)
-- [ ] vocabulary: round `maxWidth` down with `Math.floor` and set the line's `maxWidth` in the scaling JS before the shrink loop
-- [ ] run `bun test scripts/lib/__tests__/anki-template-fields.test.ts` (checks every `{{...}}` reference) - must pass before task 4
+- [x] kanji: add the `.alt-meanings` div after `#header-scaled`, before the Details button; CSS: centered, `max-width: 75%`, small top margin, `1.2rem`, `#888`, dark mode `#aaa`
+- [x] kanji: add the Synonyms row after the Alternative row in `#back-full`
+- [x] vocabulary: add the `.alt-meanings` div in `.header-text` between `<h1>` and the reading; same size and colors, no `max-width` in CSS (the JS sets it)
+- [x] vocabulary: round `maxWidth` down with `Math.floor` and set the line's `maxWidth` in the scaling JS before the shrink loop
+- [x] run `bun test scripts/lib/__tests__/anki-template-fields.test.ts` (checks every `{{...}}` reference) - must pass before task 4
 
 ### Task 4: Verify acceptance criteria
 

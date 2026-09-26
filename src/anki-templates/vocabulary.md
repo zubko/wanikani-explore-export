@@ -60,7 +60,9 @@ Configure these templates in Anki: Tools → Manage Note Types → Japanese Voca
     {{/masu_form}}
     <div class="header-text">
       <h1>{{primary_meaning}}</h1>
-      {{#reading}}
+      {{#alternative_meanings}}
+      <div class="alt-meanings" id="alt-meanings">{{alternative_meanings}}</div>
+      {{/alternative_meanings}} {{#reading}}
       <div class="reading-top">{{reading}}</div>
       {{/reading}}
     </div>
@@ -164,7 +166,11 @@ Configure these templates in Anki: Tools → Manage Note Types → Japanese Voca
        Anki limits the card container width and centers it, so the container
        can be narrower than the viewport. Using vw units would overshoot. */
     var container = header.parentElement;
-    var maxWidth = container.offsetWidth * 0.85;
+    /* offsetWidth is an integer, so a full-width alt line can measure 512
+       against a fractional limit of 511.7 */
+    var maxWidth = Math.floor(container.offsetWidth * 0.85);
+    var alt = document.getElementById("alt-meanings");
+    if (alt) alt.style.maxWidth = maxWidth + "px";
     var fontSize = maxWidth * 0.15;
     header.style.fontSize = fontSize + "px";
     while (header.offsetWidth > maxWidth && fontSize > 1) {
@@ -241,6 +247,11 @@ Configure these templates in Anki: Tools → Manage Note Types → Japanese Voca
 
 .header-scaled .reading-top {
   font-size: 1em;
+}
+
+.alt-meanings {
+  color: #888;
+  font-size: 1.2rem;
 }
 
 .details-btn {
@@ -421,6 +432,10 @@ h2 {
   }
 
   .header-scaled .masu-form {
+    color: #aaa;
+  }
+
+  .alt-meanings {
     color: #aaa;
   }
 
