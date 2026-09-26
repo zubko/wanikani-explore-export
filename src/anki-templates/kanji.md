@@ -42,7 +42,7 @@ Configure these templates in Anki: Tools → Manage Note Types → Japanese Kanj
     </div>
   </div>
   {{#alternative_meanings}}
-  <div class="alt-meanings">{{alternative_meanings}}</div>
+  <div class="alt-meanings">({{alternative_meanings}})</div>
   {{/alternative_meanings}}
   <button id="details-btn" class="details-btn">Details</button>
 </div>
@@ -199,9 +199,9 @@ Configure these templates in Anki: Tools → Manage Note Types → Japanese Kanj
 
 .alt-meanings {
   max-width: 75%;
-  margin-top: 8px;
+  margin-top: 24px;
   color: #888;
-  font-size: 1.2rem;
+  font-size: 1.6rem;
 }
 
 .details-btn {

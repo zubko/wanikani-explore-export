@@ -61,7 +61,7 @@ Configure these templates in Anki: Tools → Manage Note Types → Japanese Voca
     <div class="header-text">
       <h1>{{primary_meaning}}</h1>
       {{#alternative_meanings}}
-      <div class="alt-meanings" id="alt-meanings">{{alternative_meanings}}</div>
+      <div class="alt-meanings" id="alt-meanings">({{alternative_meanings}})</div>
       {{/alternative_meanings}} {{#reading}}
       <div class="reading-top">{{reading}}</div>
       {{/reading}}
@@ -206,6 +206,9 @@ Configure these templates in Anki: Tools → Manage Note Types → Japanese Voca
 
 /* Back Short - centered display */
 .back-short {
+  /* A text line has empty space above its capitals and below its baseline that
+     grows with the font size, so equal margins alone look uneven */
+  --gap: 30px;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -218,7 +221,7 @@ Configure these templates in Anki: Tools → Manage Note Types → Japanese Voca
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.75em;
+  gap: var(--gap);
   font-size: 15vw;
 }
 
@@ -230,32 +233,38 @@ Configure these templates in Anki: Tools → Manage Note Types → Japanese Voca
 .header-scaled .masu-form {
   font-size: 1em;
   color: #888;
-  /* The flex column gap is 0.75em of the parent above and below this element.
-     -0.5em leaves 0.25em above, tight under the badge. */
-  margin-top: -0.5em;
+  /* Tight under the badge, not a full gap */
+  margin-top: calc(0.25em - var(--gap));
+  margin-bottom: -0.15em;
 }
 
 .header-scaled h1 {
   font-size: 1.5em;
+  line-height: 1;
+  margin: -0.17em 0 -0.12em;
 }
 
 .header-scaled .header-text {
   display: flex;
   flex-direction: column;
+  gap: var(--gap);
   text-align: center;
 }
 
 .header-scaled .reading-top {
   font-size: 1em;
+  line-height: 1;
+  margin: -0.14em 0 -0.09em;
 }
 
 .alt-meanings {
+  margin: -0.27em 0 -0.2em;
   color: #888;
-  font-size: 1.2rem;
+  font-size: 1.6rem;
 }
 
 .details-btn {
-  margin-top: 24px;
+  margin-top: var(--gap);
   min-height: 44px;
   padding: 0 24px;
   font-size: 1rem;
@@ -380,11 +389,12 @@ h2 {
 /* Extra margin to visually balance the space above the button,
    where .header-scaled's line-height adds invisible trailing space */
 .short-sentence {
-  margin-top: 28px;
+  margin-top: var(--gap);
   text-align: center;
 }
 
 .short-sentence-jap {
+  margin-top: -0.22em;
   color: #888;
   font-size: 1.2rem;
 }
