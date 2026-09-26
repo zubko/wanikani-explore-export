@@ -31,6 +31,27 @@ export function getExtraMeanings(meanings: Meaning[]): string {
     .join(", ");
 }
 
+export function getAlternativeMeanings(meanings: Meaning[], synonyms: string[]): string[] {
+  const alternatives = meanings
+    .filter((m) => !m.primary && m.accepted_answer)
+    .map((m) => m.meaning);
+  const seen = new Set(meanings.map((m) => synonymKey(m.meaning)));
+  const extraSynonyms: string[] = [];
+  for (const synonym of synonyms) {
+    const key = synonymKey(synonym);
+    if (key === "" || seen.has(key)) continue;
+    seen.add(key);
+    extraSynonyms.push(synonym.trim());
+  }
+  return [...alternatives, ...extraSynonyms];
+}
+
+// WaniKani stores some meanings decomposed, so 旧姓 has "Née" with a combining accent.
+// Without NFC the same word typed precomposed looks different and slips through.
+export function synonymKey(word: string): string {
+  return word.trim().toLowerCase().normalize("NFC");
+}
+
 export function findStudyMaterial(
   studyMaterials: StudyMaterial[],
   subjectId: number,

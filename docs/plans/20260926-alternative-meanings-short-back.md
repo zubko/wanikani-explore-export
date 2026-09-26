@@ -97,13 +97,13 @@
 - Modify: `src/model/__tests__/subject-utils.test.ts`
 - Modify: `src/client/components/card-components/UserSynonymsRow.tsx` (use the moved normalizer)
 
-- [ ] move the synonym normalizer from `UserSynonymsRow.tsx` to `subject-utils.ts`, import it back
-- [ ] add `getAlternativeMeanings(meanings, synonyms)` next to `getExtraMeanings`
-- [ ] write tests: alternatives only, synonyms only, both, nothing (empty list)
-- [ ] write tests: a synonym equal to an alternative or to the primary meaning in another case / with spaces is dropped, repeated synonyms appear once, non-accepted meanings are left out
-- [ ] write tests: a meaning `"a & b"` and a synonym `"A & B"` give one entry (the helper works on raw text)
-- [ ] write tests: blank synonyms (`["", "   "]`) give an empty list, blanks mixed with real meanings are dropped
-- [ ] run `bun test src/model/__tests__/subject-utils.test.ts src/client` - must pass before task 2
+- [x] move the synonym normalizer from `UserSynonymsRow.tsx` to `subject-utils.ts`, import it back
+- [x] add `getAlternativeMeanings(meanings, synonyms)` next to `getExtraMeanings`
+- [x] write tests: alternatives only, synonyms only, both, nothing (empty list)
+- [x] write tests: a synonym equal to an alternative or to the primary meaning in another case / with spaces is dropped, repeated synonyms appear once, non-accepted meanings are left out
+- [x] write tests: a meaning `"a & b"` and a synonym `"A & B"` give one entry (the helper works on raw text)
+- [x] write tests: blank synonyms (`["", "   "]`) give an empty list, blanks mixed with real meanings are dropped
+- [x] run `bun test src/model/__tests__/subject-utils.test.ts src/client` - must pass before task 2
 
 ### Task 2: Add the new fields to the field lists and note builders, remove the kanji "not in Anki" hint
 
