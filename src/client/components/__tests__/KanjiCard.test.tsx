@@ -87,9 +87,9 @@ describe("KanjiCard editors", () => {
     ]);
   });
 
-  it("says that kanji synonyms do not reach Anki", () => {
+  it("does not say that kanji synonyms stay out of Anki", () => {
     const view = mountKanjiCard();
 
-    expect(view.html()).toContain("not in Anki");
+    expect(view.html()).not.toContain("not in Anki");
   });
 });

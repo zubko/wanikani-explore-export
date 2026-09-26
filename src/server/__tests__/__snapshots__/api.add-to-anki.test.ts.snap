@@ -184,6 +184,7 @@ exports[`add-to-anki API add vocabulary (毎晩, id=3766) full AnkiConnect seque
       "note": {
         "deckName": "Japanese Kanji",
         "fields": {
+          "alternative_meanings": "Each",
           "character": "毎",
           "extra_meanings": "Each",
           "meaning_hint": "Make sure you get every one, and don't miss any of them. Actually search around in your imagination for any more windows, because you want to stress it's important you hit each and every window with your gun.",
@@ -198,6 +199,7 @@ exports[`add-to-anki API add vocabulary (毎晩, id=3766) full AnkiConnect seque
           "readings_kunyomi": "ごと",
           "readings_nanori": "",
           "readings_onyomi": "<b>まい</b>",
+          "user_synonyms": "",
         },
         "modelName": "Japanese Kanji",
         "tags": [
@@ -228,6 +230,7 @@ exports[`add-to-anki API add vocabulary (毎晩, id=3766) full AnkiConnect seque
       "note": {
         "deckName": "Japanese Kanji",
         "fields": {
+          "alternative_meanings": "Evening",
           "character": "晩",
           "extra_meanings": "Evening",
           "meaning_hint": "Imagine you’re the sun, working all day. Of course you get tired. This is a good excuse to go to bed at night and get some rest. Feel how sore and hot and sweaty and exhausted you are after a hard day’s work of being the sun.",
@@ -242,6 +245,7 @@ exports[`add-to-anki API add vocabulary (毎晩, id=3766) full AnkiConnect seque
           "readings_kunyomi": "",
           "readings_nanori": "",
           "readings_onyomi": "<b>ばん</b>",
+          "user_synonyms": "",
         },
         "modelName": "Japanese Kanji",
         "tags": [
@@ -286,6 +290,7 @@ exports[`add-to-anki API add vocabulary (毎晩, id=3766) full AnkiConnect seque
       "note": {
         "deckName": "Japanese Vocabulary",
         "fields": {
+          "alternative_meanings": "Nightly",
           "characters": "毎晩",
           "conjugations": "",
           "extra_meanings": "Nightly",
@@ -359,6 +364,7 @@ exports[`add-to-anki API add kana vocabulary (ここ, id=9209) 1`] = `
       "note": {
         "deckName": "Japanese Vocabulary",
         "fields": {
+          "alternative_meanings": "",
           "characters": "ここ",
           "conjugations": "",
           "extra_meanings": "",
@@ -396,6 +402,7 @@ exports[`add-to-anki API add kana vocabulary (ここ, id=9209) 1`] = `
 
 exports[`add-to-anki API add verb vocabulary (入る, id=2480) fills masu_form 1`] = `
 {
+  "alternative_meanings": "To Go In",
   "characters": "入る",
   "conjugations": "入る, 入ります, 入って, 入らない",
   "extra_meanings": "To Go In",

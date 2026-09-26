@@ -9,6 +9,7 @@ Configure these templates in Anki: Tools → Manage Note Types → Japanese Voca
 - `primary_meaning` - Primary meaning
 - `extra_meanings` - Alternative meanings (comma-separated)
 - `user_synonyms` - User synonyms (comma-separated)
+- `alternative_meanings` - Alternative meanings and user synonyms joined, without duplicates (comma-separated)
 - `word_type` - Parts of speech (comma-separated)
 - `conjugations` - Verb conjugations: dictionary, masu, te, nai (or empty)
 - `masu_form` - Polite (masu) form for verbs, empty otherwise

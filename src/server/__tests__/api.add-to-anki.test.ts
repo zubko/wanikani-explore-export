@@ -52,12 +52,29 @@ function findNoteFields(params: {
   value: string;
 }): Record<string, string> {
   const { action, field, value } = params;
+  return findFieldsWhere(action, value, (fields) => fields[field] === value);
+}
+
+/** A radical note like 入 holds the same `character`, only the kanji note has `radicals`. */
+function findKanjiFields(action: string, character: string): Record<string, string> {
+  return findFieldsWhere(
+    action,
+    character,
+    (fields) => fields.character === character && "radicals" in fields
+  );
+}
+
+function findFieldsWhere(
+  action: string,
+  label: string,
+  matches: (fields: Record<string, string>) => boolean
+): Record<string, string> {
   const call = ankiCalls.find((c) => {
     if (c.action !== action) return false;
     const note = c.params.note as { fields?: Record<string, string> } | undefined;
-    return note?.fields?.[field] === value;
+    return note?.fields !== undefined && matches(note.fields);
   });
-  if (!call) throw new Error(`No ${action} call for ${value}`);
+  if (!call) throw new Error(`No ${action} call for ${label}`);
   return (call.params.note as { fields: Record<string, string> }).fields;
 }
 
@@ -127,6 +144,17 @@ describe("add-to-anki API", () => {
 
     expect(findVocabularyFields("addNote", "毎晩").masu_form).toBe("");
     expect(ankiCalls).toMatchSnapshot();
+  });
+
+  test("add vocabulary (毎晩) lists a synonym equal to a WaniKani meaning once", async () => {
+    const result = await addToAnkiJson({ id: 3766, type: "vocabulary" });
+    expect(result.ok).toBe(true);
+
+    const fields = findVocabularyFields("addNote", "毎晩");
+    const nightly = fields
+      .alternative_meanings!.split(", ")
+      .filter((m) => m.toLowerCase() === "nightly");
+    expect(nightly).toEqual(["Nightly"]);
   });
 
   test("add kana vocabulary (ここ, id=9209)", async () => {
@@ -228,6 +256,15 @@ describe("add-to-anki API", () => {
     const fields = findVocabularyFields("updateNoteFields", "入る");
     expect(fields.masu_form).toBe("入ります");
     expect(fields.conjugations).toBe("入る, 入ります, 入って, 入らない");
+    expect(fields.alternative_meanings).toMatchInlineSnapshot(`"To Go In"`);
+
+    const kanjiFields = findKanjiFields("updateNoteFields", "入");
+    expect([kanjiFields.user_synonyms, kanjiFields.alternative_meanings]).toMatchInlineSnapshot(`
+      [
+        "",
+        "",
+      ]
+    `);
   });
 
   test("note type without masu_form returns an error", async () => {
@@ -269,7 +306,11 @@ describe("HTML in a local note", () => {
         meaning_note: "use < for the smaller one & > for the bigger",
         meaning_synonyms: ["a & b", "c < d"],
       },
-      "958": { meaning_note: "night & day", reading_note: "ban < bang" },
+      "958": {
+        meaning_note: "night & day",
+        reading_note: "ban < bang",
+        meaning_synonyms: ["dusk & dark", "x < y"],
+      },
     });
   });
 
@@ -284,13 +325,18 @@ describe("HTML in a local note", () => {
     expect(fields.user_synonyms).toBe("a &amp; b, c &lt; d");
   });
 
-  test("a kanji note reaches Anki escaped", async () => {
+  test("a kanji note and its synonyms reach Anki escaped", async () => {
     const result = await addToAnkiJson({ id: 958, type: "kanji" });
     expect(result.ok).toBe(true);
 
     const fields = findNoteFields({ action: "addNote", field: "character", value: "晩" });
     expect(fields.meaning_note).toBe("night &amp; day");
     expect(fields.reading_note).toBe("ban &lt; bang");
+    expect(fields.user_synonyms).toBe("dusk &amp; dark, x &lt; y");
+    expect(fields.alternative_meanings).toMatchInlineSnapshot(
+      `"Evening, dusk &amp; dark, x &lt; y"`
+    );
+    expect(fields.alternative_meanings).not.toContain("&amp;amp;");
   });
 
   test("a vocabulary note and its synonyms reach Anki escaped", async () => {
@@ -305,5 +351,6 @@ describe("HTML in a local note", () => {
     const fields = findVocabularyFields("addNote", "毎晩");
     expect(fields.meaning_note).toBe("every evening &amp; night");
     expect(fields.user_synonyms).toBe("a &lt; b");
+    expect(fields.alternative_meanings).toMatchInlineSnapshot(`"Nightly, a &lt; b"`);
   });
 });

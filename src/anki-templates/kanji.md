@@ -9,6 +9,8 @@ Configure these templates in Anki: Tools → Manage Note Types → Japanese Kanj
 - `primary_meaning` - Primary meaning
 - `primary_reading` - Primary reading (the one marked primary in Wanikani)
 - `extra_meanings` - Alternative meanings (comma-separated)
+- `user_synonyms` - User synonyms (comma-separated)
+- `alternative_meanings` - Alternative meanings and user synonyms joined, without duplicates (comma-separated)
 - `meaning_mnemonic` - Styled HTML mnemonic with colored tags
 - `meaning_hint` - Styled HTML hint
 - `meaning_note` - User note

@@ -120,17 +120,17 @@
 - Modify: `src/client/components/__tests__/KanjiCard.test.tsx`
 - Modify: `src/client/components/__tests__/UserSynonymsRow.test.tsx`
 
-- [ ] add `user_synonyms` and `alternative_meanings` to `KANJI_EXPECTED_FIELDS`, and `alternative_meanings` to `VOCABULARY_EXPECTED_FIELDS`, in the order from Technical Details
-- [ ] add the fields to `KanjiNoteFields` / the vocabulary note fields type, fill them in both builders with `getAlternativeMeanings` on the raw synonyms, then `escapeHtml` + join (see Technical Details)
-- [ ] add the fields to the `## Fields` lists of both templates and to `docs/anki-decks-fields.md`
-- [ ] update the add-to-anki snapshots, scoped: `bun test src/server/__tests__/api.add-to-anki.test.ts --update-snapshots`, then review the diff: only the new fields change
-- [ ] escaping test: the `"a & b"` / `"c < d"` synonyms belong to the radical 一, which is out of scope. Add `meaning_synonyms` with `&` and `<` to the kanji entry `"958"` (晩) in that `describe`, and assert the escaped values in kanji `user_synonyms` and `alternative_meanings`. Also assert `alternative_meanings` in the vocabulary 毎晩 escape test
-- [ ] update path: in the "update existing verb vocabulary (入る)" test, assert `alternative_meanings` on the vocabulary `updateNoteFields` call, and `user_synonyms` / `alternative_meanings` on the kanji 入 `updateNoteFields` call (inline snapshot, like the existing asserts: the values come from the real `study_materials.json` and can change after a download)
-- [ ] the fixture 毎晩 has the WaniKani alternative "Nightly" and the local synonym "nightly": assert it appears once in `alternative_meanings`
-- [ ] escaped exactly once: in the 晩 case above, assert `&amp;` and not `&amp;amp;` in `alternative_meanings`. Dedup before escaping cannot be shown at builder level: no WaniKani meaning in `data/userdata/` holds `&` or `<` (checked 2026-09-26). The helper unit test in Task 1 covers it with a hand-built `Meaning` that holds `&`
-- [ ] adding `user_synonyms` to `KANJI_EXPECTED_FIELDS` makes the kanji "not in Anki" hint go away, so remove it in this task: drop `SYNONYM_HINT` and the `KANJI_EXPECTED_FIELDS` import from `KanjiCard.tsx`, and the `hint` prop from `UserSynonymsRow` (it has no other user)
-- [ ] replace the "says that kanji synonyms do not reach Anki" test with one that expects no "not in Anki" text; drop the hint test in `UserSynonymsRow.test.tsx`
-- [ ] run the full `bun test` - must pass before task 3
+- [x] add `user_synonyms` and `alternative_meanings` to `KANJI_EXPECTED_FIELDS`, and `alternative_meanings` to `VOCABULARY_EXPECTED_FIELDS`, in the order from Technical Details
+- [x] add the fields to `KanjiNoteFields` / the vocabulary note fields type, fill them in both builders with `getAlternativeMeanings` on the raw synonyms, then `escapeHtml` + join (see Technical Details)
+- [x] add the fields to the `## Fields` lists of both templates and to `docs/anki-decks-fields.md`
+- [x] update the add-to-anki snapshots, scoped: `bun test src/server/__tests__/api.add-to-anki.test.ts --update-snapshots`, then review the diff: only the new fields change
+- [x] escaping test: the `"a & b"` / `"c < d"` synonyms belong to the radical 一, which is out of scope. Add `meaning_synonyms` with `&` and `<` to the kanji entry `"958"` (晩) in that `describe`, and assert the escaped values in kanji `user_synonyms` and `alternative_meanings`. Also assert `alternative_meanings` in the vocabulary 毎晩 escape test
+- [x] update path: in the "update existing verb vocabulary (入る)" test, assert `alternative_meanings` on the vocabulary `updateNoteFields` call, and `user_synonyms` / `alternative_meanings` on the kanji 入 `updateNoteFields` call (inline snapshot, like the existing asserts: the values come from the real `study_materials.json` and can change after a download)
+- [x] the fixture 毎晩 has the WaniKani alternative "Nightly" and the local synonym "nightly": assert it appears once in `alternative_meanings`
+- [x] escaped exactly once: in the 晩 case above, assert `&amp;` and not `&amp;amp;` in `alternative_meanings`. Dedup before escaping cannot be shown at builder level: no WaniKani meaning in `data/userdata/` holds `&` or `<` (checked 2026-09-26). The helper unit test in Task 1 covers it with a hand-built `Meaning` that holds `&`
+- [x] adding `user_synonyms` to `KANJI_EXPECTED_FIELDS` makes the kanji "not in Anki" hint go away, so remove it in this task: drop `SYNONYM_HINT` and the `KANJI_EXPECTED_FIELDS` import from `KanjiCard.tsx`, and the `hint` prop from `UserSynonymsRow` (it has no other user)
+- [x] replace the "says that kanji synonyms do not reach Anki" test with one that expects no "not in Anki" text; drop the hint test in `UserSynonymsRow.test.tsx`
+- [x] run the full `bun test` - must pass before task 3
 
 ### Task 3: Show the alternative meanings on the short back and the kanji synonyms on the Details view
 

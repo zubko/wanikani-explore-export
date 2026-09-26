@@ -16,7 +16,6 @@ export type UserSynonymsRowProps = {
   wanikaniSynonyms: string[];
   subjectMeanings: string[];
   localStudyMaterial: LocalStudyMaterial | null;
-  hint?: string;
 };
 
 export function UserSynonymsRow({
@@ -24,7 +23,6 @@ export function UserSynonymsRow({
   wanikaniSynonyms,
   subjectMeanings,
   localStudyMaterial,
-  hint,
 }: UserSynonymsRowProps) {
   const record = useLocalStudyMaterial(subjectId, localStudyMaterial);
   const [mode, setMode] = useState<"view" | "add">("view");
@@ -108,7 +106,6 @@ export function UserSynonymsRow({
           }}
         />
       )}
-      {hint && <span className="text-xs text-gray-400">{hint}</span>}
     </div>
   );
 }
