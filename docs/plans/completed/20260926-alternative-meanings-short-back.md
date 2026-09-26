@@ -167,7 +167,7 @@ From the moment this change is on the running server until step 2 is done, every
 1. Sync every other device to AnkiWeb, then sync this machine.
 2. `bun run sync-anki-fields` (interactive, needs a TTY). It adds `user_synonyms` + `alternative_meanings` to kanji and `alternative_meanings` to vocabulary. Then choose upload on the one-way sync.
 3. `bun run sync-anki-templates`.
-4. `bun run dev`, then `bun run sync-anki-notes` to fill the new fields in the existing notes. It walks the vocabulary notes only, so a kanji is refreshed as a component of a word. A kanji note with no word in Anki keeps the new fields empty until it is added again.
+4. `bun run dev`, then `bun run sync-anki-notes` to fill the new fields in the existing notes. It refreshes a kanji as a component of a word, and then every kanji note that no word add refreshed.
 
 **Manual verification**:
 

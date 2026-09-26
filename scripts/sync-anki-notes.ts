@@ -1,5 +1,6 @@
 import { parseArgs } from "util";
 
+import type { AnkiAddResult } from "../src/model/wanikani.ts";
 import { formatError } from "./lib/format-error.ts";
 
 type CliArgs = {
@@ -17,7 +18,7 @@ type AnkiNoteItem = {
 
 type AnkiNotesResponse = { ok: true; data: AnkiNoteItem[] } | { ok: false; error: string };
 
-type AddToAnkiResponse = { ok: true; data: unknown } | { ok: false; error: string };
+type AddToAnkiResponse = { ok: true; data: AnkiAddResult } | { ok: false; error: string };
 
 type AnkiSyncResponse = { ok: true } | { ok: false; error: string };
 
@@ -105,9 +106,38 @@ async function syncAnkiWeb(baseUrl: string): Promise<AnkiSyncResponse> {
 
 // === Main ===
 
+async function fetchResolvedNotes(baseUrl: string, type: string): Promise<AnkiNoteItem[]> {
+  process.stdout.write(`Fetching ${type} notes from Anki... `);
+  const notesResult = await fetchAnkiNotes(baseUrl, type);
+
+  if (!notesResult.ok) {
+    console.log("FAILED");
+    console.error(`Error: ${notesResult.error}`);
+    process.exit(1);
+  }
+
+  const allNotes = notesResult.data;
+  console.log(`OK (${allNotes.length} items)`);
+
+  const unresolved = allNotes.filter((n) => n.wkId === null);
+  if (unresolved.length > 0) {
+    console.log(`\n⚠️  ${unresolved.length} ${type} items not found in WaniKani data:`);
+    for (const item of unresolved) {
+      console.log(`   - ${item.characters}`);
+    }
+    console.log();
+  }
+
+  return allNotes.filter((n) => n.wkId !== null);
+}
+
 function padIndex(index: number, total: number): string {
   const width = String(total).length;
   return String(index).padStart(width);
+}
+
+function takeLimit<T>(items: T[], limit: number | undefined): T[] {
+  return limit === undefined ? items : items.slice(0, limit);
 }
 
 async function main(): Promise<void> {
@@ -121,74 +151,45 @@ async function main(): Promise<void> {
   console.log("=".repeat(50));
   console.log();
 
-  process.stdout.write("Fetching vocabulary notes from Anki... ");
-  const notesResult = await fetchAnkiNotes(args.baseUrl, "vocabulary");
+  const words = await fetchResolvedNotes(args.baseUrl, "vocabulary");
+  const kanji = await fetchResolvedNotes(args.baseUrl, "kanji");
 
-  if (!notesResult.ok) {
-    console.log("FAILED");
-    console.error(`Error: ${notesResult.error}`);
-    process.exit(1);
-  }
-
-  const allNotes = notesResult.data;
-  console.log(`OK (${allNotes.length} items)`);
-
-  const unresolved = allNotes.filter((n) => n.wkId === null);
-  if (unresolved.length > 0) {
-    console.log(`\n⚠️  ${unresolved.length} items not found in WaniKani data:`);
-    for (const item of unresolved) {
-      console.log(`   - ${item.characters}`);
-    }
-  }
-
-  let processable = allNotes.filter((n) => n.wkId !== null);
-
-  if (args.limit && args.limit < processable.length) {
-    processable = processable.slice(0, args.limit);
-  }
-
-  if (processable.length === 0) {
+  if (words.length === 0 && kanji.length === 0) {
     console.log("\nNo items to update.");
     return;
   }
 
-  console.log(`\n${args.dryRun ? "Would update" : "Updating"} ${processable.length} items...\n`);
-
   if (args.dryRun) {
-    for (const [i, item] of processable.entries()) {
-      console.log(
-        `[${padIndex(i + 1, processable.length)}/${processable.length}] ${item.characters} (${item.meaning})`
-      );
+    const listed = takeLimit([...words, ...kanji], args.limit);
+    console.log(`\nWould update up to ${listed.length} items.`);
+    console.log("A real run skips the kanji that a word update already refreshed.\n");
+    for (const [i, item] of listed.entries()) {
+      console.log(`[${padIndex(i + 1, listed.length)}/${listed.length}] ${formatNote(item)}`);
     }
     console.log(`\n[DRY RUN] No changes made.`);
     return;
   }
 
-  const spinner = createSpinner();
-  let updated = 0;
-  let errors = 0;
   const startTime = Date.now();
 
-  for (const [i, item] of processable.entries()) {
-    const prefix = `[${padIndex(i + 1, processable.length)}/${processable.length}]`;
+  const wordBatch = takeLimit(words, args.limit);
+  console.log(`\nUpdating ${wordBatch.length} words...\n`);
+  const wordResults = await updateNotes(args.baseUrl, wordBatch);
 
-    spinner.start(`${prefix} `);
-
-    try {
-      const result = await addToAnki(args.baseUrl, item.wkId!, item.wkType!);
-      if (result.ok) {
-        spinner.stop(`${prefix} ✅ ${item.characters} (${item.meaning})`);
-        updated++;
-      } else {
-        spinner.stop(`${prefix} ❌ ${item.characters} (${item.meaning}) - ${result.error}`);
-        errors++;
-      }
-    } catch (err) {
-      spinner.stop(`${prefix} ❌ ${item.characters} (${item.meaning}) - ${formatError(err)}`);
-      errors++;
-    }
+  // A word update also writes its kanji, so only the kanji that no word update wrote need their own
+  const refreshedKanji = new Set(
+    wordResults.flatMap((result) => result.kanji.map((k) => k.character))
+  );
+  const kanjiBatch = takeLimit(
+    kanji.filter((note) => !refreshedKanji.has(note.characters)),
+    args.limit === undefined ? undefined : args.limit - wordBatch.length
+  );
+  if (kanjiBatch.length > 0) {
+    console.log(`\nUpdating ${kanjiBatch.length} kanji with no word...\n`);
+    await updateNotes(args.baseUrl, kanjiBatch);
   }
 
+  const updated = wordBatch.length + kanjiBatch.length;
   let synced = false;
   if (updated > 0) {
     process.stdout.write("\nSyncing to AnkiWeb... ");
@@ -207,14 +208,41 @@ async function main(): Promise<void> {
   console.log("=".repeat(50));
   console.log("Summary");
   console.log("-".repeat(50));
-  console.log(`Total:   ${processable.length}`);
-  console.log(`Updated: ${updated}`);
-  console.log(`Errors:  ${errors}`);
+  console.log(`Words:   ${wordBatch.length}`);
+  console.log(`Kanji:   ${kanjiBatch.length}`);
   console.log(`Synced:  ${updated > 0 ? (synced ? "yes" : "no") : "nothing to sync"}`);
   console.log(`Time:    ${elapsed}s`);
   console.log("=".repeat(50));
 
   if (updated > 0 && !synced) process.exit(1);
+}
+
+async function updateNotes(baseUrl: string, items: AnkiNoteItem[]): Promise<AnkiAddResult[]> {
+  const spinner = createSpinner();
+  const results: AnkiAddResult[] = [];
+
+  for (const [i, item] of items.entries()) {
+    const prefix = `[${padIndex(i + 1, items.length)}/${items.length}]`;
+    spinner.start(`${prefix} `);
+
+    const result = await addToAnki(baseUrl, item.wkId!, item.wkType!).catch(
+      (err): AddToAnkiResponse => ({ ok: false, error: formatError(err) })
+    );
+    if (!result.ok) {
+      spinner.stop(`${prefix} ❌ ${formatNote(item)} - ${result.error}`);
+      console.error("\nStopped at the first failed update. Nothing was synced to AnkiWeb.");
+      process.exit(1);
+    }
+
+    spinner.stop(`${prefix} ✅ ${formatNote(item)}`);
+    results.push(result.data);
+  }
+
+  return results;
+}
+
+function formatNote(item: AnkiNoteItem): string {
+  return `${item.characters} (${item.meaning})`;
 }
 
 main().catch((error) => {
