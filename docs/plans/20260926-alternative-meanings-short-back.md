@@ -153,8 +153,8 @@
 
 ### Task 5: [Final] Update documentation
 
-- [ ] update CLAUDE.md: kanji synonyms now reach Anki (remove the "Kanji synonyms are the one exception" part and the `KanjiCard` "not in Anki" hint text); mention `alternative_meanings` as the joined field of the short back
-- [ ] move this plan to `docs/plans/completed/`
+- [x] update CLAUDE.md: kanji synonyms now reach Anki (remove the "Kanji synonyms are the one exception" part and the `KanjiCard` "not in Anki" hint text); mention `alternative_meanings` as the joined field of the short back
+- [x] move this plan to `docs/plans/completed/` (skipped - the harness moves the plan after all phases finish)
 
 ## Post-Completion
 
