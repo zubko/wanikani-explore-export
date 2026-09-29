@@ -266,7 +266,7 @@ Get your WaniKani token from: https://www.wanikani.com/settings/personal_access_
 - `docs/wanikani-api.md` - Wanikani API reference (endpoints, auth, pagination, data structures)
 - `docs/anki-connect-typescript-api.md` - AnkiConnect API for Anki deck operations
 - `docs/anki-decks-fields.md` - Anki deck field definitions for each subject type
-- `docs/backlog.md` - To-dos stashed for the future. Pick from it when choosing what to work on next
+- `docs/backlog.md` - To-dos stashed for the future. Pick from it when choosing what to work on next. When the user asks to add a TODO item, add it here
 - `docs/hosting-on-linux.md` - Running the app with a headless Anki on a Linux box, so cards can be added from a phone
 
 ## Anki Integration
@@ -437,19 +437,6 @@ After making code changes:
 ## Git Workflow
 
 When asked to commit and push, also check `data/userdata/` for changes — it is a separate git repository. If there are changes there, commit and push them separately. Afterwards, return the working directory back to the main project root.
-
-## GitHub Issues
-
-Project uses GitHub Issues for task tracking at https://github.com/zubko/wk-make-anki-cards/issues
-
-- After completing a coding task, check if any GitHub issues can be closed
-- When user asks to add a TODO item, create a new GitHub issue instead
-
-```bash
-gh issue list                    # List open issues
-gh issue create --title "..." --body "..."  # Create new issue
-gh issue close <number>          # Close an issue
-```
 
 ## Testing
 

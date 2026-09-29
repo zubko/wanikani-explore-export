@@ -73,8 +73,8 @@ Search for a vocabulary word to see its full breakdown — kanji composition, ra
 ## Setup
 
 ```bash
-git clone https://github.com/zubko/wk-make-anki-cards.git
-cd wk-make-anki-cards
+git clone https://github.com/zubko/wanikani-explore-export.git
+cd wanikani-explore-export
 bun install
 ```
 
