@@ -300,6 +300,7 @@ AnkiConnect client is in `src/server/services/anki-connect.ts`. Card templates a
 ### TypeScript
 
 - Prefer `type` over `interface`
+- Prefer a long clear name over a short jargon word. A longer name is fine when it says exactly what the value is: `nameWithoutExtension`, not `stem`, `baseName` or `key`
 - No barrel/index files for exports - always import directly from the source file (e.g., `import { getKanji } from "./repository/kanji.ts"` not `from "./repository"`)
 - No type re-exports - import types directly from their source file, don't re-export them from other modules
 - Order in the module should be: types, constants, variables, exported functions / React components, utility functions / React components
