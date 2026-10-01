@@ -16,9 +16,13 @@ type AnkiCall = {
   params: Record<string, unknown>;
 };
 
+type AnkiErrorOverride = { message: string; onCall?: number };
+
 export const ankiCalls: AnkiCall[] = [];
 
 const responseOverrides = new Map<string, unknown>();
+const errorOverrides = new Map<string, AnkiErrorOverride>();
+const callCounts = new Map<string, number>();
 const modelFieldOverrides = new Map<string, string[]>();
 let mediaStatus = 200;
 
@@ -49,8 +53,11 @@ export function installFetchInterceptor() {
       };
       const params = body.params ?? {};
       ankiCalls.push({ action: body.action, params });
-      const result = handleAnkiRequest(body.action, params);
-      return new Response(JSON.stringify({ result, error: null }), {
+      const callNumber = (callCounts.get(body.action) ?? 0) + 1;
+      callCounts.set(body.action, callNumber);
+      const error = ankiError(body.action, callNumber);
+      const result = error === null ? handleAnkiRequest(body.action, params) : null;
+      return new Response(JSON.stringify({ result, error }), {
         status: 200,
         headers: { "Content-Type": "application/json" },
       });
@@ -81,6 +88,12 @@ export function setAnkiResponse(action: string, result: unknown) {
   responseOverrides.set(action, result);
 }
 
+/** Every call of the action answers the error. `onCall` limits it to one call, counted from 1. */
+export function setAnkiError(params: { action: string; message: string; onCall?: number }) {
+  const { action, message, onCall } = params;
+  errorOverrides.set(action, { message, onCall });
+}
+
 export function setModelFields(modelName: string, fields: string[]) {
   modelFieldOverrides.set(modelName, fields);
 }
@@ -92,9 +105,18 @@ export function setMediaStatus(status: number) {
 export function resetFetchInterceptor() {
   ankiCalls.length = 0;
   responseOverrides.clear();
+  errorOverrides.clear();
+  callCounts.clear();
   modelFieldOverrides.clear();
   mediaStatus = 200;
   nextNoteId = 1000000;
+}
+
+function ankiError(action: string, callNumber: number): string | null {
+  const override = errorOverrides.get(action);
+  if (!override) return null;
+  if (override.onCall !== undefined && override.onCall !== callNumber) return null;
+  return override.message;
 }
 
 function handleAnkiRequest(action: string, params: Record<string, unknown>): unknown {

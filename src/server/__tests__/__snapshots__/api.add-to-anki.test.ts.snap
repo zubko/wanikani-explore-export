@@ -2,6 +2,7 @@
 
 exports[`add-to-anki API add radical (一, id=1) 1`] = `
 [
+  "sync",
   "modelFieldNames",
   "findNotes",
   "addNote",
@@ -11,6 +12,7 @@ exports[`add-to-anki API add radical (一, id=1) 1`] = `
 
 exports[`add-to-anki API add kanji (校, id=658) with radicals 1`] = `
 [
+  "sync",
   "modelFieldNames",
   "findNotes",
   "addNote",
@@ -30,6 +32,10 @@ exports[`add-to-anki API add kanji (校, id=658) with radicals 1`] = `
 
 exports[`add-to-anki API add vocabulary (毎晩, id=3766) full AnkiConnect sequence 1`] = `
 [
+  {
+    "action": "sync",
+    "params": {},
+  },
   {
     "action": "modelFieldNames",
     "params": {
@@ -328,6 +334,10 @@ exports[`add-to-anki API add vocabulary (毎晩, id=3766) full AnkiConnect seque
 
 exports[`add-to-anki API add kana vocabulary (ここ, id=9209) 1`] = `
 [
+  {
+    "action": "sync",
+    "params": {},
+  },
   {
     "action": "modelFieldNames",
     "params": {

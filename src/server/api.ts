@@ -8,6 +8,7 @@ import type {
   KanaVocabulary,
   LocalStudyMaterialPatch,
   Radical,
+  Subject,
   SubjectType,
   Vocabulary,
 } from "@/model/wanikani.ts";
@@ -52,27 +53,17 @@ function getErrorMessage(err: unknown): string {
   return String(err);
 }
 
-async function addSubjectToAnki(id: number, type: SubjectType): Promise<AnkiAddResult | null> {
-  if (type === "radical") {
-    const radical = await getRadical(id);
-    if (!radical) return null;
-    return addOrUpdateRadical(radical);
-  }
+async function findSubjectForAnki(id: number, type: SubjectType): Promise<Subject | null> {
+  if (type === "radical") return getRadical(id);
+  if (type === "kanji") return getKanji(id);
+  // /search answers both types from one pool, so a caller can hold a kana id under type "vocabulary"
+  return (await getVocabulary(id)) ?? getKanaVocabulary(id);
+}
 
-  if (type === "kanji") {
-    const kanji = await getKanji(id);
-    if (!kanji) return null;
-    return addKanjiWithRadicals(kanji);
-  }
-
-  if (type === "vocabulary" || type === "kana_vocabulary") {
-    // /search answers both types from one pool, so a caller can hold a kana id under type "vocabulary"
-    const vocab = (await getVocabulary(id)) ?? getKanaVocabulary(id);
-    if (!vocab) return null;
-    return addVocabularyWithKanjiAndRadicals(vocab);
-  }
-
-  throw new Error(`Unknown subject type: ${type}`);
+function addSubjectToAnki(subject: Subject): Promise<AnkiAddResult> {
+  if (subject.object === "radical") return addOrUpdateRadical(subject);
+  if (subject.object === "kanji") return addKanjiWithRadicals(subject);
+  return addVocabularyWithKanjiAndRadicals(subject);
 }
 
 function validateStudyMaterialPatch(patch: Record<string, unknown>): string | null {
@@ -227,11 +218,16 @@ const app = new Hono()
     console.log(`[API] Add to Anki: ${type} id=${id}`);
 
     try {
-      const result = await addSubjectToAnki(id, type);
-      if (!result) {
+      const subject = await findSubjectForAnki(id, type);
+      if (!subject) {
         console.log(`[API] Add to Anki: ${type} id=${id} — subject not found`);
         return c.json({ ok: false as const, error: "Subject not found" }, 404);
       }
+      if (sync) {
+        console.log(`[API] Add to Anki: ${type} id=${id} — syncing with AnkiWeb first`);
+        await syncAnkiWeb();
+      }
+      const result = await addSubjectToAnki(subject);
       await saveCache();
       if (sync) await syncAnkiWeb();
       console.log(`[API] Add to Anki: ${type} id=${id} — done`);

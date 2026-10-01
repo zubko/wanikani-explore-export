@@ -100,7 +100,8 @@ async function addToAnki(baseUrl: string, id: number, type: string): Promise<Add
     method: "POST",
     headers: { "Content-Type": "application/json" },
     // syncing per word would answer ok:false for a word that is already written, and run one
-    // full AnkiWeb sync per word — the run syncs once at the end instead
+    // full AnkiWeb sync per word — the run syncs once at the start, so every lookup sees the
+    // current AnkiWeb state, and once at the end
     body: JSON.stringify({ id, type, sync: false }),
   });
   if (!response.headers.get("content-type")?.includes("application/json")) {
@@ -135,6 +136,17 @@ async function main(): Promise<void> {
   }
 
   const items = parseGoalItems(JSON.parse(await readFile(join(IKNOW_DIR, current), "utf-8")));
+
+  process.stdout.write("Syncing with AnkiWeb... ");
+  const syncResult = await syncAnkiWeb(args.baseUrl).catch(
+    (err): AnkiSyncResponse => ({ ok: false, error: formatError(err) })
+  );
+  if (!syncResult.ok) {
+    console.log(`FAILED: ${syncResult.error}`);
+    process.exit(1);
+  }
+  console.log("OK");
+
   const inAnki = await fetchAnkiWords(args.baseUrl);
   const problemWords = new Set(status.problems.map((p) => p.word));
 

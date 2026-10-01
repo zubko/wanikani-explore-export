@@ -9,6 +9,7 @@ import {
   installFetchInterceptor,
   resetFetchInterceptor,
   ankiCalls,
+  setAnkiError,
   setAnkiResponse,
   setMediaStatus,
   setModelFields,
@@ -262,10 +263,34 @@ describe("add-to-anki API", () => {
     expect(ankiCalls.map((c) => c.action)).not.toContain("sync");
   });
 
+  test("a failed sync before the add writes nothing", async () => {
+    setAnkiError({ action: "sync", message: "Sync status 2 not one of [0, 1]" });
+    const result = await addToAnkiJson({ id: 1, type: "radical" });
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain("Sync status 2");
+    expect(ankiCalls.map((c) => c.action)).toEqual(["sync"]);
+  });
+
+  test("a failed sync after the write answers ok:false, the note is written", async () => {
+    setAnkiError({ action: "sync", message: "auth not configured", onCall: 2 });
+    const result = await addToAnkiJson({ id: 1, type: "radical" });
+    expect(result.ok).toBe(false);
+    expect(result.error).toBe("auth not configured");
+    const actions = ankiCalls.map((c) => c.action);
+    expect(actions).toContain("addNote");
+    expect(actions.filter((action) => action === "sync")).toHaveLength(2);
+  });
+
   test("anki-sync syncs to AnkiWeb once", async () => {
     const response = await api.request("/anki-sync", { method: "POST" });
     expect(await response.json()).toEqual({ ok: true });
     expect(ankiCalls.map((c) => c.action)).toEqual(["sync"]);
+  });
+
+  test("anki-sync answers the AnkiConnect error", async () => {
+    setAnkiError({ action: "sync", message: "auth not configured" });
+    const response = await api.request("/anki-sync", { method: "POST" });
+    expect(await response.json()).toEqual({ ok: false, error: "auth not configured" });
   });
 });
 

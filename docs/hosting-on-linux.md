@@ -17,7 +17,7 @@ x11vnc (on demand)        mirrors :99 to a VNC client, Tailscale address only
 
 Everything runs as systemd **user** units, root is needed only for the install. The phone comes in over Tailscale. The ufw firewall blocks every other inbound port, so the dev server may listen on all interfaces.
 
-The box is a second Anki client next to the usual one. Both sync with AnkiWeb, which merges normal changes. Only a schema change forces a one-way sync, see "Things that bite".
+The box is a second Anki client next to the usual one. Both sync with AnkiWeb, which merges normal changes. The server syncs before every add, so the note lookup here sees what the Mac already uploaded. Two adds of the same subject on both machines at the same second can still create two notes. Only a schema change forces a one-way sync, see "Things that bite".
 
 ## What you need
 
@@ -166,7 +166,7 @@ Stop `anki` before you stop or restart `xvfb-anki`. Stopping the display kills A
 - **Missing library.** The Anki journal shows `ImportError: libXXX.so: cannot open shared object file`. `ldd ~/opt/anki/app_packages/PyQt6/*.abi3.so | grep "not found"` lists them.
 - **Nothing listens on 8765** while Anki runs: a dialog waits on the hidden screen, the language dialog on the first run, an update or sync-conflict dialog later. Look with VNC or a screenshot.
 - **`sync` answers "auth not configured"**: the profile is not logged in to AnkiWeb. Log in over VNC, since Anki 24.11 an add-on cannot do it with a password.
-- **`sync` answers "Sync status ... not one of"**: a one-way sync is required, usually after `bun run sync-anki-fields` changed the note types. Open VNC, click Sync and choose the direction. Until then every add that reaches the sync step fails.
+- **`sync` answers "Sync status ... not one of"**: a one-way sync is required, usually after `bun run sync-anki-fields` changed the note types. Open VNC, click Sync and choose the direction. Until then every add fails at its first step, before anything is written.
 - **VNC shows no password field**, or the client refuses: the unit runs with `-rfbauth`, the client must send the stored password.
 - **Upgrading Anki**: unpack the new tarball next to the old one, move the `~/opt/anki` symlink, `systemctl --user restart anki`, check the version with the curl call above.
 

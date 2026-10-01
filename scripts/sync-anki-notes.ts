@@ -151,6 +151,16 @@ async function main(): Promise<void> {
   console.log("=".repeat(50));
   console.log();
 
+  process.stdout.write("Syncing with AnkiWeb... ");
+  const syncResult = await syncAnkiWeb(args.baseUrl).catch(
+    (err): AnkiSyncResponse => ({ ok: false, error: formatError(err) })
+  );
+  if (!syncResult.ok) {
+    console.log(`FAILED: ${syncResult.error}`);
+    process.exit(1);
+  }
+  console.log("OK");
+
   const words = await fetchResolvedNotes(args.baseUrl, "vocabulary");
   const kanji = await fetchResolvedNotes(args.baseUrl, "kanji");
 
@@ -166,7 +176,7 @@ async function main(): Promise<void> {
     for (const [i, item] of listed.entries()) {
       console.log(`[${padIndex(i + 1, listed.length)}/${listed.length}] ${formatNote(item)}`);
     }
-    console.log(`\n[DRY RUN] No changes made.`);
+    console.log(`\n[DRY RUN] No notes written.`);
     return;
   }
 
