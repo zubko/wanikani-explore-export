@@ -33,14 +33,19 @@ import {
   VOCABULARY_MODEL_NAME,
   VOCABULARY_EXPECTED_FIELDS,
 } from "@/model/anki-models.ts";
-import { generateSentenceAudio } from "@/server/services/azure-tts.ts";
+import {
+  buildSentenceSsml,
+  generateSentenceAudio,
+  pickSentenceVoice,
+  readAzureTtsConfig,
+} from "@/server/services/azure-tts.ts";
 import {
   extensionOfContentType,
   getOrFetchMedia,
   type FetchedMedia,
   type MediaFolder,
 } from "@/server/repository/media-cache.ts";
-import { shortHash } from "@/server/utils/hash.ts";
+import { hashNumber, shortHash } from "@/server/utils/hash.ts";
 
 const ANKI_CONNECT_URL = "http://127.0.0.1:8765";
 
@@ -541,23 +546,6 @@ export async function addKanjiWithRadicals(kanji: Kanji): Promise<AnkiAddResult>
 
 // === Vocabulary ===
 
-async function storeAudioData(filename: string, audio: ArrayBuffer): Promise<void> {
-  await storeMediaFile(filename, Buffer.from(audio));
-}
-
-async function fetchAndStoreAudio(url: string, filename: string): Promise<void> {
-  console.log(`[Anki] Downloading audio: ${url}`);
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw createAnkiError(
-      `Failed to download audio (${response.status}): ${url}`,
-      "fetchAndStoreAudio"
-    );
-  }
-  const audio = await response.arrayBuffer();
-  await storeAudioData(filename, audio);
-}
-
 function buildKanjiCompositionHtml(componentKanji: Kanji[]): string {
   if (componentKanji.length === 0) return "";
 
@@ -572,6 +560,19 @@ function buildKanjiCompositionHtml(componentKanji: Kanji[]): string {
 
 function getComponentKanji(vocabulary: Vocabulary | KanaVocabulary): Kanji[] {
   return vocabulary.object === "vocabulary" ? (vocabulary as Vocabulary).componentKanji : [];
+}
+
+/**
+ * A fixed gender per word keeps the clip names stable, so a re-sync reads every clip from disk.
+ * The reading and not the slug is hashed: with two voices, female first, one slug hash for both
+ * would always give the reading the same gender as the sentence voice.
+ */
+function preferredReadingGender(vocabulary: Vocabulary | KanaVocabulary): "male" | "female" {
+  const primaryReading =
+    vocabulary.object === "vocabulary"
+      ? getPrimaryReading(vocabulary.readings)
+      : vocabulary.characters;
+  return hashNumber(primaryReading) % 2 === 0 ? "female" : "male";
 }
 
 function pickReadingAudios(
@@ -593,6 +594,28 @@ function pickReadingAudios(
     if (readingAudios.length > 0) return { gender, readingAudios };
   }
   return { gender: preferredGender, readingAudios: [] };
+}
+
+/** Answers the Anki file name of the clip, or "" when the word has no sentence. */
+async function storeSentenceAudio(params: {
+  deckId: number;
+  slug: string;
+  sentence: ContextSentence | null;
+}): Promise<string> {
+  const { deckId, slug, sentence } = params;
+  const { voices } = readAzureTtsConfig();
+  if (!sentence?.ja.trim()) return "";
+
+  // The Dragon HD voice is on trial to read the kanji itself. The generated
+  // kana reading only fills the furigana field.
+  const ssml = buildSentenceSsml({ text: sentence.ja, voice: pickSentenceVoice(voices, slug) });
+  return storeCachedMedia({
+    deckId,
+    folder: "sentences",
+    // The SSML holds the text, the voice and the format, so a change of any of them is a new clip
+    nameWithoutExtension: `${slug}_${shortHash(ssml)}`,
+    fetch: () => generateSentenceAudio(ssml),
+  });
 }
 
 function buildVocabularyNoteFields(params: {
@@ -656,8 +679,10 @@ async function addOrUpdateVocabularyCore(
   const slug = vocabulary.slug;
   // Anki auto-plays every [sound:] tag on the card back, so only one gender is
   // filled. All readings of it are kept: 平壌 needs both ぴょんやん and へいじょう.
-  const preferredGender = Math.random() < 0.5 ? "male" : "female";
-  const { gender, readingAudios } = pickReadingAudios(vocabulary, preferredGender);
+  const { gender, readingAudios } = pickReadingAudios(
+    vocabulary,
+    preferredReadingGender(vocabulary)
+  );
 
   const readingAudioTags = { female: "", male: "" };
 
@@ -666,23 +691,23 @@ async function addOrUpdateVocabularyCore(
   }
   const soundTags: string[] = [];
   for (const audio of readingAudios) {
-    const filename = `${deckId}_${slug}_${gender}_${shortHash(audio.metadata.pronunciation)}.mp3`;
-    await fetchAndStoreAudio(audio.url, filename);
+    const filename = await storeCachedMedia({
+      deckId,
+      folder: "readings",
+      nameWithoutExtension: `${slug}_${gender}_${shortHash(audio.metadata.pronunciation)}`,
+      // selectReadingAudios keeps only the audio/mpeg files
+      fetch: () => downloadMedia({ url: audio.url, extension: "mp3" }),
+    });
     soundTags.push(`[sound:${filename}]`);
   }
   readingAudioTags[gender] = soundTags.join(" ");
 
-  let sentenceAudioFilename = "";
   const shortestSentence = getShortestSentence(vocabulary.contextSentences);
-  if (shortestSentence) {
-    // The Dragon HD voice is on trial to read the kanji itself. The generated
-    // kana reading only fills the furigana field.
-    const sentenceAudio = await generateSentenceAudio(shortestSentence.ja);
-    if (sentenceAudio) {
-      sentenceAudioFilename = `${deckId}_${slug}_sentence.mp3`;
-      await storeAudioData(sentenceAudioFilename, sentenceAudio);
-    }
-  }
+  const sentenceAudioFilename = await storeSentenceAudio({
+    deckId,
+    slug,
+    sentence: shortestSentence,
+  });
 
   const fields = buildVocabularyNoteFields({
     vocabulary,

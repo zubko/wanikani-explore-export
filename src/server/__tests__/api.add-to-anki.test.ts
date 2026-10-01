@@ -15,21 +15,13 @@ import {
   setMediaStatus,
   setModelFields,
 } from "@/test/fetch-interceptor.ts";
-import {
-  ensureRepositoryInitialized,
-  resetFsMock,
-  resetRandom,
-  writeCalls,
-} from "@/test/preload.ts";
+import { ensureRepositoryInitialized, resetFsMock, writeCalls } from "@/test/preload.ts";
 import { VOCABULARY_MODEL_NAME, VOCABULARY_EXPECTED_FIELDS } from "@/model/anki-models.ts";
 import { getRadicalSvgUrl } from "@/model/radical-utils.ts";
 import { MEDIA_ROOT_PATH } from "@server/repository/media-cache.ts";
 import { getRadical } from "@server/repository/radical.ts";
+import { getVocabulary } from "@server/repository/vocabulary.ts";
 import { api } from "../api.ts";
-
-process.env.AZURE_TTS_KEY = "test-key";
-process.env.AZURE_TTS_REGION = "eastus";
-process.env.AZURE_TTS_VOICES = "ja-JP-TestNeural";
 
 installFetchInterceptor();
 beforeAll(async () => {
@@ -39,7 +31,6 @@ beforeAll(async () => {
 // An add writes media files and registry lines, which must not reach the next test or file
 beforeEach(() => {
   resetFetchInterceptor();
-  resetRandom();
   resetFsMock();
 });
 afterEach(resetFsMock);
@@ -189,15 +180,15 @@ describe("add-to-anki API", () => {
     const fields = findVocabularyFields("addNote", "平壌");
     expect([fields.reading_audio_female, fields.reading_audio_male]).toMatchInlineSnapshot(`
       [
+        "[sound:1003_平壌_female_3af1ead2.mp3] [sound:1003_平壌_female_d10a9de1.mp3]",
         "",
-        "[sound:1003_平壌_male_3af1ead2.mp3] [sound:1003_平壌_male_d10a9de1.mp3]",
       ]
     `);
     expect(storedAudioFilenames()).toMatchInlineSnapshot(`
       [
-        "1003_平壌_male_3af1ead2.mp3",
-        "1003_平壌_male_d10a9de1.mp3",
-        "1003_平壌_sentence.mp3",
+        "1003_平壌_female_3af1ead2.mp3",
+        "1003_平壌_female_d10a9de1.mp3",
+        "1003_平壌_c8a1d7e7.mp3",
       ]
     `);
   });
@@ -213,11 +204,16 @@ describe("add-to-anki API", () => {
     );
   });
 
-  test("failed audio download returns error", async () => {
+  test("failed audio download returns error and caches nothing", async () => {
+    const vocabulary = await getVocabulary(3766);
+    const audioUrls = vocabulary?.pronunciationAudios.map((audio) => audio.url);
     setMediaStatus(404);
     const result = await addToAnkiJson({ id: 3766, type: "vocabulary" });
     expect(result.ok).toBe(false);
-    expect(result.error).toContain("Failed to download audio (404)");
+    const failedUrl = externalFetches.at(-1);
+    expect(audioUrls).toContain(failedUrl);
+    expect(result.error).toBe(`Failed to download media (404): ${failedUrl}`);
+    expect(cachedMediaPaths()).toEqual([]);
   });
 
   test("failed SVG download returns error and caches nothing", async () => {
@@ -371,6 +367,56 @@ describe("media cache", () => {
       value: `<img src="${ankiFilename}">`,
     });
     expect(fields.primary_name).toBe("Beggar");
+  });
+});
+
+describe("media cache for a word", () => {
+  test("an add caches the reading clips and the sentence clip with no deck id (毎晩)", async () => {
+    const result = await addToAnkiJson({ id: 3766, type: "vocabulary" });
+    expect(result.ok).toBe(true);
+
+    expect(cachedMediaPaths()).toMatchInlineSnapshot(`
+      [
+        "./data/userdata/media/readings/毎晩_female_a03eecb8.mp3",
+        "./data/userdata/media/sentences/毎晩_a85eebe6.mp3",
+      ]
+    `);
+    expect(storedAudioFilenames()).toMatchInlineSnapshot(`
+      [
+        "1003_毎晩_female_a03eecb8.mp3",
+        "1003_毎晩_a85eebe6.mp3",
+      ]
+    `);
+    const fields = findVocabularyFields("addNote", "毎晩");
+    expect(fields.sentence_jap_audio).toMatch(/^\[sound:1003_毎晩_[0-9a-f]{8}\.mp3\]$/);
+  });
+
+  test("a second add reads every clip from disk (毎晩)", async () => {
+    await addToAnkiJson({ id: 3766, type: "vocabulary" });
+    const firstStored = storedMediaFilenames();
+    const firstFields = findVocabularyFields("addNote", "毎晩");
+    resetFetchInterceptor();
+
+    const result = await addToAnkiJson({ id: 3766, type: "vocabulary" });
+    expect(result.ok).toBe(true);
+    expect(externalFetches).toEqual([]);
+    expect(storedMediaFilenames()).toEqual(firstStored);
+    const fields = findVocabularyFields("addNote", "毎晩");
+    expect(fields.reading_audio_female).toBe(firstFields.reading_audio_female);
+    expect(fields.reading_audio_male).toBe(firstFields.reading_audio_male);
+    expect(fields.sentence_jap_audio).toBe(firstFields.sentence_jap_audio);
+  });
+
+  test("a missing Azure value fails the add", async () => {
+    const key = process.env.AZURE_TTS_KEY;
+    delete process.env.AZURE_TTS_KEY;
+    try {
+      const result = await addToAnkiJson({ id: 3766, type: "vocabulary" });
+      expect(result.ok).toBe(false);
+      expect(result.error).toBe("Missing AZURE_TTS_KEY in the root env file");
+    } finally {
+      process.env.AZURE_TTS_KEY = key;
+    }
   });
 });
 

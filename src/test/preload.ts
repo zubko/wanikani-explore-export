@@ -145,17 +145,11 @@ mock.module("fs/promises", () => ({
   mkdir: async () => {},
 }));
 
-const RANDOM_SEED = 0.42;
-let randomSeed = RANDOM_SEED;
-
-Math.random = () => {
-  randomSeed = (randomSeed * 16807) % 2147483647;
-  return (randomSeed - 1) / 2147483646;
-};
-
-export function resetRandom() {
-  randomSeed = RANDOM_SEED;
-}
+// Plain assignments: bun test loads the root env file, and its real voice list would change the
+// sentence clip names in the snapshots from machine to machine
+process.env.AZURE_TTS_KEY = "test-key";
+process.env.AZURE_TTS_REGION = "eastus";
+process.env.AZURE_TTS_VOICES = "ja-JP-TestNeural";
 
 let initialized = false;
 

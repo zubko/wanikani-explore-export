@@ -270,15 +270,15 @@ export function createReloadingFile<T>(params: {
 - Modify: `src/server/__tests__/__snapshots__/api.add-to-anki.test.ts.snap`
 - Create: `src/server/services/__tests__/azure-tts.test.ts`
 
-- [ ] `azure-tts.ts`: `readAzureTtsConfig()` that throws with the missing name, `pickSentenceVoice(voices, slug)`, `buildSentenceSsml({ text, voice })`, `generateSentenceAudio(ssml)` returning `FetchedMedia` and never null, no `Math.random`; `src/server/index.ts` calls `readAzureTtsConfig()` before `initRepository()`
-- [ ] move the three `AZURE_TTS_*` test values from `api.add-to-anki.test.ts` into `src/test/preload.ts`, as plain assignments
-- [ ] reading clips: `getOrFetchMedia` with folder `readings` and `${slug}_${gender}_${shortHash(pronunciation)}`, extension `mp3`; delete `fetchAndStoreAudio` and `storeAudioData`
-- [ ] sentence clip: gate on a non-blank sentence only, name `${slug}_${shortHash(ssml)}`, Anki name `${deckId}_${fileName}`
-- [ ] reading gender from `hashNumber(primaryReading)`; remove the seeded `Math.random` and `resetRandom()` from `src/test/preload.ts` and the `resetRandom()` call from `api.add-to-anki.test.ts`
-- [ ] write `azure-tts.test.ts` with its own fetch mock and env save/restore: `pickSentenceVoice` is stable for one slug and uses both voices over a set of slugs; `readAzureTtsConfig()` throws with the name of the first missing variable; `buildSentenceSsml` escapes `<` and `&` and holds the voice name; `generateSentenceAudio` posts the SSML as the body with the three headers and returns `extension: "mp3"`; a bad status throws
-- [ ] update the add tests: a second add of the same word makes no request to `files.wanikani.com` and none to Azure, but every clip is still pushed with `storeMediaFile`; the sentence tag holds `${slug}_<hash>.mp3`; the audio 404 test expects "Failed to download media (404)" and the audio URL
-- [ ] update the snapshot scoped and check the diff touches only the audio tags (the gender of a word may flip once, the hash decides)
-- [ ] run `bun test`, `bun run tsc` and lint - must pass before task 7
+- [x] `azure-tts.ts`: `readAzureTtsConfig()` that throws with the missing name, `pickSentenceVoice(voices, slug)`, `buildSentenceSsml({ text, voice })`, `generateSentenceAudio(ssml)` returning `FetchedMedia` and never null, no `Math.random`; `src/server/index.ts` calls `readAzureTtsConfig()` before `initRepository()`
+- [x] move the three `AZURE_TTS_*` test values from `api.add-to-anki.test.ts` into `src/test/preload.ts`, as plain assignments
+- [x] reading clips: `getOrFetchMedia` with folder `readings` and `${slug}_${gender}_${shortHash(pronunciation)}`, extension `mp3`; delete `fetchAndStoreAudio` and `storeAudioData`
+- [x] sentence clip: gate on a non-blank sentence only, name `${slug}_${shortHash(ssml)}`, Anki name `${deckId}_${fileName}`
+- [x] reading gender from `hashNumber(primaryReading)`; remove the seeded `Math.random` and `resetRandom()` from `src/test/preload.ts` and the `resetRandom()` call from `api.add-to-anki.test.ts`
+- [x] write `azure-tts.test.ts` with its own fetch mock and env save/restore: `pickSentenceVoice` is stable for one slug and uses both voices over a set of slugs; `readAzureTtsConfig()` throws with the name of the first missing variable; `buildSentenceSsml` escapes `<` and `&` and holds the voice name; `generateSentenceAudio` posts the SSML as the body with the three headers and returns `extension: "mp3"`; a bad status throws
+- [x] update the add tests: a second add of the same word makes no request to `files.wanikani.com` and none to Azure, but every clip is still pushed with `storeMediaFile`; the sentence tag holds `${slug}_<hash>.mp3`; the audio 404 test expects "Failed to download media (404)" and the audio URL
+- [x] update the snapshot scoped and check the diff touches only the audio tags (the gender of a word may flip once, the hash decides)
+- [x] run `bun test`, `bun run tsc` and lint - must pass before task 7
 
 ### Task 7: Give `sync-anki-notes` a radical pass
 
