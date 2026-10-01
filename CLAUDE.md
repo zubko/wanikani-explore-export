@@ -112,7 +112,7 @@ bun run generate-verb-conjugations     # Generate verb conjugations via LLM
 bun run generate-sentence-readings     # Generate kana readings for context sentences via LLM
 bun run sync-anki-fields               # Add missing note-type fields to Anki (interactive, needs a TTY)
 bun run sync-anki-templates            # Sync Anki templates to Anki
-bun run sync-anki-notes                # Sync all Anki vocabulary notes and kanji notes with no word (requires dev server running)
+bun run sync-anki-notes                # Sync all Anki vocabulary notes, kanji notes with no word and radical notes with no kanji (requires dev server running)
 bun run add-iknow-vocab                # Add the next iKnow Core 1000 words (requires dev server running)
 ```
 
@@ -122,7 +122,7 @@ The sentence readings script has CLI options: `--limit <n>`, `--batch-size <n>` 
 
 Both LLM scripts only fill ids that are missing in their data file, so a rerun continues where the last run stopped. They send one JSON array of items per request, check every answer item, save after every batch, and stop after 3 batches in a row without a usable answer. An item that fails a check is logged and skipped, a rerun picks it up. `--batch-size 1` helps with the last stubborn items. The model is `LLM_MODEL` from `scripts/.env`
 
-The sync Anki notes script has CLI options: `--base-url <url>`, `--limit <n>`, `--dry-run`, `--help`. `--limit` counts words and kanji together. A dry run lists all words and all kanji notes, because only a real add tells which kanji a word refreshed
+The sync Anki notes script has CLI options: `--base-url <url>`, `--limit <n>`, `--dry-run`, `--help`. `--limit` counts words, kanji and radicals together. A dry run lists all word, kanji and radical notes, because only a real add tells which kanji and radicals an add refreshed
 
 ### Fixing Wrong WaniKani Data
 
@@ -250,7 +250,7 @@ bun run sync-anki-notes    # Re-generate all Anki notes
 
 Requires Anki to be running with AnkiConnect plugin.
 
-Adding or re-syncing a word always creates or refreshes its component kanji and radicals too. This is intended: every word in Anki must have its kanji and radicals there. So the script adds every word first. Then it adds only the kanji notes that no word add wrote: `/add-to-anki` answers with the kanji it wrote in `data.kanji`, and the script collects those characters. A radical is always refreshed through a kanji, never on its own. The first failed add stops the run with exit 1 and no AnkiWeb sync, because a failed word leaves its kanji unrefreshed. The script syncs with AnkiWeb once at the start, before it reads the note list, adds every note with `sync: false`, and syncs once more at the end, so a full run is two AnkiWeb syncs, not one per note. A failed start sync stops the run, because every lookup after it would be stale. A dry run syncs too: its list is only true after a sync, and a sync never writes a note of ours, so the dry-run line says `No notes written`.
+Adding or re-syncing a word always creates or refreshes its component kanji and radicals too. This is intended: every word in Anki must have its kanji and radicals there. So the script adds every word first. Then it adds only the kanji notes that no word add wrote: `/add-to-anki` answers with the kanji it wrote in `data.kanji`, and the script collects those characters. Last it adds only the radical notes that no word or kanji add wrote, by the names in `data.radicals`. Such a name is the primary meaning, the same value the radical note holds in `primary_name`. This pass reaches a radical that was added on its own from the web UI and has no kanji in the deck. `pickNotesToRefresh` in `scripts/lib/note-refresh.ts` drops the refreshed notes and applies the rest of `--limit` for both passes. The first failed add stops the run with exit 1 and no AnkiWeb sync, because a failed word leaves its kanji unrefreshed. The script syncs with AnkiWeb once at the start, before it reads the note list, adds every note with `sync: false`, and syncs once more at the end, so a full run is two AnkiWeb syncs, not one per note. A failed start sync stops the run, because every lookup after it would be stale. A dry run syncs too: its list is only true after a sync, and a sync never writes a note of ours, so the dry-run line says `No notes written`.
 
 ## Environment
 

@@ -291,12 +291,12 @@ export function createReloadingFile<T>(params: {
 
 A radical added on its own from the web UI, with no kanji of it in the deck, is never reached by a word or kanji add. After this plan its `mnemonic_image` field still holds the old URL, and the new template would show that URL as text. So the script gets a third pass, the same pattern it already uses for kanji.
 
-- [ ] fetch the radical notes right after the kanji fetch, with `fetchResolvedNotes(baseUrl, "radical")`, so the dry run (which returns early before any batch) can list them, the "No items to update" check counts them, and a failed fetch exits before any write; the dry run says that a real run skips the radicals a word or kanji update refreshed
-- [ ] keep the kanji pass results (today `await updateNotes(...)` drops them) and collect the radical names from `data.radicals` of every word and kanji result, like `refreshedKanji` collects the kanji characters; `AnkiAddResult.radicals[].name` is the primary meaning, the same value the radical note holds in `characters` and `meaning`
-- [ ] add the radicals that are not in that set with `type: "radical"` under the remaining `--limit` budget; log "Updating N radicals with no kanji"; count the batch in `updated`, which gates the final AnkiWeb sync and the exit code, and add a `Radicals:` line to the summary
-- [ ] create `scripts/lib/note-refresh.ts` with `pickNotesToRefresh({ notes, refreshed, remaining })`: drops the notes whose `characters` is in `refreshed`, then takes at most `remaining`; generic over `{ characters: string }` so the script's local `AnkiNoteItem` type fits; both the kanji pass and the radical pass call it
-- [ ] write `note-refresh.test.ts`: a refreshed name is skipped, an unknown name is kept, `remaining` cuts the list, `remaining: 0` gives an empty list (the usual case for the radical pass under `--limit`), `remaining` undefined keeps all
-- [ ] run `bun test`, `bun run tsc` and lint - must pass before task 8
+- [x] fetch the radical notes right after the kanji fetch, with `fetchResolvedNotes(baseUrl, "radical")`, so the dry run (which returns early before any batch) can list them, the "No items to update" check counts them, and a failed fetch exits before any write; the dry run says that a real run skips the radicals a word or kanji update refreshed
+- [x] keep the kanji pass results (today `await updateNotes(...)` drops them) and collect the radical names from `data.radicals` of every word and kanji result, like `refreshedKanji` collects the kanji characters; `AnkiAddResult.radicals[].name` is the primary meaning, the same value the radical note holds in `characters` and `meaning`
+- [x] add the radicals that are not in that set with `type: "radical"` under the remaining `--limit` budget; log "Updating N radicals with no kanji"; count the batch in `updated`, which gates the final AnkiWeb sync and the exit code, and add a `Radicals:` line to the summary
+- [x] create `scripts/lib/note-refresh.ts` with `pickNotesToRefresh({ notes, refreshed, remaining })`: drops the notes whose `characters` is in `refreshed`, then takes at most `remaining`; generic over `{ characters: string }` so the script's local `AnkiNoteItem` type fits; both the kanji pass and the radical pass call it
+- [x] write `note-refresh.test.ts`: a refreshed name is skipped, an unknown name is kept, `remaining` cuts the list, `remaining: 0` gives an empty list (the usual case for the radical pass under `--limit`), `remaining` undefined keeps all
+- [x] run `bun test`, `bun run tsc` and lint - must pass before task 8
 
 ### Task 8: Git attributes and data repo docs
 

@@ -2,6 +2,7 @@ import { parseArgs } from "util";
 
 import type { AnkiAddResult } from "../src/model/wanikani.ts";
 import { formatError } from "./lib/format-error.ts";
+import { pickNotesToRefresh } from "./lib/note-refresh.ts";
 
 type CliArgs = {
   baseUrl: string;
@@ -140,6 +141,10 @@ function takeLimit<T>(items: T[], limit: number | undefined): T[] {
   return limit === undefined ? items : items.slice(0, limit);
 }
 
+function remainingLimit(limit: number | undefined, used: number): number | undefined {
+  return limit === undefined ? undefined : limit - used;
+}
+
 async function main(): Promise<void> {
   const args = parseCliArgs();
 
@@ -163,16 +168,20 @@ async function main(): Promise<void> {
 
   const words = await fetchResolvedNotes(args.baseUrl, "vocabulary");
   const kanji = await fetchResolvedNotes(args.baseUrl, "kanji");
+  const radicals = await fetchResolvedNotes(args.baseUrl, "radical");
 
-  if (words.length === 0 && kanji.length === 0) {
+  if (words.length === 0 && kanji.length === 0 && radicals.length === 0) {
     console.log("\nNo items to update.");
     return;
   }
 
   if (args.dryRun) {
-    const listed = takeLimit([...words, ...kanji], args.limit);
+    const listed = takeLimit([...words, ...kanji, ...radicals], args.limit);
     console.log(`\nWould update up to ${listed.length} items.`);
-    console.log("A real run skips the kanji that a word update already refreshed.\n");
+    console.log(
+      "A real run skips the kanji that a word update already refreshed," +
+        " and the radicals that a word or kanji update already refreshed.\n"
+    );
     for (const [i, item] of listed.entries()) {
       console.log(`[${padIndex(i + 1, listed.length)}/${listed.length}] ${formatNote(item)}`);
     }
@@ -187,19 +196,30 @@ async function main(): Promise<void> {
   const wordResults = await updateNotes(args.baseUrl, wordBatch);
 
   // A word update also writes its kanji, so only the kanji that no word update wrote need their own
-  const refreshedKanji = new Set(
-    wordResults.flatMap((result) => result.kanji.map((k) => k.character))
-  );
-  const kanjiBatch = takeLimit(
-    kanji.filter((note) => !refreshedKanji.has(note.characters)),
-    args.limit === undefined ? undefined : args.limit - wordBatch.length
-  );
+  const kanjiBatch = pickNotesToRefresh({
+    notes: kanji,
+    refreshed: new Set(wordResults.flatMap((result) => result.kanji.map((k) => k.character))),
+    remaining: remainingLimit(args.limit, wordBatch.length),
+  });
   if (kanjiBatch.length > 0) {
     console.log(`\nUpdating ${kanjiBatch.length} kanji with no word...\n`);
-    await updateNotes(args.baseUrl, kanjiBatch);
   }
+  const kanjiResults = await updateNotes(args.baseUrl, kanjiBatch);
 
-  const updated = wordBatch.length + kanjiBatch.length;
+  // A word or kanji update also writes its radicals, so only the radicals that none of them wrote need their own
+  const radicalBatch = pickNotesToRefresh({
+    notes: radicals,
+    refreshed: new Set(
+      [...wordResults, ...kanjiResults].flatMap((result) => result.radicals.map((r) => r.name))
+    ),
+    remaining: remainingLimit(args.limit, wordBatch.length + kanjiBatch.length),
+  });
+  if (radicalBatch.length > 0) {
+    console.log(`\nUpdating ${radicalBatch.length} radicals with no kanji...\n`);
+  }
+  await updateNotes(args.baseUrl, radicalBatch);
+
+  const updated = wordBatch.length + kanjiBatch.length + radicalBatch.length;
   let synced = false;
   if (updated > 0) {
     process.stdout.write("\nSyncing to AnkiWeb... ");
@@ -218,10 +238,11 @@ async function main(): Promise<void> {
   console.log("=".repeat(50));
   console.log("Summary");
   console.log("-".repeat(50));
-  console.log(`Words:   ${wordBatch.length}`);
-  console.log(`Kanji:   ${kanjiBatch.length}`);
-  console.log(`Synced:  ${updated > 0 ? (synced ? "yes" : "no") : "nothing to sync"}`);
-  console.log(`Time:    ${elapsed}s`);
+  console.log(`Words:    ${wordBatch.length}`);
+  console.log(`Kanji:    ${kanjiBatch.length}`);
+  console.log(`Radicals: ${radicalBatch.length}`);
+  console.log(`Synced:   ${updated > 0 ? (synced ? "yes" : "no") : "nothing to sync"}`);
+  console.log(`Time:     ${elapsed}s`);
   console.log("=".repeat(50));
 
   if (updated > 0 && !synced) process.exit(1);
