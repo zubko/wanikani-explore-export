@@ -1,9 +1,6 @@
 import type { LocalStudyMaterial } from "@/model/wanikani.ts";
 import { readJson } from "@server/utils/json-utils.ts";
-import {
-  LOCAL_STUDY_MATERIALS_PATH,
-  setLocalStudyMaterials,
-} from "@server/repository/data-loader.ts";
+import { LOCAL_STUDY_MATERIALS_PATH } from "@server/repository/data-loader.ts";
 import { resetFsMock, setFileContent, writeCalls } from "./preload.ts";
 
 const FIXTURE_PATH = "src/test/fixtures/study_materials_extra.json";
@@ -20,11 +17,11 @@ export async function loadStudyMaterialFixture(): Promise<void> {
 
 /**
  * Every test file that writes local study materials calls this in `beforeEach` and in `afterEach`,
- * because bun runs all files in one process and the repository state is module level.
+ * because bun runs all files in one process and the fs mock is process-global. The reset seeds the
+ * fixture file again, and the repository rereads it on the next get.
  */
 export function resetStudyMaterialState(): void {
   resetFsMock();
-  setLocalStudyMaterials(structuredClone(studyMaterialFixture));
 }
 
 /** Changes the file behind the repository, like a hand edit or a git pull does. */

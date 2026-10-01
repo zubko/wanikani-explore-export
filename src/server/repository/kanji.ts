@@ -6,11 +6,12 @@ import {
   buildSubjectReferences,
   getPrimaryMeaning,
 } from "@/model/subject-utils.ts";
-import { kanji, vocabulary, studyMaterials, localStudyMaterials } from "./data-loader.ts";
+import { kanji, vocabulary, studyMaterials, getLocalStudyMaterials } from "./data-loader.ts";
 import { getRadicals } from "./radical.ts";
 
 async function mapKanjiDataToKanji(data: KanjiData): Promise<Kanji> {
   const componentRadicals = await getRadicals(data.data.component_subject_ids);
+  const localStudyMaterials = await getLocalStudyMaterials();
 
   const visuallySimilarKanji = buildSubjectReferences(
     kanji,

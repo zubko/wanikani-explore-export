@@ -25,7 +25,9 @@ const SEEDED_FILES = [
   },
 ];
 
-// A media file that is not in the mock must read as missing, never as the user's real file
+// A seeded or media file that is not in the mock must read as missing, never as the user's real
+// file. An exact compare, because a fixture file has the same base name as its seeded path.
+const SEEDED_PATHS = new Set(SEEDED_FILES.map(({ path }) => normalize(path)));
 const MEDIA_FOLDER = normalize("./data/userdata/media/");
 
 export const writeCalls: { path: string; data: FileData }[] = [];
@@ -90,9 +92,12 @@ mock.module("fs/promises", () => ({
     options?: BufferEncoding | { encoding?: BufferEncoding | null }
   ) => {
     throwWhenSet("readFile");
-    const file = files.get(fileKey(path));
+    const key = fileKey(path);
+    const file = files.get(key);
     if (file === undefined) {
-      if (fileKey(path).startsWith(MEDIA_FOLDER)) throw missingFileError("readFile", path);
+      if (SEEDED_PATHS.has(key) || key.startsWith(MEDIA_FOLDER)) {
+        throw missingFileError("readFile", path);
+      }
       return realReadFile(path, options);
     }
     const encoding = typeof options === "string" ? options : options?.encoding;

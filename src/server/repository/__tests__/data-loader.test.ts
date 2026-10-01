@@ -1,8 +1,10 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
+import { unlink } from "fs/promises";
 import type { LocalStudyMaterial } from "@/model/wanikani.ts";
-import { resetFsMock, setFileContent, setFsError, writeCalls } from "@/test/preload.ts";
+import { resetFsMock, setFileContent, writeCalls } from "@/test/preload.ts";
 import {
   checkLocalStudyMaterialSubjects,
+  ensureLocalStudyMaterialsFile,
   LOCAL_STUDY_MATERIALS_PATH,
   readLocalStudyMaterials,
 } from "../data-loader.ts";
@@ -78,11 +80,11 @@ describe("readLocalStudyMaterials", () => {
     expect(await readError()).toContain("subject 958 has no field");
   });
 
-  test("a missing file is created with an empty object", async () => {
-    setFsError("readFile", Object.assign(new Error("no such file"), { code: "ENOENT" }));
+  test("a missing file is refused and not created", async () => {
+    await unlink(LOCAL_STUDY_MATERIALS_PATH);
 
-    expect(await readLocalStudyMaterials()).toEqual({});
-    expect(writeCalls).toEqual([{ path: LOCAL_STUDY_MATERIALS_PATH, data: "{}\n" }]);
+    expect(await readError()).toContain(`${LOCAL_STUDY_MATERIALS_PATH} is missing`);
+    expect(writeCalls).toHaveLength(0);
   });
 
   test("broken JSON reports the parse error and not the create hint", async () => {
@@ -92,6 +94,23 @@ describe("readLocalStudyMaterials", () => {
     expect(error).toContain(`Cannot read ${LOCAL_STUDY_MATERIALS_PATH}`);
     expect(error).toContain("JSON");
     expect(error).not.toContain("Create it with");
+  });
+});
+
+describe("ensureLocalStudyMaterialsFile", () => {
+  test("a missing file is created with an empty object", async () => {
+    await unlink(LOCAL_STUDY_MATERIALS_PATH);
+
+    await ensureLocalStudyMaterialsFile();
+
+    expect(writeCalls).toEqual([{ path: LOCAL_STUDY_MATERIALS_PATH, data: "{}\n" }]);
+    expect(await readLocalStudyMaterials()).toEqual({});
+  });
+
+  test("an existing file is left as it is", async () => {
+    await ensureLocalStudyMaterialsFile();
+
+    expect(writeCalls).toHaveLength(0);
   });
 });
 

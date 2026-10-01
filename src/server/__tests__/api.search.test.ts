@@ -4,12 +4,26 @@ import {
   installFetchInterceptor,
   resetFetchInterceptor,
 } from "@/test/fetch-interceptor.ts";
-import { ensureRepositoryInitialized, resetFsMock, writeCalls } from "@/test/preload.ts";
+import {
+  ensureRepositoryInitialized,
+  resetFsMock,
+  setFileContent,
+  writeCalls,
+} from "@/test/preload.ts";
+import {
+  loadStudyMaterialFixture,
+  setStudyMaterialFile,
+  studyMaterialFixture as fixture,
+} from "@/test/study-material-fixture.ts";
+import { LOCAL_STUDY_MATERIALS_PATH } from "../repository/data-loader.ts";
 import { MNEMONIC_IMAGES_PATH } from "../repository/mnemonic-image-fetcher.ts";
 import { api } from "../api.ts";
 
 installFetchInterceptor();
-beforeAll(() => ensureRepositoryInitialized());
+beforeAll(async () => {
+  await ensureRepositoryInitialized();
+  await loadStudyMaterialFixture();
+});
 beforeEach(resetFetchInterceptor);
 // Earlier tests and files may already have appended a page to the registry
 beforeEach(resetFsMock);
@@ -129,5 +143,25 @@ describe("search API", () => {
     expect(result.found).toBe(true);
     expect(result.data.characters).toBe("ここ");
     expect(result.data).toMatchSnapshot();
+  });
+});
+
+describe("search API with the local study materials changed outside the app", () => {
+  test("a record put into the file shows in the next answer without a save (川)", async () => {
+    setStudyMaterialFile({ ...fixture, "456": { meaning_note: "Typed by hand" } });
+
+    const result = await searchJson("type=kanji&q=川");
+    expect(result.data.localStudyMaterial).toEqual({ meaning_note: "Typed by hand" });
+    expect(writeCalls.some((call) => call.path === LOCAL_STUDY_MATERIALS_PATH)).toBe(false);
+  });
+
+  test("a broken file fails the next search, a fixed file answers again (川)", async () => {
+    setFileContent(LOCAL_STUDY_MATERIALS_PATH, "{ broken");
+    expect((await searchApi("type=kanji&q=川")).status).toBe(500);
+
+    setStudyMaterialFile(fixture);
+    const response = await searchApi("type=kanji&q=川");
+    expect(response.status).toBe(200);
+    expect((await response.json()).data.localStudyMaterial).toEqual(fixture["456"]!);
   });
 });

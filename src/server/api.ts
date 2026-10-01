@@ -56,7 +56,7 @@ async function findSubjectForAnki(id: number, type: SubjectType): Promise<Subjec
   if (type === "radical") return getRadical(id);
   if (type === "kanji") return getKanji(id);
   // /search answers both types from one pool, so a caller can hold a kana id under type "vocabulary"
-  return (await getVocabulary(id)) ?? getKanaVocabulary(id);
+  return (await getVocabulary(id)) ?? (await getKanaVocabulary(id));
 }
 
 function addSubjectToAnki(subject: Subject): Promise<AnkiAddResult> {

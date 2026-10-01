@@ -1,8 +1,7 @@
 import { describe, test, expect, beforeAll, beforeEach, afterEach } from "bun:test";
-import { setLocalStudyMaterials } from "@server/repository/data-loader.ts";
 import {
   loadStudyMaterialFixture,
-  resetStudyMaterialState,
+  setStudyMaterialFile,
   studyMaterialFixture as fixture,
 } from "@/test/study-material-fixture.ts";
 import {
@@ -421,11 +420,8 @@ describe("media cache for a word", () => {
 });
 
 describe("alternative_meanings", () => {
-  beforeEach(resetStudyMaterialState);
-  afterEach(resetStudyMaterialState);
-
   test("a local synonym equal to a WaniKani meaning is listed once (毎晩)", async () => {
-    setLocalStudyMaterials({ ...fixture, "3766": { meaning_synonyms: ["nightly", "Nights"] } });
+    setStudyMaterialFile({ ...fixture, "3766": { meaning_synonyms: ["nightly", "Nights"] } });
 
     const result = await addToAnkiJson({ id: 3766, type: "vocabulary" });
     expect(result.ok).toBe(true);
@@ -440,7 +436,7 @@ describe("alternative_meanings", () => {
   });
 
   test("WaniKani and local synonyms are joined, a case variant is listed once (アメリカ人)", async () => {
-    setLocalStudyMaterials({ ...fixture, "2478": { meaning_synonyms: ["USA Person", "yankee"] } });
+    setStudyMaterialFile({ ...fixture, "2478": { meaning_synonyms: ["USA Person", "yankee"] } });
 
     const result = await addToAnkiJson({ id: 2478, type: "vocabulary" });
     expect(result.ok).toBe(true);
@@ -456,7 +452,7 @@ describe("alternative_meanings", () => {
 
   test("an updated kanji note gets its synonyms (晩)", async () => {
     setAnkiResponse("findNotes", [1]);
-    setLocalStudyMaterials({ ...fixture, "958": { meaning_synonyms: ["dusk"] } });
+    setStudyMaterialFile({ ...fixture, "958": { meaning_synonyms: ["dusk"] } });
 
     const result = await addToAnkiJson({ id: 958, type: "kanji" });
     expect(result.ok).toBe(true);
@@ -474,8 +470,7 @@ describe("alternative_meanings", () => {
 
 describe("HTML in a local note", () => {
   beforeEach(() => {
-    resetStudyMaterialState();
-    setLocalStudyMaterials({
+    setStudyMaterialFile({
       ...fixture,
       "1": {
         meaning_note: "use < for the smaller one & > for the bigger",
@@ -488,8 +483,6 @@ describe("HTML in a local note", () => {
       },
     });
   });
-
-  afterEach(resetStudyMaterialState);
 
   test("a radical note and its synonyms reach Anki escaped", async () => {
     const result = await addToAnkiJson({ id: 1, type: "radical" });
@@ -514,7 +507,7 @@ describe("HTML in a local note", () => {
   });
 
   test("a vocabulary note and its synonyms reach Anki escaped", async () => {
-    setLocalStudyMaterials({
+    setStudyMaterialFile({
       ...fixture,
       "3766": { meaning_note: "every evening & night", meaning_synonyms: ["a < b"] },
     });

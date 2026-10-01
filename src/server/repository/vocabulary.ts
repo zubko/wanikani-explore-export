@@ -15,7 +15,7 @@ import {
   vocabulary,
   kanaVocabulary,
   studyMaterials,
-  localStudyMaterials,
+  getLocalStudyMaterials,
   verbConjugations,
   sentenceReadings,
 } from "./data-loader.ts";
@@ -37,6 +37,7 @@ function enrichContextSentencesWithReadings(
 
 async function mapVocabularyDataToVocabulary(data: VocabularyData): Promise<Vocabulary> {
   const componentKanji = await getKanjis(data.data.component_subject_ids);
+  const localStudyMaterials = await getLocalStudyMaterials();
 
   return {
     object: "vocabulary" as const,
@@ -61,7 +62,11 @@ async function mapVocabularyDataToVocabulary(data: VocabularyData): Promise<Voca
   };
 }
 
-function mapKanaVocabularyDataToKanaVocabulary(data: KanaVocabularyData): KanaVocabulary {
+async function mapKanaVocabularyDataToKanaVocabulary(
+  data: KanaVocabularyData
+): Promise<KanaVocabulary> {
+  const localStudyMaterials = await getLocalStudyMaterials();
+
   return {
     object: "kana_vocabulary" as const,
     id: data.id,
@@ -102,7 +107,7 @@ export async function getVocabulary(id: number): Promise<Vocabulary | null> {
   return mapVocabularyDataToVocabulary(data);
 }
 
-export function getKanaVocabulary(id: number): KanaVocabulary | null {
+export async function getKanaVocabulary(id: number): Promise<KanaVocabulary | null> {
   const data = kanaVocabulary.find((v) => v.id === id);
   if (!data) return null;
   return mapKanaVocabularyDataToKanaVocabulary(data);

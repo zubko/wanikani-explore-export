@@ -42,19 +42,19 @@ describe("getVocabulary", () => {
 describe("getKanaVocabulary", () => {
   beforeEach(resetMockState);
 
-  test("returns enriched kana vocabulary (ここ, id=9209)", () => {
-    const v = getKanaVocabulary(9209);
+  test("returns enriched kana vocabulary (ここ, id=9209)", async () => {
+    const v = await getKanaVocabulary(9209);
 
     expect(v).toMatchSnapshot();
   });
 
-  test("returns null for regular vocabulary id", () => {
-    const v = getKanaVocabulary(3766);
+  test("returns null for regular vocabulary id", async () => {
+    const v = await getKanaVocabulary(3766);
     expect(v).toBeNull();
   });
 
-  test("returns null for non-existent id", () => {
-    const v = getKanaVocabulary(999999);
+  test("returns null for non-existent id", async () => {
+    const v = await getKanaVocabulary(999999);
     expect(v).toBeNull();
   });
 });
