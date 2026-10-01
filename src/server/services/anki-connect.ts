@@ -34,7 +34,7 @@ import {
   VOCABULARY_EXPECTED_FIELDS,
 } from "@/model/anki-models.ts";
 import { generateSentenceAudio } from "@/server/services/azure-tts.ts";
-import { createHash } from "crypto";
+import { shortHash } from "@/server/utils/hash.ts";
 
 const ANKI_CONNECT_URL = "http://127.0.0.1:8765";
 
@@ -508,10 +508,6 @@ async function fetchAndStoreAudio(url: string, filename: string): Promise<void> 
   }
   const audio = await response.arrayBuffer();
   await storeAudioData(filename, audio);
-}
-
-function shortHash(text: string): string {
-  return createHash("sha1").update(text).digest("hex").slice(0, 8);
 }
 
 function buildKanjiCompositionHtml(componentKanji: Kanji[]): string {

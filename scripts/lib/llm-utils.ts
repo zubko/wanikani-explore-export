@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import { readFile, rename, unlink, writeFile } from "fs/promises";
 import type OpenAI from "openai";
 import { formatError } from "./format-error.ts";
@@ -56,7 +57,7 @@ export async function loadJsonFile<T>(path: string): Promise<Record<string, T>> 
 }
 
 export async function saveJsonAtomic(path: string, data: unknown): Promise<void> {
-  const tempPath = `${path}.tmp`;
+  const tempPath = `${path}.${randomUUID()}.tmp`;
   try {
     await writeFile(tempPath, JSON.stringify(data, null, 2) + "\n");
     await rename(tempPath, path);

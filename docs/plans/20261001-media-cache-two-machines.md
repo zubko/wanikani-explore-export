@@ -179,11 +179,11 @@ export function createReloadingFile<T>(params: {
 - Modify: `src/server/utils/__tests__/json-utils.test.ts`
 - Modify: `scripts/lib/llm-utils.ts` (the second copy of `saveJsonAtomic`, CLAUDE.md says change both)
 
-- [ ] create `src/server/utils/hash.ts` with `shortHash` (moved from `anki-connect.ts`) and `hashNumber`
-- [ ] add `writeFileAtomic(path, data)` with the `randomUUID` temp name to `json-utils.ts`, make `saveJsonAtomic` call it; give the copy in `scripts/lib/llm-utils.ts` the same temp name
-- [ ] write tests for `shortHash` (8 hex chars, stable) and `hashNumber` (a number, stable, differs for two slugs)
-- [ ] `json-utils.test.ts`: the temp path check matches `/\.[0-9a-f-]{36}\.tmp$/` instead of the exact `.tmp` name; `study-material.test.ts` (a failed save leaves no temp entry) must still pass
-- [ ] run `bun test`, `bun run tsc` and lint - must pass before task 2
+- [x] create `src/server/utils/hash.ts` with `shortHash` (moved from `anki-connect.ts`) and `hashNumber`
+- [x] add `writeFileAtomic(path, data)` with the `randomUUID` temp name to `json-utils.ts`, make `saveJsonAtomic` call it; give the copy in `scripts/lib/llm-utils.ts` the same temp name
+- [x] write tests for `shortHash` (8 hex chars, stable) and `hashNumber` (a number, stable, differs for two slugs)
+- [x] `json-utils.test.ts`: the temp path check matches `/\.[0-9a-f-]{36}\.tmp$/` instead of the exact `.tmp` name; `study-material.test.ts` (a failed save leaves no temp entry) must still pass
+- [x] run `bun test`, `bun run tsc` and lint - must pass before task 2
 
 ### Task 2: Add the reloading file helper
 
