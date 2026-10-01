@@ -436,7 +436,12 @@ After making code changes:
 
 ## Git Workflow
 
-When asked to commit and push, also check `data/userdata/` for changes — it is a separate git repository. If there are changes there, commit and push them separately. Afterwards, return the working directory back to the main project root.
+The project has two git repositories: the main one and `data/userdata/`. A request to commit, push or pull covers both of them, unless the user names one.
+
+- Pull both repos first, with a merge (`git pull --no-rebase`). A server also commits and pushes `data/userdata/`, so the local copy is often behind.
+- When a local change in `data/userdata/` touches a file the pull also changes, commit it first and then pull. The JSON caches like `mnemonic-images.json` then conflict, but both sides only add keys. Resolve such a conflict as the union of both key sets, and stop if one key has two different values.
+- Commit and push each repo on its own.
+- Afterwards, return the working directory to the main project root.
 
 ## Testing
 
