@@ -4,6 +4,8 @@ exports[`add-to-anki API add radical (一, id=1) 1`] = `
 [
   "sync",
   "modelFieldNames",
+  "deckNamesAndIds",
+  "storeMediaFile",
   "findNotes",
   "addNote",
   "sync",

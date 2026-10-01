@@ -1,7 +1,7 @@
 import { mkdir, readdir, readFile } from "fs/promises";
 import { isMissingFile, writeFileAtomic } from "@server/utils/json-utils.ts";
 
-type MediaFolder = "radicals" | "mnemonics" | "readings" | "sentences";
+export type MediaFolder = "radicals" | "mnemonics" | "readings" | "sentences";
 
 export type FetchedMedia = { data: Buffer; extension: string };
 

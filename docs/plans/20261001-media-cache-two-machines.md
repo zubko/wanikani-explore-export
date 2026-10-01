@@ -249,14 +249,14 @@ export function createReloadingFile<T>(params: {
 - Modify: `src/server/__tests__/api.add-to-anki.test.ts`
 - Modify: `src/server/__tests__/__snapshots__/api.add-to-anki.test.ts.snap`
 
-- [ ] interceptor: `files.wanikani.com` answers with `Content-Type: image/svg+xml`
-- [ ] add `downloadMedia({ url, extension? })`, change `storeMediaFile` to take a `Buffer` (`storeAudioData` passes `Buffer.from(audio)` until Task 6 deletes it); delete `fetchAndStoreSvg`
-- [ ] radical note and kanji radical list: `getOrFetchMedia` with folder `radicals` and `${slug}_${shortHash(svgUrl)}`, extension `svg` from the metadata, Anki name `${deckId}_${fileName}`
-- [ ] radical mnemonic picture: `getOrFetchMedia` with folder `mnemonics` and `${slug}_mnemonic_${shortHash(url)}`, extension from the header, the full `<img src="..." class="mnemonic-img">` tag in `mnemonic_image`; `buildRadicalNoteFields` takes a params object
-- [ ] `radicals.md`: the template line becomes `{{#mnemonic_image}}{{mnemonic_image}}{{/mnemonic_image}}`, the Fields line says "mnemonic picture as an `<img>` tag of a media file" (`docs/anki-decks-fields.md` lists bare names only, nothing to change there); run `bun run sync-anki-templates` (needs Anki running, ask the user if it is not)
-- [ ] add tests: `beforeEach` and `afterEach` call `resetFsMock()`, the file writes media files and registry lines that must not leak into the next file; a radical add (一, the fixture page with a picture) stores the picture and the field holds the `<img>` tag with the Anki file name; a second add of the same radical makes no request to `files.wanikani.com` (check `externalFetches`) but still calls `storeMediaFile`; a second add of a radical with an SVG (8766) makes no request to `files.wanikani.com`; the SVG 500 test expects "Failed to download media (500)" and the URL
-- [ ] update the snapshot scoped: `bun test src/server/__tests__/api.add-to-anki.test.ts --update-snapshots`, then check the `.snap` diff: the "add radical (一, id=1)" action list gains `deckNamesAndIds` and a `storeMediaFile`, nothing else changes
-- [ ] run `bun test`, `bun run tsc` and lint - must pass before task 6
+- [x] interceptor: `files.wanikani.com` answers with `Content-Type: image/svg+xml`
+- [x] add `downloadMedia({ url, extension? })`, change `storeMediaFile` to take a `Buffer` (`storeAudioData` passes `Buffer.from(audio)` until Task 6 deletes it); delete `fetchAndStoreSvg`
+- [x] radical note and kanji radical list: `getOrFetchMedia` with folder `radicals` and `${slug}_${shortHash(svgUrl)}`, extension `svg` from the metadata, Anki name `${deckId}_${fileName}`
+- [x] radical mnemonic picture: `getOrFetchMedia` with folder `mnemonics` and `${slug}_mnemonic_${shortHash(url)}`, extension from the header, the full `<img src="..." class="mnemonic-img">` tag in `mnemonic_image`; `buildRadicalNoteFields` takes a params object
+- [x] `radicals.md`: the template line becomes `{{#mnemonic_image}}{{mnemonic_image}}{{/mnemonic_image}}`, the Fields line says "mnemonic picture as an `<img>` tag of a media file" (`docs/anki-decks-fields.md` lists bare names only, nothing to change there); run `bun run sync-anki-templates` (needs Anki running, ask the user if it is not) (template push deferred to migration step 5, user decision)
+- [x] add tests: `beforeEach` and `afterEach` call `resetFsMock()`, the file writes media files and registry lines that must not leak into the next file; a radical add (一, the fixture page with a picture) stores the picture and the field holds the `<img>` tag with the Anki file name; a second add of the same radical makes no request to `files.wanikani.com` (check `externalFetches`) but still calls `storeMediaFile`; a second add of a radical with an SVG (8766) makes no request to `files.wanikani.com`; the SVG 500 test expects "Failed to download media (500)" and the URL
+- [x] update the snapshot scoped: `bun test src/server/__tests__/api.add-to-anki.test.ts --update-snapshots`, then check the `.snap` diff: the "add radical (一, id=1)" action list gains `deckNamesAndIds` and a `storeMediaFile`, nothing else changes
+- [x] run `bun test`, `bun run tsc` and lint - must pass before task 6
 
 ### Task 6: Route the reading clips and the sentence clip through the cache
 

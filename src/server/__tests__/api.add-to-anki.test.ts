@@ -9,13 +9,22 @@ import {
   installFetchInterceptor,
   resetFetchInterceptor,
   ankiCalls,
+  externalFetches,
   setAnkiError,
   setAnkiResponse,
   setMediaStatus,
   setModelFields,
 } from "@/test/fetch-interceptor.ts";
-import { ensureRepositoryInitialized, resetRandom } from "@/test/preload.ts";
+import {
+  ensureRepositoryInitialized,
+  resetFsMock,
+  resetRandom,
+  writeCalls,
+} from "@/test/preload.ts";
 import { VOCABULARY_MODEL_NAME, VOCABULARY_EXPECTED_FIELDS } from "@/model/anki-models.ts";
+import { getRadicalSvgUrl } from "@/model/radical-utils.ts";
+import { MEDIA_ROOT_PATH } from "@server/repository/media-cache.ts";
+import { getRadical } from "@server/repository/radical.ts";
 import { api } from "../api.ts";
 
 process.env.AZURE_TTS_KEY = "test-key";
@@ -27,10 +36,13 @@ beforeAll(async () => {
   await ensureRepositoryInitialized();
   await loadStudyMaterialFixture();
 });
+// An add writes media files and registry lines, which must not reach the next test or file
 beforeEach(() => {
   resetFetchInterceptor();
   resetRandom();
+  resetFsMock();
 });
+afterEach(resetFsMock);
 
 type AddBody = { id: number; type: string; sync?: boolean };
 
@@ -66,11 +78,18 @@ function findVocabularyFields(action: string, characters: string): Record<string
   return findNoteFields({ action, field: "characters", value: characters });
 }
 
-function storedAudioFilenames(): string[] {
+function storedMediaFilenames(): string[] {
   return ankiCalls
     .filter((c) => c.action === "storeMediaFile")
-    .map((c) => String(c.params.filename))
-    .filter((name) => name.endsWith(".mp3"));
+    .map((c) => String(c.params.filename));
+}
+
+function storedAudioFilenames(): string[] {
+  return storedMediaFilenames().filter((name) => name.endsWith(".mp3"));
+}
+
+function cachedMediaPaths(): string[] {
+  return writeCalls.map((call) => call.path).filter((path) => path.startsWith(MEDIA_ROOT_PATH));
 }
 
 describe("add-to-anki API", () => {
@@ -201,11 +220,14 @@ describe("add-to-anki API", () => {
     expect(result.error).toContain("Failed to download audio (404)");
   });
 
-  test("failed SVG download returns error", async () => {
+  test("failed SVG download returns error and caches nothing", async () => {
+    const radical = await getRadical(8766);
+    const svgUrl = radical && getRadicalSvgUrl(radical);
     setMediaStatus(500);
     const result = await addToAnkiJson({ id: 8766, type: "radical" });
     expect(result.ok).toBe(false);
-    expect(result.error).toContain("Failed to download SVG (500)");
+    expect(result.error).toBe(`Failed to download media (500): ${svgUrl}`);
+    expect(cachedMediaPaths()).toEqual([]);
   });
 
   test("add verb vocabulary (入る, id=2480) fills masu_form", async () => {
@@ -291,6 +313,64 @@ describe("add-to-anki API", () => {
     setAnkiError({ action: "sync", message: "auth not configured" });
     const response = await api.request("/anki-sync", { method: "POST" });
     expect(await response.json()).toEqual({ ok: false, error: "auth not configured" });
+  });
+});
+
+describe("media cache", () => {
+  test("a radical add stores the mnemonic picture as an <img> tag (一)", async () => {
+    const result = await addToAnkiJson({ id: 1, type: "radical" });
+    expect(result.ok).toBe(true);
+
+    const [ankiFilename] = storedMediaFilenames();
+    expect(storedMediaFilenames()).toMatchInlineSnapshot(`
+      [
+        "1001_ground_mnemonic_f09eea31.svg",
+      ]
+    `);
+    expect(cachedMediaPaths()).toMatchInlineSnapshot(`
+      [
+        "./data/userdata/media/mnemonics/ground_mnemonic_f09eea31.svg",
+      ]
+    `);
+    const fields = findNoteFields({ action: "addNote", field: "character", value: "一" });
+    expect(fields.mnemonic_image).toBe(`<img src="${ankiFilename}" class="mnemonic-img">`);
+  });
+
+  test("a second radical add reads the mnemonic picture from disk (一)", async () => {
+    await addToAnkiJson({ id: 1, type: "radical" });
+    const firstStored = storedMediaFilenames();
+    resetFetchInterceptor();
+
+    const result = await addToAnkiJson({ id: 1, type: "radical" });
+    expect(result.ok).toBe(true);
+    expect(externalFetches).toEqual([]);
+    expect(storedMediaFilenames()).toEqual(firstStored);
+  });
+
+  test("a second radical add reads the SVG from disk (8766)", async () => {
+    await addToAnkiJson({ id: 8766, type: "radical" });
+    expect(cachedMediaPaths()).toMatchInlineSnapshot(`
+      [
+        "./data/userdata/media/radicals/beggar_ee00622d.svg",
+      ]
+    `);
+    resetFetchInterceptor();
+
+    const result = await addToAnkiJson({ id: 8766, type: "radical" });
+    expect(result.ok).toBe(true);
+    expect(externalFetches).toEqual([]);
+    const [ankiFilename] = storedMediaFilenames();
+    expect(storedMediaFilenames()).toMatchInlineSnapshot(`
+      [
+        "1001_beggar_ee00622d.svg",
+      ]
+    `);
+    const fields = findNoteFields({
+      action: "addNote",
+      field: "character",
+      value: `<img src="${ankiFilename}">`,
+    });
+    expect(fields.primary_name).toBe("Beggar");
   });
 });
 

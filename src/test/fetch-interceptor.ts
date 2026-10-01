@@ -70,6 +70,7 @@ export function installFetchInterceptor() {
     if (url.includes("files.wanikani.com")) {
       return new Response(mediaStatus === 200 ? "<svg></svg>" : "Not Found", {
         status: mediaStatus,
+        headers: { "Content-Type": "image/svg+xml" },
       });
     }
 

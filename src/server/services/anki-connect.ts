@@ -34,6 +34,12 @@ import {
   VOCABULARY_EXPECTED_FIELDS,
 } from "@/model/anki-models.ts";
 import { generateSentenceAudio } from "@/server/services/azure-tts.ts";
+import {
+  extensionOfContentType,
+  getOrFetchMedia,
+  type FetchedMedia,
+  type MediaFolder,
+} from "@/server/repository/media-cache.ts";
 import { shortHash } from "@/server/utils/hash.ts";
 
 const ANKI_CONNECT_URL = "http://127.0.0.1:8765";
@@ -154,24 +160,36 @@ async function validateModelFields(modelName: string, expectedFields: string[]):
   }
 }
 
-async function storeMediaFile(filename: string, data: string): Promise<void> {
-  const sizeKb = ((data.length * 0.75) / 1024).toFixed(1);
+async function storeMediaFile(filename: string, data: Buffer): Promise<void> {
+  const sizeKb = (data.length / 1024).toFixed(1);
   console.log(`[Anki] Storing media: ${filename} (${sizeKb} KB)`);
-  await ankiInvoke("storeMediaFile", { filename, data });
+  await ankiInvoke("storeMediaFile", { filename, data: data.toString("base64") });
 }
 
-async function fetchAndStoreSvg(url: string, filename: string): Promise<void> {
-  console.log(`[Anki] Downloading SVG: ${url}`);
+/** One cached file serves every deck, so only the Anki name carries the deck id. */
+async function storeCachedMedia(params: {
+  deckId: number;
+  folder: MediaFolder;
+  nameWithoutExtension: string;
+  fetch: () => Promise<FetchedMedia>;
+}): Promise<string> {
+  const { deckId, ...media } = params;
+  const { fileName, data } = await getOrFetchMedia(media);
+  const ankiFileName = `${deckId}_${fileName}`;
+  await storeMediaFile(ankiFileName, data);
+  return ankiFileName;
+}
+
+async function downloadMedia(params: { url: string; extension?: string }): Promise<FetchedMedia> {
+  const { url } = params;
+  console.log(`[Anki] Downloading media: ${url}`);
   const response = await fetch(url);
   if (!response.ok) {
-    throw createAnkiError(
-      `Failed to download SVG (${response.status}): ${url}`,
-      "fetchAndStoreSvg"
-    );
+    throw createAnkiError(`Failed to download media (${response.status}): ${url}`, "downloadMedia");
   }
-  const svgText = await response.text();
-  const base64 = Buffer.from(svgText, "utf-8").toString("base64");
-  await storeMediaFile(filename, base64);
+  const extension =
+    params.extension ?? extensionOfContentType(response.headers.get("content-type"));
+  return { data: Buffer.from(await response.arrayBuffer()), extension };
 }
 
 async function findNote(
@@ -329,7 +347,12 @@ function escapeHtml(text: string): string {
 
 // === Radical ===
 
-function buildRadicalNoteFields(radical: Radical, storedSvgFilename?: string): RadicalNoteFields {
+function buildRadicalNoteFields(params: {
+  radical: Radical;
+  storedSvgFilename?: string;
+  storedMnemonicFilename?: string;
+}): RadicalNoteFields {
+  const { radical, storedSvgFilename, storedMnemonicFilename } = params;
   const primaryMeaning = getPrimaryMeaning(radical.meanings);
   const studyMaterial = mergeStudyMaterialForAnki(
     radical.studyMaterial,
@@ -345,7 +368,10 @@ function buildRadicalNoteFields(radical: Radical, storedSvgFilename?: string): R
     extra_names: getExtraMeanings(radical.meanings),
     user_synonyms: studyMaterial.meaningSynonyms.join(", "),
     mnemonic_text: styleMnemonicHtml(radical.meaningMnemonic),
-    mnemonic_image: radical.mnemonicImageUrl ?? "",
+    // Anki's Check Media deletes a file that no field references through an <img> or [sound:] tag
+    mnemonic_image: storedMnemonicFilename
+      ? `<img src="${storedMnemonicFilename}" class="mnemonic-img">`
+      : "",
     note: studyMaterial.meaningNote,
   };
 }
@@ -358,18 +384,27 @@ async function addOrUpdateRadicalCore(
 
   await validateModelFields(RADICAL_MODEL_NAME, RADICAL_EXPECTED_FIELDS);
 
+  const svgUrl = radical.characters ? undefined : getRadicalSvgUrl(radical);
+  const mnemonicImageUrl = radical.mnemonicImageUrl;
   let storedSvgFilename: string | undefined;
+  let storedMnemonicFilename: string | undefined;
 
-  if (!radical.characters) {
-    const svgUrl = getRadicalSvgUrl(radical);
+  if (svgUrl || mnemonicImageUrl) {
+    const deckId = await getDeckId(RADICAL_DECK_NAME);
     if (svgUrl) {
-      const deckId = await getDeckId(RADICAL_DECK_NAME);
-      storedSvgFilename = `${deckId}_${radical.slug}.svg`;
-      await fetchAndStoreSvg(svgUrl, storedSvgFilename);
+      storedSvgFilename = await storeRadicalSvg({ deckId, radical, svgUrl });
+    }
+    if (mnemonicImageUrl) {
+      storedMnemonicFilename = await storeCachedMedia({
+        deckId,
+        folder: "mnemonics",
+        nameWithoutExtension: `${radical.slug}_mnemonic_${shortHash(mnemonicImageUrl)}`,
+        fetch: () => downloadMedia({ url: mnemonicImageUrl }),
+      });
     }
   }
 
-  const fields = buildRadicalNoteFields(radical, storedSvgFilename);
+  const fields = buildRadicalNoteFields({ radical, storedSvgFilename, storedMnemonicFilename });
 
   const result = await addOrUpdateNote(RADICAL_DECK_NAME, RADICAL_MODEL_NAME, fields, {
     name: "primary_name",
@@ -386,6 +421,21 @@ export async function addOrUpdateRadical(radical: Radical): Promise<AnkiAddResul
     kanji: [],
     radicals: [],
   };
+}
+
+function storeRadicalSvg(params: {
+  deckId: number;
+  radical: Radical;
+  svgUrl: string;
+}): Promise<string> {
+  const { deckId, radical, svgUrl } = params;
+  return storeCachedMedia({
+    deckId,
+    folder: "radicals",
+    nameWithoutExtension: `${radical.slug}_${shortHash(svgUrl)}`,
+    // getRadicalSvgUrl picks the image/svg+xml image, so the type is known before the download
+    fetch: () => downloadMedia({ url: svgUrl, extension: "svg" }),
+  });
 }
 
 // === Kanji ===
@@ -409,8 +459,7 @@ async function buildRadicalsHtml(componentRadicals: Radical[]): Promise<string> 
       } else {
         const svgUrl = getRadicalSvgUrl(radical);
         if (svgUrl) {
-          const filename = `${deckId}_${radical.slug}.svg`;
-          await fetchAndStoreSvg(svgUrl, filename);
+          const filename = await storeRadicalSvg({ deckId, radical, svgUrl });
           characterHtml = `<img src="${filename}" class="radical-img">`;
         } else {
           characterHtml = name;
@@ -493,8 +542,7 @@ export async function addKanjiWithRadicals(kanji: Kanji): Promise<AnkiAddResult>
 // === Vocabulary ===
 
 async function storeAudioData(filename: string, audio: ArrayBuffer): Promise<void> {
-  const base64 = Buffer.from(audio).toString("base64");
-  await storeMediaFile(filename, base64);
+  await storeMediaFile(filename, Buffer.from(audio));
 }
 
 async function fetchAndStoreAudio(url: string, filename: string): Promise<void> {
