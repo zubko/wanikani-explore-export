@@ -216,14 +216,14 @@ export function createReloadingFile<T>(params: {
 - Rewrite: `src/server/repository/__tests__/mnemonic-image-fetcher.test.ts`
 - Modify: `src/server/__tests__/api.search.test.ts`
 
-- [ ] add `appendFile` to the mock (concatenate, bump the version, record a write)
-- [ ] convert the fixture to JSONL (one `{"page","image"}` line per entry, same content) and seed it under the `.jsonl` path instead of the `.json` one
-- [ ] interceptor: push every non-AnkiConnect URL to `externalFetches`, cleared in `resetFetchInterceptor`
-- [ ] rewrite `mnemonic-image-fetcher.ts`: `parseMnemonicImageLines`, one module-level reloading file and `pendingFetches`, `getMnemonicImageUrl(documentUrl)` and `loadMnemonicImageRegistry()`, append one line after a scrape and clear the pending entry after it, `fetchMnemonicImageUrl` throws on a bad status; delete the class and `createMnemonicImageFetcher`
-- [ ] `radical.ts` calls `getMnemonicImageUrl`; `data-loader.ts` drops `imageFetcher` and `saveCache`, `initRepository` awaits `loadMnemonicImageRegistry()`; delete both `await saveCache()` in `api.ts`
-- [ ] rewrite `mnemonic-image-fetcher.test.ts`, with the reset in `beforeEach` and `afterEach` because the bad-line test leaves a broken registry in the shared mock: a known page answers without a fetch; an unknown page scrapes once and appends one line (check `writeCalls`); two calls at once scrape once (the old dedup test); a failed scrape appends nothing and answers `null`; a bad status appends nothing; a failed append (`setFsError("appendFile")`) throws; a line put in with `setFileContent` from outside is found on the next call without a scrape; a bad line fails with its line number; a blank line is skipped; two identical lines for a page are fine; a URL line beats a `null` line in both orders; two different URL lines for a page fail with the page
-- [ ] `api.search.test.ts`: add `beforeEach(resetFsMock)` and `afterEach(resetFsMock)`; a search for a radical whose page is not in the fixture appends one line, a second search makes no scrape (check `externalFetches`); `radical.test.ts` needs no change, its hit and its snapshot stay
-- [ ] run `bun test`, `bun run tsc` and lint - must pass before task 4
+- [x] add `appendFile` to the mock (concatenate, bump the version, record a write)
+- [x] convert the fixture to JSONL (one `{"page","image"}` line per entry, same content) and seed it under the `.jsonl` path instead of the `.json` one
+- [x] interceptor: push every non-AnkiConnect URL to `externalFetches`, cleared in `resetFetchInterceptor`
+- [x] rewrite `mnemonic-image-fetcher.ts`: `parseMnemonicImageLines`, one module-level reloading file and `pendingFetches`, `getMnemonicImageUrl(documentUrl)` and `loadMnemonicImageRegistry()`, append one line after a scrape and clear the pending entry after it, `fetchMnemonicImageUrl` throws on a bad status; delete the class and `createMnemonicImageFetcher`
+- [x] `radical.ts` calls `getMnemonicImageUrl`; `data-loader.ts` drops `imageFetcher` and `saveCache`, `initRepository` awaits `loadMnemonicImageRegistry()`; delete both `await saveCache()` in `api.ts`
+- [x] rewrite `mnemonic-image-fetcher.test.ts`, with the reset in `beforeEach` and `afterEach` because the bad-line test leaves a broken registry in the shared mock: a known page answers without a fetch; an unknown page scrapes once and appends one line (check `writeCalls`); two calls at once scrape once (the old dedup test); a failed scrape appends nothing and answers `null`; a bad status appends nothing; a failed append (`setFsError("appendFile")`) throws; a line put in with `setFileContent` from outside is found on the next call without a scrape; a bad line fails with its line number; a blank line is skipped; two identical lines for a page are fine; a URL line beats a `null` line in both orders; two different URL lines for a page fail with the page
+- [x] `api.search.test.ts`: add `beforeEach(resetFsMock)` and `afterEach(resetFsMock)`; a search for a radical whose page is not in the fixture appends one line, a second search makes no scrape (check `externalFetches`); `radical.test.ts` needs no change, its hit and its snapshot stay
+- [x] run `bun test`, `bun run tsc` and lint - must pass before task 4
 
 ### Task 4: Add the media cache module
 

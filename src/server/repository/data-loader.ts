@@ -10,8 +10,7 @@ import type {
 } from "@/model/wanikani.ts";
 import { LOCAL_STUDY_MATERIAL_FIELDS } from "@/model/wanikani.ts";
 import { localStudyMaterialValueProblem, readingNoteProblem } from "@/model/subject-utils.ts";
-import type { MnemonicImageFetcher } from "./mnemonic-image-fetcher.ts";
-import { createMnemonicImageFetcher } from "./mnemonic-image-fetcher.ts";
+import { loadMnemonicImageRegistry } from "./mnemonic-image-fetcher.ts";
 import { isMissingFile, readJson, saveJsonAtomic } from "@server/utils/json-utils.ts";
 
 type RawVerbConjugations = Omit<VerbConjugations, "type">;
@@ -28,7 +27,6 @@ export let studyMaterials: StudyMaterial[];
 export let localStudyMaterials: Record<string, LocalStudyMaterial>;
 export let verbConjugations: Record<string, RawVerbConjugations>;
 export let sentenceReadings: Record<string, SentenceReadingEntry>;
-export let imageFetcher: MnemonicImageFetcher;
 
 export async function initRepository(): Promise<void> {
   [
@@ -40,7 +38,6 @@ export async function initRepository(): Promise<void> {
     localStudyMaterials,
     verbConjugations,
     sentenceReadings,
-    imageFetcher,
   ] = await Promise.all([
     readJson<RadicalData[]>("./data/userdata/radicals.json"),
     readJson<KanjiData[]>("./data/userdata/kanji.json"),
@@ -50,9 +47,9 @@ export async function initRepository(): Promise<void> {
     readLocalStudyMaterials(),
     readJson<Record<string, RawVerbConjugations>>("./data/verb_conjugations.json"),
     readJson<Record<string, SentenceReadingEntry>>("./data/sentence_readings.json"),
-    createMnemonicImageFetcher(),
   ]);
   checkLocalStudyMaterialSubjects(localStudyMaterials);
+  await loadMnemonicImageRegistry();
 }
 
 export function findSubjectTypeById(id: number): SubjectType | null {
@@ -82,10 +79,6 @@ export function checkLocalStudyMaterialSubjects(records: Record<string, LocalStu
 
 export function setLocalStudyMaterials(next: Record<string, LocalStudyMaterial>): void {
   localStudyMaterials = next;
-}
-
-export async function saveCache(): Promise<void> {
-  await imageFetcher.saveIfNeeded();
 }
 
 export async function readLocalStudyMaterials(): Promise<Record<string, LocalStudyMaterial>> {

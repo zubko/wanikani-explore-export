@@ -19,6 +19,8 @@ type AnkiCall = {
 type AnkiErrorOverride = { message: string; onCall?: number };
 
 export const ankiCalls: AnkiCall[] = [];
+/** Every URL fetched that is not AnkiConnect, so a test can check that a cache hit made no request. */
+export const externalFetches: string[] = [];
 
 const responseOverrides = new Map<string, unknown>();
 const errorOverrides = new Map<string, AnkiErrorOverride>();
@@ -63,6 +65,8 @@ export function installFetchInterceptor() {
       });
     }
 
+    externalFetches.push(url);
+
     if (url.includes("files.wanikani.com")) {
       return new Response(mediaStatus === 200 ? "<svg></svg>" : "Not Found", {
         status: mediaStatus,
@@ -104,6 +108,7 @@ export function setMediaStatus(status: number) {
 
 export function resetFetchInterceptor() {
   ankiCalls.length = 0;
+  externalFetches.length = 0;
   responseOverrides.clear();
   errorOverrides.clear();
   callCounts.clear();

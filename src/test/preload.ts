@@ -7,7 +7,7 @@ import { installDom } from "./dom.ts";
 // react-dom reads the DOM globals when it loads, so this must run before any test file imports it
 installDom();
 
-type FsOp = "readFile" | "writeFile" | "rename" | "unlink" | "stat";
+type FsOp = "readFile" | "writeFile" | "appendFile" | "rename" | "unlink" | "stat";
 
 type FileData = string | Buffer;
 
@@ -16,8 +16,8 @@ type MockFile = { data: FileData; version: number };
 // Checked-in fixtures under the real paths, so no test depends on user-specific state
 const SEEDED_FILES = [
   {
-    path: "./data/userdata/mnemonic-images.json",
-    fixturePath: "src/test/fixtures/mnemonic-images.json",
+    path: "./data/userdata/mnemonic-images.jsonl",
+    fixturePath: "src/test/fixtures/mnemonic-images.jsonl",
   },
   {
     path: "./data/userdata/study_materials_extra.json",
@@ -96,6 +96,12 @@ mock.module("fs/promises", () => ({
   writeFile: async (path: string, data: FileData) => {
     throwWhenSet("writeFile");
     putFile(path, data);
+    writeCalls.push({ path: String(path), data });
+  },
+  appendFile: async (path: string, data: FileData) => {
+    throwWhenSet("appendFile");
+    const current = files.get(fileKey(path))?.data ?? "";
+    putFile(path, Buffer.concat([Buffer.from(current), Buffer.from(data)]));
     writeCalls.push({ path: String(path), data });
   },
   rename: async (from: string, to: string) => {

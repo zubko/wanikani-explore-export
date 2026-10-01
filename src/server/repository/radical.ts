@@ -6,16 +6,11 @@ import {
   buildSubjectReferences,
   getPrimaryMeaning,
 } from "@/model/subject-utils.ts";
-import {
-  radicals,
-  kanji,
-  studyMaterials,
-  localStudyMaterials,
-  imageFetcher,
-} from "./data-loader.ts";
+import { radicals, kanji, studyMaterials, localStudyMaterials } from "./data-loader.ts";
+import { getMnemonicImageUrl } from "./mnemonic-image-fetcher.ts";
 
 async function buildRadical(data: RadicalData): Promise<Radical> {
-  const mnemonicImageUrl = await imageFetcher.get(data.data.document_url);
+  const mnemonicImageUrl = await getMnemonicImageUrl(data.data.document_url);
 
   const foundInKanji = buildSubjectReferences(kanji, data.data.amalgamation_subject_ids);
 

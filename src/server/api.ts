@@ -27,7 +27,6 @@ import {
   vocabulary as vocabularyData,
   kanaVocabulary as kanaVocabularyData,
 } from "./repository/data-loader.ts";
-import { saveCache } from "./repository/data-loader.ts";
 import { findSubjectTypeById } from "./repository/data-loader.ts";
 import { upsertLocalStudyMaterial } from "./repository/study-material.ts";
 import {
@@ -148,8 +147,6 @@ const app = new Hono()
       }
     }
 
-    await saveCache();
-
     if (!result) {
       console.log(`[API] Search ${type} "${q}" — not found`);
       return c.json({ found: false as const }, 404);
@@ -228,7 +225,6 @@ const app = new Hono()
         await syncAnkiWeb();
       }
       const result = await addSubjectToAnki(subject);
-      await saveCache();
       if (sync) await syncAnkiWeb();
       console.log(`[API] Add to Anki: ${type} id=${id} — done`);
       return c.json({ ok: true as const, data: result });

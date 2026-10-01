@@ -1,11 +1,19 @@
-import { describe, test, expect, beforeAll, beforeEach } from "bun:test";
-import { installFetchInterceptor, resetFetchInterceptor } from "@/test/fetch-interceptor.ts";
-import { ensureRepositoryInitialized } from "@/test/preload.ts";
+import { describe, test, expect, beforeAll, beforeEach, afterEach } from "bun:test";
+import {
+  externalFetches,
+  installFetchInterceptor,
+  resetFetchInterceptor,
+} from "@/test/fetch-interceptor.ts";
+import { ensureRepositoryInitialized, resetFsMock, writeCalls } from "@/test/preload.ts";
+import { MNEMONIC_IMAGES_PATH } from "../repository/mnemonic-image-fetcher.ts";
 import { api } from "../api.ts";
 
 installFetchInterceptor();
 beforeAll(() => ensureRepositoryInitialized());
 beforeEach(resetFetchInterceptor);
+// Earlier tests and files may already have appended a page to the registry
+beforeEach(resetFsMock);
+afterEach(resetFsMock);
 
 async function searchApi(params: string) {
   return api.request(`/search?${params}`);
@@ -70,6 +78,23 @@ describe("search API", () => {
     const result = await searchJson("type=radical&q=ground");
     expect(result.found).toBe(true);
     expect(result.data.id).toBe(1);
+  });
+
+  test("a radical page not in the registry is scraped once and appended (barb)", async () => {
+    const page = "https://www.wanikani.com/radicals/barb";
+
+    const result = await searchJson("type=radical&q=barb");
+    expect(result.data.documentUrl).toBe(page);
+    expect(result.data.mnemonicImageUrl).toBeNull();
+    expect(externalFetches).toEqual([page]);
+    expect(writeCalls).toEqual([
+      { path: MNEMONIC_IMAGES_PATH, data: JSON.stringify({ page, image: null }) + "\n" },
+    ]);
+
+    resetFetchInterceptor();
+    await searchJson("type=radical&q=barb");
+    expect(externalFetches).toEqual([]);
+    expect(writeCalls).toHaveLength(1);
   });
 
   test("find vocabulary by characters (毎晩)", async () => {
