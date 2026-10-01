@@ -25,7 +25,7 @@ The box is a second Anki client next to the usual one. Both sync with AnkiWeb, w
 - sudo for `apt` and `loginctl`, nothing else
 - Tailscale on the box and the phone, and a firewall that admits only Tailscale, for example ufw with `default deny incoming`, `allow in on tailscale0`, `allow 41641/udp`
 - An AnkiWeb account that already holds the collection
-- Node 24 and Bun in `~/.local/bin`, and this repo checked out with `data/userdata/` cloned into it
+- Node 24 and Bun in `~/.local/bin`, and this repo checked out with `data/userdata/` cloned into it. Run `git -C data/userdata config merge.ours.driver true` once in that clone, so a media file that both machines added merges with no conflict, see "Two machines" in `data/userdata/README.md`
 
 ## Install
 

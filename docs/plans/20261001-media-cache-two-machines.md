@@ -306,10 +306,10 @@ A radical added on its own from the web UI, with no kanji of it in the deck, is 
 - Modify: `data/userdata/README.md`
 - Modify: `docs/hosting-on-linux.md`
 
-- [ ] add `.gitattributes` with `*.jsonl merge=union` and `media/** merge=ours`
-- [ ] README: replace the `mnemonic-images.json` row with `mnemonic-images.jsonl`, add a `media/` row with the four subfolders, add a "Two machines" section with the config line `git config merge.ours.driver true` and why it is needed
-- [ ] hosting doc: add the config line to the data repo bullet in "What you need"
-- [ ] no test for docs; `bunx prettier --write docs/hosting-on-linux.md` (`bun run format` covers only `src` and `scripts`, and prettier skips `data/userdata/`), line up the README table by hand
+- [x] add `.gitattributes` with `*.jsonl merge=union` and `media/** merge=ours`
+- [x] README: replace the `mnemonic-images.json` row with `mnemonic-images.jsonl`, add a `media/` row with the four subfolders, add a "Two machines" section with the config line `git config merge.ours.driver true` and why it is needed
+- [x] hosting doc: add the config line to the data repo bullet in "What you need"
+- [x] no test for docs; `bunx prettier --write docs/hosting-on-linux.md` (`bun run format` covers only `src` and `scripts`, and prettier skips `data/userdata/`), line up the README table by hand (`data/userdata/` files left uncommitted for migration step 3, run note)
 
 ### Task 9: Reread the local study materials on change
 
