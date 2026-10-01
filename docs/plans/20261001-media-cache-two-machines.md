@@ -193,13 +193,14 @@ export function createReloadingFile<T>(params: {
 - Create: `src/server/utils/__tests__/reloading-file.test.ts`
 - Modify: `src/test/preload.ts`
 - Modify: `src/test/study-material-fixture.ts`, `src/server/repository/__tests__/study-material.test.ts`, `src/server/repository/__tests__/mnemonic-image-fetcher.test.ts` (`String(data)`)
+- ➕ Modify: `src/server/utils/json-utils.ts`, `src/server/repository/data-loader.ts` (`isMissingFile` moved to `json-utils.ts`, so the reloading file and the later media cache share it)
 
-- [ ] preload: seed the two fixtures into the map through `setFileContent` (the registry still under its old `.json` path in this task), drop the two redirects, normalize the map keys and keep `writeCalls[].path` raw, add the global version counter and `stat`, let `writeFile`, `rename` and `setFileContent` bump the version, `FsOp` and `resetFsMock` cover `stat`
-- [ ] preload: `files` and `writeCalls` hold `string | Buffer`, `readFile` without encoding returns a `Buffer`; wrap the three `.data` readers in `String()`
-- [ ] `json-utils.test.ts`: add one `writeFileAtomic` test with `Buffer` data, now that the mock keeps the bytes
-- [ ] create `createReloadingFile({ path, parse })` with `get()` as described in Technical Details
-- [ ] write tests, with `resetFsMock` in `beforeEach` and `afterEach`: first `get()` reads and parses; second `get()` with the same stat does not read again (`setFsError("readFile")` after the first call); `setFileContent` from outside makes the next `get()` return the new value; a missing file gives `parse(null)`; a stat error other than `ENOENT` throws; a `parse` error is thrown on every `get()` and a fixed file is picked up by the next one
-- [ ] run `bun test`, `bun run tsc` and lint - must pass before task 3
+- [x] preload: seed the two fixtures into the map through `setFileContent` (the registry still under its old `.json` path in this task), drop the two redirects, normalize the map keys and keep `writeCalls[].path` raw, add the global version counter and `stat`, let `writeFile`, `rename` and `setFileContent` bump the version, `FsOp` and `resetFsMock` cover `stat`
+- [x] preload: `files` and `writeCalls` hold `string | Buffer`, `readFile` without encoding returns a `Buffer`; wrap the three `.data` readers in `String()`
+- [x] `json-utils.test.ts`: add one `writeFileAtomic` test with `Buffer` data, now that the mock keeps the bytes
+- [x] create `createReloadingFile({ path, parse })` with `get()` as described in Technical Details
+- [x] write tests, with `resetFsMock` in `beforeEach` and `afterEach`: first `get()` reads and parses; second `get()` with the same stat does not read again (`setFsError("readFile")` after the first call); `setFileContent` from outside makes the next `get()` return the new value; a missing file gives `parse(null)`; a stat error other than `ENOENT` throws; a `parse` error is thrown on every `get()` and a fixed file is picked up by the next one
+- [x] run `bun test`, `bun run tsc` and lint - must pass before task 3
 
 ### Task 3: Turn the mnemonic image registry into an append-only JSONL file
 

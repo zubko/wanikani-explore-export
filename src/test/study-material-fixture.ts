@@ -35,5 +35,5 @@ export function setStudyMaterialFile(file: Record<string, LocalStudyMaterial>): 
 export function lastWrite(): Record<string, LocalStudyMaterial> {
   const call = writeCalls.at(-1);
   if (!call) throw new Error("no write recorded");
-  return JSON.parse(call.data) as Record<string, LocalStudyMaterial>;
+  return JSON.parse(String(call.data)) as Record<string, LocalStudyMaterial>;
 }

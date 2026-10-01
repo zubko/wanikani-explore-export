@@ -137,7 +137,7 @@ describe("upsertLocalStudyMaterial", () => {
 
     expect(writeCalls).toHaveLength(1);
     expect(writeCalls[0]!.path).toBe(LOCAL_STUDY_MATERIALS_PATH);
-    expect(writeCalls[0]!.data.endsWith("\n")).toBe(true);
+    expect(String(writeCalls[0]!.data).endsWith("\n")).toBe(true);
     expect(writeCalls.some((call) => call.path.endsWith(".tmp"))).toBe(false);
   });
 });

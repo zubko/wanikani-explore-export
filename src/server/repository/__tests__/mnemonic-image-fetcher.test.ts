@@ -94,7 +94,7 @@ describe("MnemonicImageFetcher", () => {
 
     expect(mockState.writeCalls).toHaveLength(1);
     expect(mockState.writeCalls[0]!.path).toBe("./data/userdata/mnemonic-images.json");
-    const written = JSON.parse(mockState.writeCalls[0]!.data);
+    const written = JSON.parse(String(mockState.writeCalls[0]!.data));
     expect(written).toEqual({ "https://example.com/doc": "https://img.png" });
   });
 

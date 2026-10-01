@@ -12,7 +12,7 @@ import { LOCAL_STUDY_MATERIAL_FIELDS } from "@/model/wanikani.ts";
 import { localStudyMaterialValueProblem, readingNoteProblem } from "@/model/subject-utils.ts";
 import type { MnemonicImageFetcher } from "./mnemonic-image-fetcher.ts";
 import { createMnemonicImageFetcher } from "./mnemonic-image-fetcher.ts";
-import { readJson, saveJsonAtomic } from "@server/utils/json-utils.ts";
+import { isMissingFile, readJson, saveJsonAtomic } from "@server/utils/json-utils.ts";
 
 type RawVerbConjugations = Omit<VerbConjugations, "type">;
 
@@ -145,8 +145,4 @@ function invalidFile(problem: string): Error {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function isMissingFile(error: unknown): boolean {
-  return isRecord(error) && error.code === "ENOENT";
 }

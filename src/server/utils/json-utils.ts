@@ -21,3 +21,7 @@ export async function writeFileAtomic(path: string, data: string | Buffer): Prom
     throw error;
   }
 }
+
+export function isMissingFile(error: unknown): boolean {
+  return typeof error === "object" && error !== null && "code" in error && error.code === "ENOENT";
+}
