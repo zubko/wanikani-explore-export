@@ -1,13 +1,13 @@
 import { mock } from "bun:test";
 import { readFileSync } from "fs";
 import { readFile } from "fs/promises";
-import { normalize } from "path";
+import { basename, dirname, normalize } from "path";
 import { installDom } from "./dom.ts";
 
 // react-dom reads the DOM globals when it loads, so this must run before any test file imports it
 installDom();
 
-type FsOp = "readFile" | "writeFile" | "appendFile" | "rename" | "unlink" | "stat";
+type FsOp = "readFile" | "writeFile" | "appendFile" | "rename" | "unlink" | "stat" | "readdir";
 
 type FileData = string | Buffer;
 
@@ -24,6 +24,9 @@ const SEEDED_FILES = [
     fixturePath: "src/test/fixtures/study_materials_extra.json",
   },
 ];
+
+// A media file that is not in the mock must read as missing, never as the user's real file
+const MEDIA_FOLDER = normalize("./data/userdata/media/");
 
 export const writeCalls: { path: string; data: FileData }[] = [];
 
@@ -88,7 +91,10 @@ mock.module("fs/promises", () => ({
   ) => {
     throwWhenSet("readFile");
     const file = files.get(fileKey(path));
-    if (file === undefined) return realReadFile(path, options);
+    if (file === undefined) {
+      if (fileKey(path).startsWith(MEDIA_FOLDER)) throw missingFileError("readFile", path);
+      return realReadFile(path, options);
+    }
     const encoding = typeof options === "string" ? options : options?.encoding;
     const bytes = Buffer.from(file.data);
     return encoding ? bytes.toString(encoding) : bytes;
@@ -127,6 +133,16 @@ mock.module("fs/promises", () => ({
     if (file === undefined) throw missingFileError("stat", path);
     return { mtimeMs: file.version, size: Buffer.byteLength(file.data) };
   },
+  readdir: async (path: string) => {
+    throwWhenSet("readdir");
+    const folder = fileKey(path);
+    const names = [...files.keys()]
+      .filter((key) => dirname(key) === folder)
+      .map((key) => basename(key));
+    if (names.length === 0) throw missingFileError("readdir", path);
+    return names;
+  },
+  mkdir: async () => {},
 }));
 
 const RANDOM_SEED = 0.42;

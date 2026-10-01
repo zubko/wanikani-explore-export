@@ -233,11 +233,11 @@ export function createReloadingFile<T>(params: {
 - Create: `src/server/repository/__tests__/media-cache.test.ts`
 - Modify: `src/test/preload.ts`
 
-- [ ] add `readdir` and the no-op `mkdir` to the mock; a `readFile` under `data/userdata/media/` never falls through to the real disk
-- [ ] create `getOrFetchMedia` and `extensionOfContentType` in `src/server/repository/media-cache.ts` as described in Technical Details, with the `[Media]` log lines
-- [ ] write tests, with `resetFsMock` in `beforeEach` and `afterEach`: a miss calls `fetch` once and the file shows in `writeCalls` under the real path with no temp entry left; a second call for the same name is a hit, does not call `fetch` and returns the same bytes; a `.tmp` file next to the name is not a hit; two files with the same name and different extensions throw; a `writeFile` error leaves no temp entry and throws; a `readFile` error on a hit throws and does not call `fetch`
-- [ ] write tests for `extensionOfContentType`: the four known types, a `; charset=utf-8` suffix, an unknown type and a `null` header throw
-- [ ] run `bun test`, `bun run tsc` and lint - must pass before task 5
+- [x] add `readdir` and the no-op `mkdir` to the mock; a `readFile` under `data/userdata/media/` never falls through to the real disk
+- [x] create `getOrFetchMedia` and `extensionOfContentType` in `src/server/repository/media-cache.ts` as described in Technical Details, with the `[Media]` log lines
+- [x] write tests, with `resetFsMock` in `beforeEach` and `afterEach`: a miss calls `fetch` once and the file shows in `writeCalls` under the real path with no temp entry left; a second call for the same name is a hit, does not call `fetch` and returns the same bytes; a `.tmp` file next to the name is not a hit; two files with the same name and different extensions throw; a `writeFile` error leaves no temp entry and throws; a `readFile` error on a hit throws and does not call `fetch`
+- [x] write tests for `extensionOfContentType`: the four known types, a `; charset=utf-8` suffix, an unknown type and a `null` header throw
+- [x] run `bun test`, `bun run tsc` and lint - must pass before task 5
 
 ### Task 5: Route the radical SVG and the mnemonic picture through the cache
 
