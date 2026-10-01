@@ -21,7 +21,7 @@ The box is a second Anki client next to the usual one. Both sync with AnkiWeb, w
 
 ## What you need
 
-- Debian 12+ or Ubuntu 22.04+ on x86_64, Anki needs glibc 2.35+. About 1 GB of free RAM for Anki and its WebEngine helpers, 1 GB of disk
+- Debian 12+ or Ubuntu 22.04+ on x86_64, Anki needs glibc 2.35+. About 1 GB of free RAM for Anki and its WebEngine helpers: Anki starts at about 250 MB and grows with every note written until the nightly restart, see "Things that bite". 1 GB of disk
 - sudo for `apt` and `loginctl`, nothing else
 - Tailscale on the box and the phone, and a firewall that admits only Tailscale, for example ufw with `default deny incoming`, `allow in on tailscale0`, `allow 41641/udp`
 - An AnkiWeb account that already holds the collection
@@ -60,11 +60,11 @@ Steps marked **root** need sudo. An AI agent can do the rest.
    cp -r /tmp/anki-connect/plugin ~/.local/share/Anki2/addons21/AnkiConnect
    ```
 
-5. Copy the three unit files below to `~/.config/systemd/user/`, then:
+5. Copy the five unit files below to `~/.config/systemd/user/`, then:
 
    ```bash
    systemctl --user daemon-reload
-   systemctl --user enable --now xvfb-anki anki
+   systemctl --user enable --now xvfb-anki anki anki-restart.timer
    ```
 
 6. A VNC password, 8 characters at most, the protocol ignores the rest. macOS Screen Sharing refuses a server without one:
@@ -121,6 +121,28 @@ RestartSec=5
 WantedBy=default.target
 ```
 
+`anki-restart.service` and `anki-restart.timer`. They restart Anki every night at 04:00 to free the memory it leaks, see "Things that bite". `try-restart` leaves a stopped Anki stopped:
+
+```ini
+[Unit]
+Description=Restart headless Anki to free the memory its web views leak
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/systemctl --user try-restart anki.service
+```
+
+```ini
+[Unit]
+Description=Restart headless Anki every night at 04:00
+
+[Timer]
+OnCalendar=*-*-* 04:00:00
+
+[Install]
+WantedBy=timers.target
+```
+
 `anki-vnc.service`. Not enabled, started by hand. All three IPv6 flags are needed, without them x11vnc also listens on `[::]:5900`, every IPv6 address of the box:
 
 ```ini
@@ -155,8 +177,9 @@ systemctl --user restart anki               # restart Anki alone
 systemctl --user stop anki                  # stop Anki, the display keeps running
 systemctl --user start xvfb-anki anki       # bring both back
 systemctl --user start anki-vnc             # open VNC for an hour
+systemctl --user list-timers anki-restart   # when the next nightly restart runs
 journalctl --user -u anki -f                # follow Anki's log
-free -m                                     # Anki takes about 570 MB
+free -m                                     # Anki starts at about 250 MB, then grows
 ```
 
 Stop `anki` before you stop or restart `xvfb-anki`. Stopping the display kills Anki mid-write, which once corrupted `prefs21.db`.
@@ -167,6 +190,10 @@ Stop `anki` before you stop or restart `xvfb-anki`. Stopping the display kills A
 - **Nothing listens on 8765** while Anki runs: a dialog waits on the hidden screen, the language dialog on the first run, an update or sync-conflict dialog later. Look with VNC or a screenshot.
 - **`sync` answers "auth not configured"**: the profile is not logged in to AnkiWeb. Log in over VNC, since Anki 24.11 an add-on cannot do it with a password.
 - **`sync` answers "Sync status ... not one of"**: a one-way sync is required, usually after `bun run sync-anki-fields` changed the note types. Open VNC, click Sync and choose the direction. Until then every add fails at its first step, before anything is written.
+- **Anki's memory grows with every note written** and never shrinks. AnkiConnect's `addNote` and `updateNoteFields` call the obsolete `requireReset()`, the journal shows a stack trace and `requireReset() is obsolete` each time. That redraws the main window, and every redraw leaves about 4.5 MB in a QtWebEngine renderer. The memory is private heap, the kernel can only swap it out. Measured on 2026-10-01: after 1 day 19 hours and 142 writes Anki held 1.45 GB, a minute of idling gave nothing back, a restart brought it to about 220 MB. A word add writes the word and refreshes its kanji and radicals, one redraw per note.
+  - Current solution: `anki-restart.timer` restarts Anki every night at 04:00. Anki closes cleanly on SIGTERM. An add that runs at that moment fails, so add again. If the box gets short of RAM during the day, run `systemctl --user restart anki`.
+  - Do not add `MemoryMax` to `anki.service` instead. Hitting it kills Anki mid-write, the same way stopping the display did when it corrupted `prefs21.db`.
+  - A Qt platform with no display does not help. Anki runs with `QT_QPA_PLATFORM=offscreen` or `minimal` and no X server, AnkiConnect works, but it leaks just as much per write, and there is no screen left for VNC. Tested 2026-10-01.
 - **VNC shows no password field**, or the client refuses: the unit runs with `-rfbauth`, the client must send the stored password.
 - **Upgrading Anki**: unpack the new tarball next to the old one, move the `~/opt/anki` symlink, `systemctl --user restart anki`, check the version with the curl call above.
 
