@@ -337,12 +337,12 @@ A radical added on its own from the web UI, with no kanji of it in the deck, is 
 
 ### Task 10: Verify acceptance criteria
 
-- [ ] a radical add, a kanji add and a vocabulary add each hit the cache on the second run and make no external request
-- [ ] a page scraped on this machine is one appended line, a page pulled from the other machine needs no scrape
-- [ ] the file names on disk carry no deck id, the Anki names do
-- [ ] a failed scrape or a failed download writes nothing
-- [ ] run full test suite: `bun test`
-- [ ] run `bun run tsc` and `bun run lint:fix`
+- [x] a radical add, a kanji add and a vocabulary add each hit the cache on the second run and make no external request (verified by tests, not the real app: `api.add-to-anki.test.ts` "a second radical add reads the mnemonic picture from disk (一)", "a second radical add reads the SVG from disk (8766)", the new "a second kanji add reads every file from disk (写)", "a second add reads every clip from disk (毎晩)")
+- [x] a page scraped on this machine is one appended line, a page pulled from the other machine needs no scrape (`mnemonic-image-fetcher.test.ts` "an unknown page is scraped once and appended as one line", "a line pulled from the other machine is found without a scrape"; `api.search.test.ts` "a radical page not in the registry is scraped once and appended (barb)")
+- [x] the file names on disk carry no deck id, the Anki names do (`api.add-to-anki.test.ts` snapshots of `cachedMediaPaths()` and `storedMediaFilenames()` for 一, 8766, 写 and 毎晩; 写 shows one cached SVG pushed as `1001_` and `1002_`)
+- [x] a failed scrape or a failed download writes nothing (`mnemonic-image-fetcher.test.ts` "a failed scrape appends nothing, answers null and is retried", "a bad status appends nothing and answers null"; `api.add-to-anki.test.ts` "failed audio download returns error and caches nothing", "failed SVG download returns error and caches nothing"; `media-cache.test.ts` "a failed fetch writes nothing and throws")
+- [x] run full test suite: `bun test`
+- [x] run `bun run tsc` and `bun run lint:fix`
 
 ### Task 11: [Final] Update documentation
 

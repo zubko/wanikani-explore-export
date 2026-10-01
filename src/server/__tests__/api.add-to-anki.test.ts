@@ -367,6 +367,31 @@ describe("media cache", () => {
     });
     expect(fields.primary_name).toBe("Beggar");
   });
+
+  test("a second kanji add reads every file from disk (写)", async () => {
+    const first = await addToAnkiJson({ id: 531, type: "kanji" });
+    expect(first.ok).toBe(true);
+    expect(cachedMediaPaths()).toMatchInlineSnapshot(`
+      [
+        "./data/userdata/media/radicals/beggar_ee00622d.svg",
+        "./data/userdata/media/mnemonics/ground_mnemonic_f09eea31.svg",
+      ]
+    `);
+    expect(storedMediaFilenames()).toMatchInlineSnapshot(`
+      [
+        "1001_beggar_ee00622d.svg",
+        "1001_ground_mnemonic_f09eea31.svg",
+        "1002_beggar_ee00622d.svg",
+      ]
+    `);
+    const firstStored = storedMediaFilenames();
+    resetFetchInterceptor();
+
+    const result = await addToAnkiJson({ id: 531, type: "kanji" });
+    expect(result.ok).toBe(true);
+    expect(externalFetches).toEqual([]);
+    expect(storedMediaFilenames()).toEqual(firstStored);
+  });
 });
 
 describe("media cache for a word", () => {
