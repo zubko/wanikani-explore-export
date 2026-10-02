@@ -1,9 +1,7 @@
-import { readFile, stat } from "fs/promises";
-import { isMissingFile } from "./file-utils.ts";
+import { readFile } from "fs/promises";
+import { MISSING_FILE_VERSION, readFileVersion } from "./file-utils.ts";
 
 type ReloadingFile<T> = { get: () => Promise<T> };
-
-const MISSING_FILE_VERSION = "missing";
 
 /**
  * Reads the file again when its inode, mtime or size changed, because the other machine may change
@@ -28,16 +26,4 @@ export function createReloadingFile<T>(params: {
   }
 
   return { get };
-}
-
-async function readFileVersion(path: string): Promise<string> {
-  try {
-    const { ino, mtimeMs, size } = await stat(path);
-    // The mtime can stay the same within one clock tick, but every atomic save and every git
-    // checkout gives the file a new inode
-    return `${ino}:${mtimeMs}:${size}`;
-  } catch (error) {
-    if (isMissingFile(error)) return MISSING_FILE_VERSION;
-    throw error;
-  }
 }

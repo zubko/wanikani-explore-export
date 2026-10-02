@@ -1,7 +1,7 @@
 import { describe, test, expect, beforeAll, beforeEach, afterEach } from "bun:test";
 import { unlink } from "fs/promises";
 import type { LocalStudyMaterial } from "@/model/wanikani.ts";
-import { writeCalls, resetFsMock, setFileContent, setFsError } from "@/test/preload.ts";
+import { holdFsOp, writeCalls, resetFsMock, setFileContent, setFsError } from "@/test/preload.ts";
 import {
   lastWrite,
   setStudyMaterialFile,
@@ -10,7 +10,7 @@ import {
 import { findSubjectTypeById, getLocalStudyMaterials } from "../data-loader.ts";
 import { LOCAL_STUDY_MATERIALS_PATH } from "../data-paths.ts";
 import { getKanji } from "../kanji.ts";
-import { upsertLocalStudyMaterial } from "../study-material.ts";
+import { LOCAL_STUDY_MATERIAL_SAVE_ATTEMPTS, upsertLocalStudyMaterial } from "../study-material.ts";
 import { ensureRepositoryInitialized, installFetchMock } from "./setup.ts";
 
 installFetchMock();
@@ -218,6 +218,41 @@ describe("upsertLocalStudyMaterial with the file changed outside the app", () =>
       meaning_note: "Rewritten by hand",
       reading_note: "Ban the night curfew",
     });
+  });
+
+  test("a change between the read and the rename makes the save start again", async () => {
+    const write = holdFsOp("writeFile");
+    const save = upsertLocalStudyMaterial(958, { reading_note: "Ban the night curfew" });
+    await write.reached;
+    setStudyMaterialFile({ ...fixture, "2484": { meaning_note: "Pulled from git" } });
+    write.release();
+
+    const saved = await save;
+
+    const file = lastWrite();
+    expect(file["2484"]).toEqual({ meaning_note: "Pulled from git" });
+    expect(file["958"]).toEqual(saved!);
+    expect(writeCalls.map((call) => call.path)).toEqual([LOCAL_STUDY_MATERIALS_PATH]);
+  });
+
+  test("a file that changes during every attempt fails the save and keeps the change", async () => {
+    let write = holdFsOp("writeFile");
+    const save = upsertLocalStudyMaterial(958, { reading_note: "Ban the night curfew" });
+    for (let attempt = 1; attempt <= LOCAL_STUDY_MATERIAL_SAVE_ATTEMPTS; attempt++) {
+      await write.reached;
+      setStudyMaterialFile({ ...fixture, "2484": { meaning_note: `Pull ${attempt}` } });
+      write.release();
+      if (attempt < LOCAL_STUDY_MATERIAL_SAVE_ATTEMPTS) write = holdFsOp("writeFile");
+    }
+
+    await expect(save).rejects.toThrow("Nothing was saved");
+
+    expect(writeCalls).toHaveLength(0);
+    const records = await getLocalStudyMaterials();
+    expect(records["2484"]).toEqual({
+      meaning_note: `Pull ${LOCAL_STUDY_MATERIAL_SAVE_ATTEMPTS}`,
+    });
+    expect(records["958"]).toEqual(fixture["958"]!);
   });
 
   test("an unreadable file fails the save and writes nothing", async () => {

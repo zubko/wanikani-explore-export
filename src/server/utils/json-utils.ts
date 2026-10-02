@@ -1,5 +1,5 @@
 import { readFile } from "fs/promises";
-import { writeFileAtomic } from "./file-utils.ts";
+import { writeFileAtomic, writeFileAtomicIfUnchanged } from "./file-utils.ts";
 
 export async function readJson<T>(path: string): Promise<T> {
   const content = await readFile(path, "utf-8");
@@ -7,5 +7,19 @@ export async function readJson<T>(path: string): Promise<T> {
 }
 
 export async function saveJsonAtomic(path: string, data: unknown): Promise<void> {
-  await writeFileAtomic(path, JSON.stringify(data, null, 2) + "\n");
+  await writeFileAtomic(path, formatJsonFile(data));
+}
+
+/** `saveJsonAtomic` through `writeFileAtomicIfUnchanged`. Answers false when nothing was written. */
+export function saveJsonAtomicIfUnchanged(params: {
+  path: string;
+  data: unknown;
+  fileVersion: string;
+}): Promise<boolean> {
+  const { path, data, fileVersion } = params;
+  return writeFileAtomicIfUnchanged({ path, data: formatJsonFile(data), fileVersion });
+}
+
+function formatJsonFile(data: unknown): string {
+  return JSON.stringify(data, null, 2) + "\n";
 }

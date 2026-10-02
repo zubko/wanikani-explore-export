@@ -35,12 +35,12 @@ src/
     utils/              # Server-side utility functions
       hash.ts           # shortHash (first 8 hex chars of SHA-1) and hashNumber
       error-utils.ts    # getErrorMessage for an Error or an AnkiConnect error object
-      file-utils.ts     # writeFileAtomic (temp file, then rename) and isMissingFile
-      json-utils.ts     # readJson, saveJsonAtomic
+      file-utils.ts     # writeFileAtomic (temp file, then rename), writeFileAtomicIfUnchanged, readFileVersion, isMissingFile
+      json-utils.ts     # readJson, saveJsonAtomic, saveJsonAtomicIfUnchanged
       reloading-file.ts # createReloadingFile: reads a file again when its inode, mtime or size changed
     repository/         # Data access layer (singleton, use initRepository() first)
                         #   data-paths.ts: the paths of the files the server writes, no imports
-                        #   study-material.ts: local notes / synonyms, saved with saveJsonAtomic
+                        #   study-material.ts: local notes / synonyms, saved with saveJsonAtomicIfUnchanged
                         #   mnemonic-image-fetcher.ts: mnemonic image registry, an append-only JSONL file
                         #   media-cache.ts: getOrFetchMedia, the media files in data/userdata/media/
     services/           # Server services (AnkiConnect integration, Azure TTS)
@@ -171,7 +171,7 @@ Design rules:
 - A file the server writes and the other machine may change is never kept in memory for the whole process. That is the mnemonic image registry and the local study materials. `createReloadingFile({ path, parse })` in `src/server/utils/reloading-file.ts` runs a `stat` on every `get()` and reads the file again when its inode, mtime or size changed. The inode counts because the mtime can stay the same within one clock tick, while every atomic save and every git checkout gives the file a new inode. `parse` gets `null` for a missing file and decides what empty means. The value is kept only after `parse` succeeded.
 - The files that only a script writes are read once at start: the four subject files, `study_materials.json`, `data/verb_conjugations.json` and `data/sentence_readings.json`. After a new download or a pull of these files, restart the server on both machines.
 - A bad data file that shows up while the server runs (a hand edit, a pull) fails every request that needs it, loudly, until the file is fixed. No restart is needed after the fix. A bad file at startup still fails the start.
-- A write is an append of one line, or an atomic write and rename. It is never a rewrite of a whole file from a memory copy. `writeFileAtomic(path, data)` in `src/server/utils/file-utils.ts` writes `<path>.<uuid>.tmp` and renames it over the file, so two writes of one path never share a temp file. `saveJsonAtomic` calls it.
+- A write is an append of one line, or an atomic write and rename. It is never a rewrite of a whole file from a memory copy. `writeFileAtomic(path, data)` in `src/server/utils/file-utils.ts` writes `<path>.<uuid>.tmp` and renames it over the file, so two writes of one path never share a temp file. `saveJsonAtomic` calls it. A read, merge and write uses `writeFileAtomicIfUnchanged({ path, data, fileVersion })` instead. It renames only when `readFileVersion(path)` still gives the version taken before the read, see "Local Study Materials".
 - The reading gender and the sentence voice come from hashes, not from `Math.random`. So a word always gets the same file names, on both machines, as long as both hold the same `AZURE_TTS_VOICES` list.
 
 The mnemonic image registry, `data/userdata/mnemonic-images.jsonl`:
@@ -216,10 +216,12 @@ Local notes and synonyms for any subject, written in the web UI. They never touc
 - `MergedStudyMaterial` uses camelCase, because it is our own computed shape, like `meaningMnemonic`. `LocalStudyMaterial` stays snake_case, because it mirrors the WaniKani record field by field. Do not "fix" one to match the other.
 - A patch never carries the synonym list. It names one word in `add_synonym` or in `remove_synonym`, and the server applies it to the record it just read from the file. So a client that holds an old record cannot delete a synonym it never saw, and no client-side reconciling of lists is needed. A patch that holds both fields removes first and adds after, and the editor only ever sends one of them. The notes stay whole values: a note is one text the user typed, and writing it over the old one is the point.
 - `applyLocalStudyMaterialPatch(current, patch)` in `src/model/subject-utils.ts` is the one place that merges a patch into a record. The server writes its result, the client shows it while the request runs. It trims the notes and the added word, drops blank and repeated synonyms, deletes a field that ends up empty and returns `null` when no field is left. It cleans the whole merged record, not only the patched fields, so the file never holds an empty string, an empty list or an empty entry.
-- `upsertLocalStudyMaterial` in `src/server/repository/study-material.ts` writes the whole object with `saveJsonAtomic` from `src/server/utils/json-utils.ts` (write `<path>.<uuid>.tmp`, rename it over the real file, unlink the temp file when a step throws). It keeps no memory copy: the next `getLocalStudyMaterials()` sees the new mtime and reads the file again. A failed write leaves the file unchanged.
+- `upsertLocalStudyMaterial` in `src/server/repository/study-material.ts` writes the whole object with `saveJsonAtomicIfUnchanged` from `src/server/utils/json-utils.ts` (write `<path>.<uuid>.tmp`, rename it over the real file, unlink the temp file when a step throws). It keeps no memory copy: the next `getLocalStudyMaterials()` sees the new mtime and reads the file again. A failed write leaves the file unchanged.
 - `saveJsonAtomic` exists twice, here and in `scripts/lib/llm-utils.ts`. The scripts must not import from `src/server/`, so the copy stays on purpose. Change both when you change one.
 - Every upsert runs in one module-level promise queue. Two saves at the same time would otherwise start from the same old object, and one change would be lost. The caller's promise stays out of the chain (`const run = queue.then(step); queue = run.catch(() => {}); return run;`). So the caller sees the error, and the next save still starts from the last good state.
 - The upsert reads the file again inside that queue with `readLocalStudyMaterials()` and merges the patch onto the fresh content. The user also edits this file by hand and pulls it from git while the server runs. A read error fails the save, because writing an old copy would drop those edits with no error.
+- The queue only orders the saves of this server. A hand edit or a pull can still land between the read and the rename. So the upsert takes `readFileVersion(path)` (inode, mtime and size) before the read. `writeFileAtomicIfUnchanged` reads the version again after the temp file is written, right before the rename. A changed version drops the temp file, and the save starts again from the read. When the file changes during all `LOCAL_STUDY_MATERIAL_SAVE_ATTEMPTS` (3) attempts, the save fails and writes nothing.
+- A small window stays open. A change that lands between the last version check and the rename is lost. Plain files cannot close it without a lock, and the window is about as long as one `rename` call. The version also misses a change in place that keeps the size within one clock tick, like in `createReloadingFile`. A git checkout and an atomic save give the file a new inode, so the check always sees them.
 - `findSubjectTypeById(id)` in `data-loader.ts` scans the four subject arrays. The route calls it before the write, because a `reading_note` for a radical or for kana vocabulary is a 400. The upsert itself trusts the id.
 - The web UI edits the values in place. `NoteSection.tsx` has a pencil button and a textarea, Esc cancels and Cmd+Enter saves. `UserSynonymsRow.tsx` has an inline input and a small × on every local chip. Both are optimistic: they show the new value at once, send the patch, and on an error put the old value back and show a `toast.error`.
 - One subject can render on several cards at once. A radical under two kanji of one word gets one card per kanji. So the saved records live in one module-level store, `src/client/hooks/useLocalStudyMaterial.ts`, and not in the components. Per-card state would show one card a value the other card saved a moment ago. A card reads the store first and falls back to the record the server sent.
@@ -449,7 +451,7 @@ A file the server writes must stay right when two requests run at once, and when
 
 - An append-only file, read through `createReloadingFile` from `src/server/utils/reloading-file.ts`. The mnemonic image registry in `src/server/repository/mnemonic-image-fetcher.ts` appends one JSONL line per scraped page. Its `pendingFetches` map lets two lookups of one page at the same time share one scrape.
 - One file per item, written with `writeFileAtomic`, like the media cache in `src/server/repository/media-cache.ts`.
-- A read, merge and write inside a module-level promise queue, with `saveJsonAtomic`, like `upsertLocalStudyMaterial`.
+- A read, merge and write inside a module-level promise queue, with `saveJsonAtomicIfUnchanged`, like `upsertLocalStudyMaterial`. A change from outside between the read and the rename makes the save start again.
 
 See "Two Machines" for the full rules.
 
