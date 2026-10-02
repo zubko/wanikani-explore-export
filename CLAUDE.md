@@ -446,6 +446,8 @@ import { readFile } from "fs/promises";
 const data = JSON.parse(await readFile("./data/userdata/file.json", "utf-8"));
 ```
 
+Node's HTTP parser answers a raw non-ASCII byte in the request line with `400 Bad Request` and an empty body, before Hono logs anything. Bun's server would accept it, but vite only runs under Node. The browser, the Hono client and the scripts percent-encode the query, so only a hand-typed URL is affected. A curl example must let curl encode it: `curl -s -G --data-urlencode "q=校" -d type=kanji http://localhost:5173/api/search`
+
 ### Caching with Parallel Operations
 
 A file the server writes must stay right when two requests run at once, and when the other machine changes it. Never load such a file once and write the whole memory copy back later: one writer drops the change of the other, and a pulled change is overwritten. Use one of these instead:

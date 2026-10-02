@@ -18,6 +18,8 @@ This prompt accepts a number argument for how many words to add. If not provided
    GET http://localhost:5173/api/search?type=vocabulary&q={word}
    ```
 
+   Percent-encode `{word}` in the URL, or let curl do it: `curl -s -G --data-urlencode "q={word}" -d type=vocabulary http://localhost:5173/api/search`. Raw Japanese in the URL gets a 400 with an empty body from Node's HTTP parser, before the app sees the request.
+
    The response is `{ found: true, data: { id, ... } }` or `{ found: false }`.
 
    c. If found, add it to Anki:

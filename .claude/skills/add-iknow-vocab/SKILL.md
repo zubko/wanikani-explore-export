@@ -64,8 +64,11 @@ About one iKnow word in five is not in the WaniKani data — 218 of the Core 100
 - **WaniKani spells it differently** (すぐ → 直ぐ, あと → 後). Search the spelling you expect:
 
   ```bash
-  curl -s "http://localhost:5173/api/search?type=vocabulary&q=<alternative>"
+  curl -s -G --data-urlencode "q=<alternative>" -d type=vocabulary http://localhost:5173/api/search
   ```
+
+  Let curl encode the word. Raw Japanese in the URL gets a `400` with an empty body from Node's
+  HTTP parser, before the app sees the request, and it is easy to misread as "not found".
 
   Show the user the hit — characters, primary meaning, level — and **ask before adding**. The
   alternative spelling is a guess about meaning, and a wrong guess puts a wrong card in the deck.

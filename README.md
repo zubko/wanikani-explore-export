@@ -130,8 +130,9 @@ Open http://localhost:5173 in your browser. Search for a radical, kanji, or voca
 You can also use the REST API directly against the running server:
 
 ```bash
-# Search for a vocabulary word
-curl "http://localhost:5173/api/search?type=vocabulary&q=食べる"
+# Search for a vocabulary word. Let curl encode the query: the dev server runs under Node,
+# and Node's HTTP parser answers 400 with an empty body to raw Japanese in the URL
+curl -s -G --data-urlencode "q=食べる" -d type=vocabulary "http://localhost:5173/api/search"
 
 # Add a subject to Anki by ID and type
 curl -X POST "http://localhost:5173/api/add-to-anki" \
