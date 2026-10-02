@@ -21,8 +21,9 @@ export function upsertLocalStudyMaterial(
 }
 
 /**
- * The queue only orders the saves of this server. A hand edit or a git pull can still land between
- * the read and the rename, so a save that finds the file changed starts again from the read.
+ * The queue only orders the saves of this server. A git pull of the other server's saves can still
+ * land between the read and the rename, so a save that finds the file changed starts again from
+ * the read.
  */
 async function saveLocalStudyMaterial(
   subjectId: number,

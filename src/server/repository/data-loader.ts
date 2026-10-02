@@ -29,7 +29,7 @@ export let studyMaterials: StudyMaterial[];
 export let verbConjugations: Record<string, RawVerbConjugations>;
 export let sentenceReadings: Record<string, SentenceReadingEntry>;
 
-// The user edits this file by hand and pulls it from git while the server runs
+// The other server writes this file too, and a git pull brings its changes while this server runs
 const localStudyMaterialsFile = createReloadingFile({
   path: LOCAL_STUDY_MATERIALS_PATH,
   parse: (content) => {
@@ -81,7 +81,7 @@ export function findSubjectTypeById(id: number): SubjectType | null {
 
 /**
  * The rules that need the subject arrays, so they are not part of `readLocalStudyMaterials`. That
- * one runs on every save, where a hand-written record of another subject must not fail the write.
+ * one runs on every save, where a pulled record of another subject must not fail the write.
  * A record of a subject the arrays do not know is kept with `"skip"`: nothing looks it up, and a
  * restart that loads the newer subjects finds it.
  */
@@ -143,7 +143,8 @@ function parseLocalStudyMaterialsFile(content: string | null): Record<string, Lo
   return parseLocalStudyMaterials(parsed);
 }
 
-// The user writes this file by hand, so a wrong shape must fail loudly and never reach the browser
+// The file also comes from the other server through git, so a wrong shape must fail loudly and
+// never reach the browser
 function parseLocalStudyMaterials(value: unknown): Record<string, LocalStudyMaterial> {
   if (!isRecord(value)) throw invalidFile("the root must be a JSON object");
 
