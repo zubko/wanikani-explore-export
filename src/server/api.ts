@@ -31,6 +31,7 @@ import { findSubjectTypeById } from "./repository/data-loader.ts";
 import { upsertLocalStudyMaterial } from "./repository/study-material.ts";
 import {
   getPrimaryMeaning,
+  isVisibleSubject,
   localStudyMaterialValueProblem,
   readingNoteProblem,
 } from "@/model/subject-utils.ts";
@@ -88,7 +89,9 @@ function resolveWkSubject(
 ): { id: number; type: SubjectType } | null {
   if (deckType === "radical") {
     const matches = radicalData.filter(
-      (r) => r.data.characters === characters || getPrimaryMeaning(r.data.meanings) === characters
+      (r) =>
+        isVisibleSubject(r) &&
+        (r.data.characters === characters || getPrimaryMeaning(r.data.meanings) === characters)
     );
     // The note holds no WaniKani id, so a guess could write the other radical into it
     if (matches.length > 1) {
@@ -101,15 +104,17 @@ function resolveWkSubject(
   }
 
   if (deckType === "kanji") {
-    const found = kanjiData.find((k) => k.data.characters === characters);
+    const found = kanjiData.find((k) => isVisibleSubject(k) && k.data.characters === characters);
     return found ? { id: found.id, type: "kanji" } : null;
   }
 
   // vocabulary deck can contain both vocabulary and kana_vocabulary
-  const vocab = vocabularyData.find((v) => v.data.characters === characters);
+  const vocab = vocabularyData.find((v) => isVisibleSubject(v) && v.data.characters === characters);
   if (vocab) return { id: vocab.id, type: "vocabulary" };
 
-  const kanaVocab = kanaVocabularyData.find((v) => v.data.characters === characters);
+  const kanaVocab = kanaVocabularyData.find(
+    (v) => isVisibleSubject(v) && v.data.characters === characters
+  );
   if (kanaVocab) return { id: kanaVocab.id, type: "kana_vocabulary" };
 
   return null;

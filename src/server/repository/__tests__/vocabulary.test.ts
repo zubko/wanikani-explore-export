@@ -37,6 +37,11 @@ describe("getVocabulary", () => {
     const v = await getVocabulary(999999);
     expect(v).toBeNull();
   });
+
+  test("returns null for a hidden word (悪女, id=3359)", async () => {
+    const v = await getVocabulary(3359);
+    expect(v).toBeNull();
+  });
 });
 
 describe("getKanaVocabulary", () => {
@@ -80,6 +85,11 @@ describe("findVocabularyByCharacters", () => {
     const v = await findVocabularyByCharacters("zzzzz");
     expect(v).toBeNull();
   });
+
+  test("never finds a hidden word (悪女, id=3359)", async () => {
+    const v = await findVocabularyByCharacters("悪女");
+    expect(v).toBeNull();
+  });
 });
 
 describe("findVocabularyByMeaning", () => {
@@ -103,6 +113,11 @@ describe("findVocabularyByMeaning", () => {
 
   test("returns null for no match", async () => {
     const v = await findVocabularyByMeaning("nonexistent_meaning_xyz");
+    expect(v).toBeNull();
+  });
+
+  test("never finds a hidden word (Evil Woman, id=3359)", async () => {
+    const v = await findVocabularyByMeaning("evil woman");
     expect(v).toBeNull();
   });
 });

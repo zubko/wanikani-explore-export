@@ -166,6 +166,10 @@ describe("checkLocalStudyMaterialSubjects", () => {
     ).toBe("no error");
   });
 
+  test("a record of a hidden subject passes (亼, id=225)", () => {
+    expect(subjectError({ "225": { meaning_note: "An old roof" } })).toBe("no error");
+  });
+
   test("an id that is no WaniKani subject is refused", () => {
     expect(subjectError({ "999999": { meaning_note: "Typo" } })).toContain(
       "subject 999999 is not a WaniKani subject"

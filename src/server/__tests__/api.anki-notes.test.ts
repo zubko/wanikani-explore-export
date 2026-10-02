@@ -152,17 +152,62 @@ describe("anki-notes API", () => {
     ]);
   });
 
-  test("a radical name that two radicals share is not resolved", async () => {
-    // WaniKani names both 宀 and 亼 "Roof"
+  test("a radical name that a hidden radical shares resolves to the visible radical", async () => {
+    // WaniKani names both 宀 (78) and the hidden 亼 (225) "Roof"
     expect(
-      radicalData.filter((radical) => getPrimaryMeaning(radical.data.meanings) === "Roof")
-    ).toHaveLength(2);
+      radicalData
+        .filter((radical) => getPrimaryMeaning(radical.data.meanings) === "Roof")
+        .map((radical) => ({ id: radical.id, hidden: radical.data.hidden_at !== null }))
+    ).toEqual([
+      { id: 78, hidden: false },
+      { id: 225, hidden: true },
+    ]);
     setAnkiResponse("findNotes", [600]);
     setAnkiResponse("notesInfo", [{ noteId: 600, fields: { primary_name: { value: "Roof" } } }]);
 
     const result = await getAnkiNotesJson("radical");
     expect(result.data).toEqual([
-      { characters: "Roof", meaning: "Roof", wkId: null, wkType: null },
+      { characters: "Roof", meaning: "Roof", wkId: 78, wkType: "radical" },
+    ]);
+  });
+
+  test("a note of a hidden radical is not resolved (Drawer, id=70)", async () => {
+    setAnkiResponse("findNotes", [601]);
+    setAnkiResponse("notesInfo", [{ noteId: 601, fields: { primary_name: { value: "Drawer" } } }]);
+
+    const result = await getAnkiNotesJson("radical");
+    expect(result.data).toEqual([
+      { characters: "Drawer", meaning: "Drawer", wkId: null, wkType: null },
+    ]);
+  });
+
+  test("a note of a hidden kanji is not resolved (昌, id=2285)", async () => {
+    setAnkiResponse("findNotes", [602]);
+    setAnkiResponse("notesInfo", [
+      {
+        noteId: 602,
+        fields: { character: { value: "昌" }, primary_meaning: { value: "Prosperous" } },
+      },
+    ]);
+
+    const result = await getAnkiNotesJson("kanji");
+    expect(result.data).toEqual([
+      { characters: "昌", meaning: "Prosperous", wkId: null, wkType: null },
+    ]);
+  });
+
+  test("a note of a hidden word is not resolved (悪女, id=3359)", async () => {
+    setAnkiResponse("findNotes", [603]);
+    setAnkiResponse("notesInfo", [
+      {
+        noteId: 603,
+        fields: { characters: { value: "悪女" }, primary_meaning: { value: "Evil Woman" } },
+      },
+    ]);
+
+    const result = await getAnkiNotesJson("vocabulary");
+    expect(result.data).toEqual([
+      { characters: "悪女", meaning: "Evil Woman", wkId: null, wkType: null },
     ]);
   });
 });

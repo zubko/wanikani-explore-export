@@ -2,9 +2,10 @@ import type { Kanji, KanjiData } from "@/model/wanikani.ts";
 import {
   findStudyMaterial,
   findLocalStudyMaterial,
-  findByIds,
+  findVisibleByIds,
   buildSubjectReferences,
   getPrimaryMeaning,
+  isVisibleSubject,
 } from "@/model/subject-utils.ts";
 import { kanji, vocabulary, studyMaterials, getLocalStudyMaterials } from "./data-loader.ts";
 import { getRadicals } from "./radical.ts";
@@ -33,9 +34,9 @@ async function mapKanjiDataToKanji(data: KanjiData): Promise<Kanji> {
     readings: data.data.readings,
     readingMnemonic: data.data.reading_mnemonic,
     readingHint: data.data.reading_hint,
-    componentSubjectIds: data.data.component_subject_ids,
-    amalgamationSubjectIds: data.data.amalgamation_subject_ids,
-    visuallySimilarSubjectIds: data.data.visually_similar_subject_ids,
+    componentSubjectIds: componentRadicals.map((radical) => radical.id),
+    amalgamationSubjectIds: foundInVocabulary.map((reference) => reference.id),
+    visuallySimilarSubjectIds: visuallySimilarKanji.map((reference) => reference.id),
     studyMaterial: findStudyMaterial(studyMaterials, data.id, "kanji"),
     localStudyMaterial: findLocalStudyMaterial(localStudyMaterials, data.id),
     componentRadicals,
@@ -45,7 +46,7 @@ async function mapKanjiDataToKanji(data: KanjiData): Promise<Kanji> {
 }
 
 async function findAndBuildKanji(predicate: (k: KanjiData) => boolean): Promise<Kanji | null> {
-  const data = kanji.find(predicate);
+  const data = kanji.find((k) => isVisibleSubject(k) && predicate(k));
   if (!data) return null;
   return mapKanjiDataToKanji(data);
 }
@@ -55,7 +56,7 @@ export async function getKanji(id: number): Promise<Kanji | null> {
 }
 
 export async function getKanjis(ids: number[]): Promise<Kanji[]> {
-  const kanjiDataList = findByIds(kanji, ids);
+  const kanjiDataList = findVisibleByIds(kanji, ids);
   return Promise.all(kanjiDataList.map((data) => mapKanjiDataToKanji(data)));
 }
 

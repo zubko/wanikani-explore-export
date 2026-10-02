@@ -101,6 +101,13 @@ describe("add-to-anki API", () => {
     expect(ankiCalls).toEqual([]);
   });
 
+  test("a hidden subject returns 404 (昌, id=2285)", async () => {
+    const response = await addToAnki({ id: 2285, type: "kanji" });
+    expect(response.status).toBe(404);
+    expect(await response.json()).toEqual({ ok: false, error: "Subject not found" });
+    expect(ankiCalls).toEqual([]);
+  });
+
   test("add radical (一, id=1)", async () => {
     const result = await addToAnkiJson({ id: 1, type: "radical" });
     expect(result.ok).toBe(true);
