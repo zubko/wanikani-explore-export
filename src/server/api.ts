@@ -27,11 +27,11 @@ import {
   vocabulary as vocabularyData,
   kanaVocabulary as kanaVocabularyData,
 } from "./repository/data-loader.ts";
-import { saveCache } from "./repository/data-loader.ts";
 import { findSubjectTypeById } from "./repository/data-loader.ts";
 import { upsertLocalStudyMaterial } from "./repository/study-material.ts";
 import {
   getPrimaryMeaning,
+  isVisibleSubject,
   localStudyMaterialValueProblem,
   readingNoteProblem,
 } from "@/model/subject-utils.ts";
@@ -44,20 +44,15 @@ import {
   isFieldMismatchError,
   syncAnkiWeb,
 } from "./services/anki-connect.ts";
+import { getErrorMessage } from "./utils/error-utils.ts";
 
 const ANKI_DECK_TYPES: AnkiDeckType[] = ["radical", "kanji", "vocabulary"];
-
-function getErrorMessage(err: unknown): string {
-  if (err instanceof Error) return err.message;
-  if (typeof err === "object" && err !== null && "message" in err) return String(err.message);
-  return String(err);
-}
 
 async function findSubjectForAnki(id: number, type: SubjectType): Promise<Subject | null> {
   if (type === "radical") return getRadical(id);
   if (type === "kanji") return getKanji(id);
   // /search answers both types from one pool, so a caller can hold a kana id under type "vocabulary"
-  return (await getVocabulary(id)) ?? getKanaVocabulary(id);
+  return (await getVocabulary(id)) ?? (await getKanaVocabulary(id));
 }
 
 function addSubjectToAnki(subject: Subject): Promise<AnkiAddResult> {
@@ -93,22 +88,33 @@ function resolveWkSubject(
   characters: string
 ): { id: number; type: SubjectType } | null {
   if (deckType === "radical") {
-    const found = radicalData.find(
-      (r) => r.data.characters === characters || getPrimaryMeaning(r.data.meanings) === characters
+    const matches = radicalData.filter(
+      (r) =>
+        isVisibleSubject(r) &&
+        (r.data.characters === characters || getPrimaryMeaning(r.data.meanings) === characters)
     );
+    // The note holds no WaniKani id, so a guess could write the other radical into it
+    if (matches.length > 1) {
+      const ids = matches.map((r) => r.id).join(", ");
+      console.warn(`[API] Radical note "${characters}" matches radicals ${ids} — not resolved`);
+      return null;
+    }
+    const found = matches[0];
     return found ? { id: found.id, type: "radical" } : null;
   }
 
   if (deckType === "kanji") {
-    const found = kanjiData.find((k) => k.data.characters === characters);
+    const found = kanjiData.find((k) => isVisibleSubject(k) && k.data.characters === characters);
     return found ? { id: found.id, type: "kanji" } : null;
   }
 
   // vocabulary deck can contain both vocabulary and kana_vocabulary
-  const vocab = vocabularyData.find((v) => v.data.characters === characters);
+  const vocab = vocabularyData.find((v) => isVisibleSubject(v) && v.data.characters === characters);
   if (vocab) return { id: vocab.id, type: "vocabulary" };
 
-  const kanaVocab = kanaVocabularyData.find((v) => v.data.characters === characters);
+  const kanaVocab = kanaVocabularyData.find(
+    (v) => isVisibleSubject(v) && v.data.characters === characters
+  );
   if (kanaVocab) return { id: kanaVocab.id, type: "kana_vocabulary" };
 
   return null;
@@ -147,8 +153,6 @@ const app = new Hono()
         result = await findVocabularyByMeaning(q);
       }
     }
-
-    await saveCache();
 
     if (!result) {
       console.log(`[API] Search ${type} "${q}" — not found`);
@@ -228,7 +232,6 @@ const app = new Hono()
         await syncAnkiWeb();
       }
       const result = await addSubjectToAnki(subject);
-      await saveCache();
       if (sync) await syncAnkiWeb();
       console.log(`[API] Add to Anki: ${type} id=${id} — done`);
       return c.json({ ok: true as const, data: result });

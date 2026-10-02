@@ -1,11 +1,29 @@
-import { describe, test, expect, beforeAll, beforeEach } from "bun:test";
-import { installFetchInterceptor, resetFetchInterceptor } from "@/test/fetch-interceptor.ts";
-import { ensureRepositoryInitialized } from "@/test/preload.ts";
+import { describe, test, expect, beforeAll, beforeEach, afterEach } from "bun:test";
+import {
+  externalFetches,
+  installFetchInterceptor,
+  resetFetchInterceptor,
+} from "@/test/fetch-interceptor.ts";
+import {
+  ensureRepositoryInitialized,
+  resetFsMock,
+  setFileContent,
+  writeCalls,
+} from "@/test/preload.ts";
+import {
+  setStudyMaterialFile,
+  studyMaterialFixture as fixture,
+} from "@/test/study-material-fixture.ts";
+import { getLocalStudyMaterials } from "../repository/data-loader.ts";
+import { LOCAL_STUDY_MATERIALS_PATH, MNEMONIC_IMAGES_PATH } from "../repository/data-paths.ts";
 import { api } from "../api.ts";
 
 installFetchInterceptor();
-beforeAll(() => ensureRepositoryInitialized());
+beforeAll(ensureRepositoryInitialized);
 beforeEach(resetFetchInterceptor);
+// Earlier tests and files may already have appended a page to the registry
+beforeEach(resetFsMock);
+afterEach(resetFsMock);
 
 async function searchApi(params: string) {
   return api.request(`/search?${params}`);
@@ -72,6 +90,23 @@ describe("search API", () => {
     expect(result.data.id).toBe(1);
   });
 
+  test("a radical page not in the registry is scraped once and appended (barb)", async () => {
+    const page = "https://www.wanikani.com/radicals/barb";
+
+    const result = await searchJson("type=radical&q=barb");
+    expect(result.data.documentUrl).toBe(page);
+    expect(result.data.mnemonicImageUrl).toBeNull();
+    expect(externalFetches).toEqual([page]);
+    expect(writeCalls).toEqual([
+      { path: MNEMONIC_IMAGES_PATH, data: JSON.stringify({ page, image: null }) + "\n" },
+    ]);
+
+    resetFetchInterceptor();
+    await searchJson("type=radical&q=barb");
+    expect(externalFetches).toEqual([]);
+    expect(writeCalls).toHaveLength(1);
+  });
+
   test("find vocabulary by characters (毎晩)", async () => {
     const result = await searchJson("type=vocabulary&q=毎晩");
     expect(result.found).toBe(true);
@@ -104,5 +139,28 @@ describe("search API", () => {
     expect(result.found).toBe(true);
     expect(result.data.characters).toBe("ここ");
     expect(result.data).toMatchSnapshot();
+  });
+});
+
+describe("search API with the local study materials changed outside the app", () => {
+  test("a record put into the file shows in the next answer without a save (川)", async () => {
+    setStudyMaterialFile({ ...fixture, "456": { meaning_note: "Typed by hand" } });
+
+    const result = await searchJson("type=kanji&q=川");
+    expect(result.data.localStudyMaterial).toEqual({ meaning_note: "Typed by hand" });
+    expect(writeCalls.some((call) => call.path === LOCAL_STUDY_MATERIALS_PATH)).toBe(false);
+  });
+
+  test("a broken file fails the next search, a fixed file answers again (川)", async () => {
+    setFileContent(LOCAL_STUDY_MATERIALS_PATH, "{ broken");
+    expect((await searchApi("type=kanji&q=川")).status).toBe(500);
+    await expect(getLocalStudyMaterials()).rejects.toThrow(
+      `Cannot read ${LOCAL_STUDY_MATERIALS_PATH}`
+    );
+
+    setStudyMaterialFile(fixture);
+    const response = await searchApi("type=kanji&q=川");
+    expect(response.status).toBe(200);
+    expect((await response.json()).data.localStudyMaterial).toEqual(fixture["456"]!);
   });
 });

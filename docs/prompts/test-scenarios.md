@@ -89,3 +89,9 @@ Checked in Anki after `bun run sync-anki-templates`.
 - Answer side of a subject with no alternatives and no synonyms: no empty line, no extra gap
 - The alternatives line stays readable in light and dark mode, on both card types
 - Details view of a kanji with a local synonym: it shows a Synonyms row
+
+## Data Files and the Media Cache
+
+- Add a radical with a mnemonic picture (`一`) to Anki, then open its card: the picture shows, and it comes from Anki's media folder, not from a WaniKani URL. It also shows with no network
+- Edit `data/userdata/study_materials_extra.json` by hand while the server runs, then search the subject: the new note shows with no restart
+- Break one line of `data/userdata/mnemonic-images.jsonl` while the server runs: the next radical search answers a 500, and the server log names the line number. Fix the line: the next search works again with no restart

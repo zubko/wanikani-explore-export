@@ -2,6 +2,13 @@ import { parseArgs } from "util";
 
 import type { AnkiAddResult } from "../src/model/wanikani.ts";
 import { formatError } from "./lib/format-error.ts";
+import {
+  pickNotesToRefresh,
+  refreshedKanjiCharacters,
+  refreshedRadicalNames,
+  remainingLimit,
+  takeLimit,
+} from "./lib/note-refresh.ts";
 
 type CliArgs = {
   baseUrl: string;
@@ -121,7 +128,7 @@ async function fetchResolvedNotes(baseUrl: string, type: string): Promise<AnkiNo
 
   const unresolved = allNotes.filter((n) => n.wkId === null);
   if (unresolved.length > 0) {
-    console.log(`\n⚠️  ${unresolved.length} ${type} items not found in WaniKani data:`);
+    console.log(`\n⚠️  ${unresolved.length} ${type} items match no single WaniKani subject:`);
     for (const item of unresolved) {
       console.log(`   - ${item.characters}`);
     }
@@ -134,10 +141,6 @@ async function fetchResolvedNotes(baseUrl: string, type: string): Promise<AnkiNo
 function padIndex(index: number, total: number): string {
   const width = String(total).length;
   return String(index).padStart(width);
-}
-
-function takeLimit<T>(items: T[], limit: number | undefined): T[] {
-  return limit === undefined ? items : items.slice(0, limit);
 }
 
 async function main(): Promise<void> {
@@ -163,16 +166,20 @@ async function main(): Promise<void> {
 
   const words = await fetchResolvedNotes(args.baseUrl, "vocabulary");
   const kanji = await fetchResolvedNotes(args.baseUrl, "kanji");
+  const radicals = await fetchResolvedNotes(args.baseUrl, "radical");
 
-  if (words.length === 0 && kanji.length === 0) {
+  if (words.length === 0 && kanji.length === 0 && radicals.length === 0) {
     console.log("\nNo items to update.");
     return;
   }
 
   if (args.dryRun) {
-    const listed = takeLimit([...words, ...kanji], args.limit);
+    const listed = takeLimit([...words, ...kanji, ...radicals], args.limit);
     console.log(`\nWould update up to ${listed.length} items.`);
-    console.log("A real run skips the kanji that a word update already refreshed.\n");
+    console.log(
+      "A real run skips the kanji that a word update already refreshed," +
+        " and the radicals that a word or kanji update already refreshed.\n"
+    );
     for (const [i, item] of listed.entries()) {
       console.log(`[${padIndex(i + 1, listed.length)}/${listed.length}] ${formatNote(item)}`);
     }
@@ -183,23 +190,27 @@ async function main(): Promise<void> {
   const startTime = Date.now();
 
   const wordBatch = takeLimit(words, args.limit);
-  console.log(`\nUpdating ${wordBatch.length} words...\n`);
-  const wordResults = await updateNotes(args.baseUrl, wordBatch);
+  const wordResults = await runPass({ baseUrl: args.baseUrl, label: "words", batch: wordBatch });
 
-  // A word update also writes its kanji, so only the kanji that no word update wrote need their own
-  const refreshedKanji = new Set(
-    wordResults.flatMap((result) => result.kanji.map((k) => k.character))
-  );
-  const kanjiBatch = takeLimit(
-    kanji.filter((note) => !refreshedKanji.has(note.characters)),
-    args.limit === undefined ? undefined : args.limit - wordBatch.length
-  );
-  if (kanjiBatch.length > 0) {
-    console.log(`\nUpdating ${kanjiBatch.length} kanji with no word...\n`);
-    await updateNotes(args.baseUrl, kanjiBatch);
-  }
+  const kanjiBatch = pickNotesToRefresh({
+    notes: kanji,
+    refreshed: refreshedKanjiCharacters(wordResults),
+    remaining: remainingLimit(args.limit, wordBatch.length),
+  });
+  const kanjiResults = await runPass({
+    baseUrl: args.baseUrl,
+    label: "kanji with no word",
+    batch: kanjiBatch,
+  });
 
-  const updated = wordBatch.length + kanjiBatch.length;
+  const radicalBatch = pickNotesToRefresh({
+    notes: radicals,
+    refreshed: refreshedRadicalNames([...wordResults, ...kanjiResults]),
+    remaining: remainingLimit(args.limit, wordBatch.length + kanjiBatch.length),
+  });
+  await runPass({ baseUrl: args.baseUrl, label: "radicals with no kanji", batch: radicalBatch });
+
+  const updated = wordBatch.length + kanjiBatch.length + radicalBatch.length;
   let synced = false;
   if (updated > 0) {
     process.stdout.write("\nSyncing to AnkiWeb... ");
@@ -218,13 +229,25 @@ async function main(): Promise<void> {
   console.log("=".repeat(50));
   console.log("Summary");
   console.log("-".repeat(50));
-  console.log(`Words:   ${wordBatch.length}`);
-  console.log(`Kanji:   ${kanjiBatch.length}`);
-  console.log(`Synced:  ${updated > 0 ? (synced ? "yes" : "no") : "nothing to sync"}`);
-  console.log(`Time:    ${elapsed}s`);
+  console.log(`Words:    ${wordBatch.length}`);
+  console.log(`Kanji:    ${kanjiBatch.length}`);
+  console.log(`Radicals: ${radicalBatch.length}`);
+  console.log(`Synced:   ${updated > 0 ? (synced ? "yes" : "no") : "nothing to sync"}`);
+  console.log(`Time:     ${elapsed}s`);
   console.log("=".repeat(50));
 
   if (updated > 0 && !synced) process.exit(1);
+}
+
+async function runPass(params: {
+  baseUrl: string;
+  label: string;
+  batch: AnkiNoteItem[];
+}): Promise<AnkiAddResult[]> {
+  const { baseUrl, label, batch } = params;
+  if (batch.length === 0) return [];
+  console.log(`\nUpdating ${batch.length} ${label}...\n`);
+  return updateNotes(baseUrl, batch);
 }
 
 async function updateNotes(baseUrl: string, items: AnkiNoteItem[]): Promise<AnkiAddResult[]> {

@@ -3,6 +3,7 @@ import { resetFsMock, setFsError, writeCalls } from "@/test/preload.ts";
 import { saveJsonAtomic } from "../json-utils.ts";
 
 const PATH = "./data/userdata/json-utils-test.json";
+const TEMP_NAME_PATTERN = /\.[0-9a-f-]{36}\.tmp$/;
 
 beforeEach(resetFsMock);
 afterEach(resetFsMock);
@@ -28,6 +29,20 @@ describe("saveJsonAtomic", () => {
 
     await expect(saveJsonAtomic(PATH, { a: 1 })).rejects.toThrow("rename failed");
 
-    expect(writeCalls).toEqual([{ path: `${PATH}.tmp`, data: '{\n  "a": 1\n}\n' }]);
+    expect(writeCalls).toEqual([
+      { path: expect.stringMatching(TEMP_NAME_PATTERN), data: '{\n  "a": 1\n}\n' },
+    ]);
+    expect(writeCalls[0]?.path.startsWith(`${PATH}.`)).toBe(true);
+  });
+
+  test("gives every write its own temp file", async () => {
+    setFsError("rename", new Error("rename failed"));
+    setFsError("unlink", new Error("unlink failed"));
+
+    await expect(saveJsonAtomic(PATH, { a: 1 })).rejects.toThrow("rename failed");
+    await expect(saveJsonAtomic(PATH, { a: 2 })).rejects.toThrow("rename failed");
+
+    expect(writeCalls).toHaveLength(2);
+    expect(writeCalls[0]?.path).not.toBe(writeCalls[1]?.path);
   });
 });

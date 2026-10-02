@@ -9,7 +9,7 @@ Configure these templates in Anki: Tools → Manage Note Types → Japanese Radi
 - `extra_names` - Alternative meanings (comma-separated)
 - `user_synonyms` - User synonyms (comma-separated)
 - `mnemonic_text` - Styled HTML mnemonic with colored tags
-- `mnemonic_image` - Mnemonic illustration URL
+- `mnemonic_image` - Mnemonic picture as an `<img>` tag of a media file
 - `note` - User note
 
 ## Front Template
@@ -50,7 +50,7 @@ Configure these templates in Anki: Tools → Manage Note Types → Japanese Radi
 
     <div class="section">
       <h2>Mnemonic</h2>
-      {{#mnemonic_image}}<img src="{{mnemonic_image}}" class="mnemonic-img" />{{/mnemonic_image}}
+      {{#mnemonic_image}}{{mnemonic_image}}{{/mnemonic_image}}
       <div class="mnemonic">{{mnemonic_text}}</div>
     </div>
 

@@ -1,11 +1,12 @@
 import { readFile } from "fs/promises";
-import { getPrimaryReading } from "../../src/model/subject-utils.ts";
+import { getPrimaryReading, isVisibleSubject } from "../../src/model/subject-utils.ts";
 import type { ContextSentence, VocabularyReading } from "../../src/model/wanikani.ts";
 
 export type VocabularyItem = {
   id: number;
   data: {
     characters: string;
+    hidden_at: string | null;
     readings?: VocabularyReading[];
     parts_of_speech: string[];
     context_sentences: ContextSentence[];
@@ -22,7 +23,7 @@ export async function loadVocabulary(): Promise<VocabularyItem[]> {
   ]);
   const vocabulary = JSON.parse(vocabContent) as VocabularyItem[];
   const kanaVocabulary = JSON.parse(kanaContent) as VocabularyItem[];
-  return [...vocabulary, ...kanaVocabulary];
+  return [...vocabulary, ...kanaVocabulary].filter(isVisibleSubject);
 }
 
 export function getVocabularyReading(item: VocabularyItem): string {

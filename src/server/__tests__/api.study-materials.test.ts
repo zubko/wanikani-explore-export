@@ -1,12 +1,13 @@
 import { describe, test, expect, beforeAll, beforeEach, afterEach } from "bun:test";
-import { ensureRepositoryInitialized, writeCalls, setFsError } from "@/test/preload.ts";
 import {
-  lastWrite,
-  loadStudyMaterialFixture,
-  resetStudyMaterialState,
-  studyMaterialFixture as fixture,
-} from "@/test/study-material-fixture.ts";
-import { localStudyMaterials, LOCAL_STUDY_MATERIALS_PATH } from "../repository/data-loader.ts";
+  ensureRepositoryInitialized,
+  resetFsMock,
+  writeCalls,
+  setFsError,
+} from "@/test/preload.ts";
+import { lastWrite, studyMaterialFixture as fixture } from "@/test/study-material-fixture.ts";
+import { getLocalStudyMaterials } from "../repository/data-loader.ts";
+import { LOCAL_STUDY_MATERIALS_PATH } from "../repository/data-paths.ts";
 import { api } from "../api.ts";
 
 async function patchJson(body: unknown, rawBody?: string) {
@@ -18,13 +19,11 @@ async function patchJson(body: unknown, rawBody?: string) {
   return { status: response.status, json: await response.json() };
 }
 
-beforeAll(async () => {
-  await ensureRepositoryInitialized();
-  await loadStudyMaterialFixture();
-});
+beforeAll(ensureRepositoryInitialized);
 
-beforeEach(resetStudyMaterialState);
-afterEach(resetStudyMaterialState);
+// The fs mock is process-global, so a saved record must not reach the next test or file
+beforeEach(resetFsMock);
+afterEach(resetFsMock);
 
 describe("study-materials API validation", () => {
   test("missing id returns 400", async () => {
@@ -127,25 +126,25 @@ describe("study-materials API validation", () => {
     expect(writeCalls).toHaveLength(0);
   });
 
-  test("a write error returns 500 and keeps the memory state", async () => {
+  test("a write error returns 500 and keeps the old records", async () => {
     setFsError("writeFile", new Error("disk full"));
 
     const { status, json } = await patchJson({ id: 1, meaning_note: "New note" });
 
     expect(status).toBe(500);
     expect(json).toEqual({ ok: false, error: "disk full" });
-    expect(localStudyMaterials["1"]).toEqual(fixture["1"]!);
+    expect((await getLocalStudyMaterials())["1"]).toEqual(fixture["1"]!);
     expect(writeCalls).toHaveLength(0);
   });
 
-  test("a rename error returns 500 and keeps the memory state", async () => {
+  test("a rename error returns 500 and keeps the old records", async () => {
     setFsError("rename", new Error("rename failed"));
 
     const { status, json } = await patchJson({ id: 1, meaning_note: "New note" });
 
     expect(status).toBe(500);
     expect(json).toEqual({ ok: false, error: "rename failed" });
-    expect(localStudyMaterials["1"]).toEqual(fixture["1"]!);
+    expect((await getLocalStudyMaterials())["1"]).toEqual(fixture["1"]!);
     expect(writeCalls).toHaveLength(0);
   });
 });
@@ -196,7 +195,7 @@ describe("study-materials API upsert", () => {
 
     expect(status).toBe(200);
     expect(json).toEqual({ ok: true, data: null });
-    expect(localStudyMaterials["456"]).toBeUndefined();
+    expect((await getLocalStudyMaterials())["456"]).toBeUndefined();
     expect(lastWrite()).toMatchSnapshot("file");
   });
 

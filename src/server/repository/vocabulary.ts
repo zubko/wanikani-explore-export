@@ -10,12 +10,13 @@ import {
   findStudyMaterial,
   findLocalStudyMaterial,
   getPrimaryMeaning,
+  isVisibleSubject,
 } from "@/model/subject-utils.ts";
 import {
   vocabulary,
   kanaVocabulary,
   studyMaterials,
-  localStudyMaterials,
+  getLocalStudyMaterials,
   verbConjugations,
   sentenceReadings,
 } from "./data-loader.ts";
@@ -37,6 +38,7 @@ function enrichContextSentencesWithReadings(
 
 async function mapVocabularyDataToVocabulary(data: VocabularyData): Promise<Vocabulary> {
   const componentKanji = await getKanjis(data.data.component_subject_ids);
+  const localStudyMaterials = await getLocalStudyMaterials();
 
   return {
     object: "vocabulary" as const,
@@ -51,7 +53,7 @@ async function mapVocabularyDataToVocabulary(data: VocabularyData): Promise<Voca
     readings: data.data.readings,
     readingMnemonic: data.data.reading_mnemonic,
     partsOfSpeech: data.data.parts_of_speech,
-    componentSubjectIds: data.data.component_subject_ids,
+    componentSubjectIds: componentKanji.map((kanjiItem) => kanjiItem.id),
     contextSentences: enrichContextSentencesWithReadings(data.id, data.data.context_sentences),
     pronunciationAudios: data.data.pronunciation_audios,
     studyMaterial: findStudyMaterial(studyMaterials, data.id, "vocabulary"),
@@ -61,7 +63,11 @@ async function mapVocabularyDataToVocabulary(data: VocabularyData): Promise<Voca
   };
 }
 
-function mapKanaVocabularyDataToKanaVocabulary(data: KanaVocabularyData): KanaVocabulary {
+async function mapKanaVocabularyDataToKanaVocabulary(
+  data: KanaVocabularyData
+): Promise<KanaVocabulary> {
+  const localStudyMaterials = await getLocalStudyMaterials();
+
   return {
     object: "kana_vocabulary" as const,
     id: data.id,
@@ -83,12 +89,14 @@ function mapKanaVocabularyDataToKanaVocabulary(data: KanaVocabularyData): KanaVo
 async function findAndBuildVocabulary(
   predicate: (v: VocabularyData | KanaVocabularyData) => boolean
 ): Promise<Vocabulary | KanaVocabulary | null> {
-  const vocabData = vocabulary.find(predicate);
+  const isMatch = (v: VocabularyData | KanaVocabularyData) => isVisibleSubject(v) && predicate(v);
+
+  const vocabData = vocabulary.find(isMatch);
   if (vocabData) {
     return mapVocabularyDataToVocabulary(vocabData);
   }
 
-  const kanaVocabData = kanaVocabulary.find(predicate);
+  const kanaVocabData = kanaVocabulary.find(isMatch);
   if (kanaVocabData) {
     return mapKanaVocabularyDataToKanaVocabulary(kanaVocabData);
   }
@@ -97,13 +105,13 @@ async function findAndBuildVocabulary(
 }
 
 export async function getVocabulary(id: number): Promise<Vocabulary | null> {
-  const data = vocabulary.find((v) => v.id === id);
+  const data = vocabulary.find((v) => v.id === id && isVisibleSubject(v));
   if (!data) return null;
   return mapVocabularyDataToVocabulary(data);
 }
 
-export function getKanaVocabulary(id: number): KanaVocabulary | null {
-  const data = kanaVocabulary.find((v) => v.id === id);
+export async function getKanaVocabulary(id: number): Promise<KanaVocabulary | null> {
+  const data = kanaVocabulary.find((v) => v.id === id && isVisibleSubject(v));
   if (!data) return null;
   return mapKanaVocabularyDataToKanaVocabulary(data);
 }

@@ -2,20 +2,17 @@ import type { Radical, RadicalData } from "@/model/wanikani.ts";
 import {
   findStudyMaterial,
   findLocalStudyMaterial,
-  findByIds,
+  findVisibleByIds,
   buildSubjectReferences,
   getPrimaryMeaning,
+  isVisibleSubject,
 } from "@/model/subject-utils.ts";
-import {
-  radicals,
-  kanji,
-  studyMaterials,
-  localStudyMaterials,
-  imageFetcher,
-} from "./data-loader.ts";
+import { radicals, kanji, studyMaterials, getLocalStudyMaterials } from "./data-loader.ts";
+import { getMnemonicImageUrl } from "./mnemonic-image-fetcher.ts";
 
 async function buildRadical(data: RadicalData): Promise<Radical> {
-  const mnemonicImageUrl = await imageFetcher.get(data.data.document_url);
+  const mnemonicImageUrl = await getMnemonicImageUrl(data.data.document_url);
+  const localStudyMaterials = await getLocalStudyMaterials();
 
   const foundInKanji = buildSubjectReferences(kanji, data.data.amalgamation_subject_ids);
 
@@ -30,7 +27,7 @@ async function buildRadical(data: RadicalData): Promise<Radical> {
     meanings: data.data.meanings,
     auxiliaryMeanings: data.data.auxiliary_meanings,
     meaningMnemonic: data.data.meaning_mnemonic,
-    amalgamationSubjectIds: data.data.amalgamation_subject_ids,
+    amalgamationSubjectIds: foundInKanji.map((reference) => reference.id),
     studyMaterial: findStudyMaterial(studyMaterials, data.id, "radical"),
     localStudyMaterial: findLocalStudyMaterial(localStudyMaterials, data.id),
     mnemonicImageUrl,
@@ -41,7 +38,7 @@ async function buildRadical(data: RadicalData): Promise<Radical> {
 async function findAndBuildRadical(
   predicate: (r: RadicalData) => boolean
 ): Promise<Radical | null> {
-  const data = radicals.find(predicate);
+  const data = radicals.find((r) => isVisibleSubject(r) && predicate(r));
   if (!data) return null;
   return buildRadical(data);
 }
@@ -51,7 +48,7 @@ export async function getRadical(id: number): Promise<Radical | null> {
 }
 
 export async function getRadicals(ids: number[]): Promise<Radical[]> {
-  const radicalDataList = findByIds(radicals, ids);
+  const radicalDataList = findVisibleByIds(radicals, ids);
   return Promise.all(radicalDataList.map((data) => buildRadical(data)));
 }
 

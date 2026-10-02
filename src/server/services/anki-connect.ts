@@ -6,6 +6,7 @@ import type {
   KanaVocabulary,
   ContextSentence,
   PronunciationAudio,
+  VoiceGender,
   AnkiAddResult,
   StudyMaterial,
   LocalStudyMaterial,
@@ -33,8 +34,23 @@ import {
   VOCABULARY_MODEL_NAME,
   VOCABULARY_EXPECTED_FIELDS,
 } from "@/model/anki-models.ts";
-import { generateSentenceAudio } from "@/server/services/azure-tts.ts";
-import { createHash } from "crypto";
+import {
+  buildSentenceSsml,
+  generateSentenceAudio,
+  pickSentenceVoice,
+  readAzureTtsConfig,
+  sentenceAudioHash,
+  type AzureTtsConfig,
+} from "@/server/services/azure-tts.ts";
+import {
+  extensionOfContentType,
+  getOrFetchMedia,
+  type FetchedMedia,
+  type MediaFolder,
+} from "@/server/repository/media-cache.ts";
+import { mnemonicImageErrorHint } from "@/server/repository/mnemonic-image-fetcher.ts";
+import { getErrorMessage } from "@/server/utils/error-utils.ts";
+import { hashNumber, shortHash } from "@/server/utils/hash.ts";
 
 const ANKI_CONNECT_URL = "http://127.0.0.1:8765";
 
@@ -154,24 +170,37 @@ async function validateModelFields(modelName: string, expectedFields: string[]):
   }
 }
 
-async function storeMediaFile(filename: string, data: string): Promise<void> {
-  const sizeKb = ((data.length * 0.75) / 1024).toFixed(1);
+async function storeMediaFile(filename: string, data: Buffer): Promise<void> {
+  const sizeKb = (data.length / 1024).toFixed(1);
   console.log(`[Anki] Storing media: ${filename} (${sizeKb} KB)`);
-  await ankiInvoke("storeMediaFile", { filename, data });
+  await ankiInvoke("storeMediaFile", { filename, data: data.toString("base64") });
 }
 
-async function fetchAndStoreSvg(url: string, filename: string): Promise<void> {
-  console.log(`[Anki] Downloading SVG: ${url}`);
+/** One cached file serves every deck, so only the Anki name carries the deck id. */
+async function storeCachedMedia(params: {
+  deckId: number;
+  folder: MediaFolder;
+  nameWithoutExtension: string;
+  fetch: () => Promise<FetchedMedia>;
+}): Promise<string> {
+  const { deckId, ...cacheParams } = params;
+  const cachedMedia = await getOrFetchMedia(cacheParams);
+  const ankiFilename = `${deckId}_${cachedMedia.fileName}`;
+  await storeMediaFile(ankiFilename, cachedMedia.data);
+  return ankiFilename;
+}
+
+async function downloadMedia(params: { url: string; extension?: string }): Promise<FetchedMedia> {
+  const { url, extension: knownExtension } = params;
+  console.log(`[Anki] Downloading media: ${url}`);
   const response = await fetch(url);
   if (!response.ok) {
-    throw createAnkiError(
-      `Failed to download SVG (${response.status}): ${url}`,
-      "fetchAndStoreSvg"
-    );
+    throw createAnkiError(`Failed to download media (${response.status}): ${url}`, "downloadMedia");
   }
-  const svgText = await response.text();
-  const base64 = Buffer.from(svgText, "utf-8").toString("base64");
-  await storeMediaFile(filename, base64);
+  const extension =
+    knownExtension ??
+    extensionOfContentType({ contentType: response.headers.get("content-type"), url });
+  return { data: Buffer.from(await response.arrayBuffer()), extension };
 }
 
 async function findNote(
@@ -329,7 +358,12 @@ function escapeHtml(text: string): string {
 
 // === Radical ===
 
-function buildRadicalNoteFields(radical: Radical, storedSvgFilename?: string): RadicalNoteFields {
+function buildRadicalNoteFields(params: {
+  radical: Radical;
+  storedSvgFilename?: string;
+  storedMnemonicFilename?: string;
+}): RadicalNoteFields {
+  const { radical, storedSvgFilename, storedMnemonicFilename } = params;
   const primaryMeaning = getPrimaryMeaning(radical.meanings);
   const studyMaterial = mergeStudyMaterialForAnki(
     radical.studyMaterial,
@@ -345,9 +379,50 @@ function buildRadicalNoteFields(radical: Radical, storedSvgFilename?: string): R
     extra_names: getExtraMeanings(radical.meanings),
     user_synonyms: studyMaterial.meaningSynonyms.join(", "),
     mnemonic_text: styleMnemonicHtml(radical.meaningMnemonic),
-    mnemonic_image: radical.mnemonicImageUrl ?? "",
+    // Anki's Check Media deletes a file that no field references through an <img> or [sound:] tag
+    mnemonic_image: storedMnemonicFilename
+      ? `<img src="${storedMnemonicFilename}" class="mnemonic-img">`
+      : "",
     note: studyMaterial.meaningNote,
   };
+}
+
+function storeRadicalSvg(params: {
+  deckId: number;
+  radical: Radical;
+  svgUrl: string;
+}): Promise<string> {
+  const { deckId, radical, svgUrl } = params;
+  return storeCachedMedia({
+    deckId,
+    folder: "radicals",
+    nameWithoutExtension: `${radical.slug}_${shortHash(svgUrl)}`,
+    // getRadicalSvgUrl picks the image/svg+xml image, so the type is known before the download
+    fetch: () => downloadMedia({ url: svgUrl, extension: "svg" }),
+  });
+}
+
+function storeRadicalMnemonicImage(params: {
+  deckId: number;
+  radical: Radical;
+  imageUrl: string;
+}): Promise<string> {
+  const { deckId, radical, imageUrl } = params;
+  return storeCachedMedia({
+    deckId,
+    folder: "mnemonics",
+    nameWithoutExtension: `${radical.slug}_mnemonic_${shortHash(imageUrl)}`,
+    fetch: async () => {
+      try {
+        return await downloadMedia({ url: imageUrl });
+      } catch (error) {
+        throw createAnkiError(
+          `${getErrorMessage(error)}. ${mnemonicImageErrorHint(radical.documentUrl)}`,
+          "downloadMedia"
+        );
+      }
+    },
+  });
 }
 
 async function addOrUpdateRadicalCore(
@@ -358,18 +433,26 @@ async function addOrUpdateRadicalCore(
 
   await validateModelFields(RADICAL_MODEL_NAME, RADICAL_EXPECTED_FIELDS);
 
+  const svgUrl = radical.characters ? undefined : getRadicalSvgUrl(radical);
+  const mnemonicImageUrl = radical.mnemonicImageUrl;
   let storedSvgFilename: string | undefined;
+  let storedMnemonicFilename: string | undefined;
 
-  if (!radical.characters) {
-    const svgUrl = getRadicalSvgUrl(radical);
+  if (svgUrl || mnemonicImageUrl) {
+    const deckId = await getDeckId(RADICAL_DECK_NAME);
     if (svgUrl) {
-      const deckId = await getDeckId(RADICAL_DECK_NAME);
-      storedSvgFilename = `${deckId}_${radical.slug}.svg`;
-      await fetchAndStoreSvg(svgUrl, storedSvgFilename);
+      storedSvgFilename = await storeRadicalSvg({ deckId, radical, svgUrl });
+    }
+    if (mnemonicImageUrl) {
+      storedMnemonicFilename = await storeRadicalMnemonicImage({
+        deckId,
+        radical,
+        imageUrl: mnemonicImageUrl,
+      });
     }
   }
 
-  const fields = buildRadicalNoteFields(radical, storedSvgFilename);
+  const fields = buildRadicalNoteFields({ radical, storedSvgFilename, storedMnemonicFilename });
 
   const result = await addOrUpdateNote(RADICAL_DECK_NAME, RADICAL_MODEL_NAME, fields, {
     name: "primary_name",
@@ -409,8 +492,7 @@ async function buildRadicalsHtml(componentRadicals: Radical[]): Promise<string> 
       } else {
         const svgUrl = getRadicalSvgUrl(radical);
         if (svgUrl) {
-          const filename = `${deckId}_${radical.slug}.svg`;
-          await fetchAndStoreSvg(svgUrl, filename);
+          const filename = await storeRadicalSvg({ deckId, radical, svgUrl });
           characterHtml = `<img src="${filename}" class="radical-img">`;
         } else {
           characterHtml = name;
@@ -492,28 +574,6 @@ export async function addKanjiWithRadicals(kanji: Kanji): Promise<AnkiAddResult>
 
 // === Vocabulary ===
 
-async function storeAudioData(filename: string, audio: ArrayBuffer): Promise<void> {
-  const base64 = Buffer.from(audio).toString("base64");
-  await storeMediaFile(filename, base64);
-}
-
-async function fetchAndStoreAudio(url: string, filename: string): Promise<void> {
-  console.log(`[Anki] Downloading audio: ${url}`);
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw createAnkiError(
-      `Failed to download audio (${response.status}): ${url}`,
-      "fetchAndStoreAudio"
-    );
-  }
-  const audio = await response.arrayBuffer();
-  await storeAudioData(filename, audio);
-}
-
-function shortHash(text: string): string {
-  return createHash("sha1").update(text).digest("hex").slice(0, 8);
-}
-
 function buildKanjiCompositionHtml(componentKanji: Kanji[]): string {
   if (componentKanji.length === 0) return "";
 
@@ -530,16 +590,27 @@ function getComponentKanji(vocabulary: Vocabulary | KanaVocabulary): Kanji[] {
   return vocabulary.object === "vocabulary" ? (vocabulary as Vocabulary).componentKanji : [];
 }
 
+/**
+ * A fixed gender per word keeps the clip names stable, so a re-sync reads every clip from disk.
+ * The sentence voice hashes the slug. With two voices, female first, the same hash would always
+ * give the reading the same gender as the sentence voice. A kana word's reading is its slug, so
+ * the hash input gets its own prefix.
+ */
+function preferredReadingGender(vocabulary: Vocabulary | KanaVocabulary): VoiceGender {
+  const primaryReading =
+    vocabulary.object === "vocabulary"
+      ? getPrimaryReading(vocabulary.readings)
+      : vocabulary.characters;
+  return hashNumber(`reading-gender:${primaryReading}`) % 2 === 0 ? "female" : "male";
+}
+
 function pickReadingAudios(
   vocabulary: Vocabulary | KanaVocabulary,
-  preferredGender: "male" | "female"
-): { gender: "male" | "female"; readingAudios: PronunciationAudio[] } {
+  preferredGender: VoiceGender
+): { gender: VoiceGender; readingAudios: PronunciationAudio[] } {
   const readings =
     vocabulary.object === "vocabulary" ? vocabulary.readings.map((r) => r.reading) : [];
-  const genders: Array<"male" | "female"> = [
-    preferredGender,
-    preferredGender === "male" ? "female" : "male",
-  ];
+  const genders: VoiceGender[] = [preferredGender, preferredGender === "male" ? "female" : "male"];
   for (const gender of genders) {
     const readingAudios = selectReadingAudios({
       audios: vocabulary.pronunciationAudios,
@@ -549,6 +620,43 @@ function pickReadingAudios(
     if (readingAudios.length > 0) return { gender, readingAudios };
   }
   return { gender: preferredGender, readingAudios: [] };
+}
+
+function storeReadingAudio(params: {
+  deckId: number;
+  slug: string;
+  gender: VoiceGender;
+  audio: PronunciationAudio;
+}): Promise<string> {
+  const { deckId, slug, gender, audio } = params;
+  return storeCachedMedia({
+    deckId,
+    folder: "readings",
+    nameWithoutExtension: `${slug}_${gender}_${shortHash(audio.metadata.pronunciation)}`,
+    // selectReadingAudios keeps only the audio/mpeg files
+    fetch: () => downloadMedia({ url: audio.url, extension: "mp3" }),
+  });
+}
+
+async function storeSentenceAudio(params: {
+  deckId: number;
+  slug: string;
+  sentence: ContextSentence | null;
+  azureTtsConfig: AzureTtsConfig;
+}): Promise<string> {
+  const { deckId, slug, sentence, azureTtsConfig } = params;
+  if (!sentence?.ja.trim()) return "";
+
+  // The Dragon HD voice is on trial to read the kanji itself. The generated
+  // kana reading only fills the furigana field.
+  const voice = pickSentenceVoice(azureTtsConfig.voices, slug);
+  const ssml = buildSentenceSsml({ text: sentence.ja, voice });
+  return storeCachedMedia({
+    deckId,
+    folder: "sentences",
+    nameWithoutExtension: `${slug}_${sentenceAudioHash(ssml)}`,
+    fetch: () => generateSentenceAudio({ ssml, config: azureTtsConfig }),
+  });
 }
 
 function buildVocabularyNoteFields(params: {
@@ -600,9 +708,11 @@ function buildVocabularyNoteFields(params: {
   };
 }
 
-async function addOrUpdateVocabularyCore(
-  vocabulary: Vocabulary | KanaVocabulary
-): Promise<{ created: boolean; noteId: number; characters: string }> {
+async function addOrUpdateVocabularyCore(params: {
+  vocabulary: Vocabulary | KanaVocabulary;
+  azureTtsConfig: AzureTtsConfig;
+}): Promise<{ created: boolean; noteId: number; characters: string }> {
+  const { vocabulary, azureTtsConfig } = params;
   const characters = vocabulary.characters;
   console.log(`[Anki] Processing vocabulary: ${characters}`);
 
@@ -612,8 +722,10 @@ async function addOrUpdateVocabularyCore(
   const slug = vocabulary.slug;
   // Anki auto-plays every [sound:] tag on the card back, so only one gender is
   // filled. All readings of it are kept: 平壌 needs both ぴょんやん and へいじょう.
-  const preferredGender = Math.random() < 0.5 ? "male" : "female";
-  const { gender, readingAudios } = pickReadingAudios(vocabulary, preferredGender);
+  const { gender, readingAudios } = pickReadingAudios(
+    vocabulary,
+    preferredReadingGender(vocabulary)
+  );
 
   const readingAudioTags = { female: "", male: "" };
 
@@ -622,23 +734,18 @@ async function addOrUpdateVocabularyCore(
   }
   const soundTags: string[] = [];
   for (const audio of readingAudios) {
-    const filename = `${deckId}_${slug}_${gender}_${shortHash(audio.metadata.pronunciation)}.mp3`;
-    await fetchAndStoreAudio(audio.url, filename);
-    soundTags.push(`[sound:${filename}]`);
+    const ankiFilename = await storeReadingAudio({ deckId, slug, gender, audio });
+    soundTags.push(`[sound:${ankiFilename}]`);
   }
   readingAudioTags[gender] = soundTags.join(" ");
 
-  let sentenceAudioFilename = "";
   const shortestSentence = getShortestSentence(vocabulary.contextSentences);
-  if (shortestSentence) {
-    // The Dragon HD voice is on trial to read the kanji itself. The generated
-    // kana reading only fills the furigana field.
-    const sentenceAudio = await generateSentenceAudio(shortestSentence.ja);
-    if (sentenceAudio) {
-      sentenceAudioFilename = `${deckId}_${slug}_sentence.mp3`;
-      await storeAudioData(sentenceAudioFilename, sentenceAudio);
-    }
-  }
+  const sentenceAudioFilename = await storeSentenceAudio({
+    deckId,
+    slug,
+    sentence: shortestSentence,
+    azureTtsConfig,
+  });
 
   const fields = buildVocabularyNoteFields({
     vocabulary,
@@ -663,6 +770,8 @@ export async function addVocabularyWithKanjiAndRadicals(
   console.log(
     `[Anki] Adding vocabulary ${vocabulary.characters} with ${componentKanji.length} kanji`
   );
+  // Read before the first write, so a missing value fails the add with no note written
+  const azureTtsConfig = readAzureTtsConfig();
 
   const uniqueRadicals = new Map(
     componentKanji.flatMap((k) => k.componentRadicals).map((r) => [r.id, r])
@@ -680,7 +789,7 @@ export async function addVocabularyWithKanjiAndRadicals(
     kanjiResults.push({ character: kanjiResult.character, created: kanjiResult.created });
   }
 
-  const vocabResult = await addOrUpdateVocabularyCore(vocabulary);
+  const vocabResult = await addOrUpdateVocabularyCore({ vocabulary, azureTtsConfig });
 
   return {
     subject: {

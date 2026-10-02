@@ -25,7 +25,7 @@ The box is a second Anki client next to the usual one. Both sync with AnkiWeb, w
 - sudo for `apt` and `loginctl`, nothing else
 - Tailscale on the box and the phone, and a firewall that admits only Tailscale, for example ufw with `default deny incoming`, `allow in on tailscale0`, `allow 41641/udp`
 - An AnkiWeb account that already holds the collection
-- Node 24 and Bun in `~/.local/bin`, and this repo checked out with `data/userdata/` cloned into it
+- Node 24 and Bun in `~/.local/bin`, and this repo checked out with `data/userdata/` cloned into it. Run `git -C data/userdata config merge.ours.driver true` once in that clone, so a media file that both machines added merges with no conflict, see "Two machines" in `data/userdata/README.md`
 
 ## Install
 
@@ -82,7 +82,7 @@ Steps marked **root** need sudo. An AI agent can do the rest.
    curl 127.0.0.1:8765 -d '{"action":"sync","version":6}'         # {"result": null, "error": null}
    ```
 
-9. The app. `bun install` in the repo, then `scp` `.env` and `scripts/.env` from the main machine. `.env` is for Azure TTS, without it sentence audio is skipped.
+9. The app. `bun install` in the repo, then `scp` `.env` and `scripts/.env` from the main machine. `.env` holds the three Azure TTS values and is required. Without one of them the dev server still starts, but the first API request fails, and the dev server log names the missing variable. Keep `AZURE_TTS_VOICES` the same on both machines: the voice is part of the sentence clip name, so a different list makes each machine create its own clip for most words.
 
 ## Unit files
 
@@ -196,6 +196,9 @@ Stop `anki` before you stop or restart `xvfb-anki`. Stopping the display kills A
   - A Qt platform with no display does not help. Anki runs with `QT_QPA_PLATFORM=offscreen` or `minimal` and no X server, AnkiConnect works, but it leaks just as much per write, and there is no screen left for VNC. Tested 2026-10-01.
 - **VNC shows no password field**, or the client refuses: the unit runs with `-rfbauth`, the client must send the stored password.
 - **Upgrading Anki**: unpack the new tarball next to the old one, move the `~/opt/anki` symlink, `systemctl --user restart anki`, check the version with the curl call above.
+- **A data repo pull stops with a conflict under `media/`**: this clone lacks the `ours` merge driver. Run `git -C data/userdata config merge.ours.driver true`, then `git -C data/userdata merge --abort`, and pull again.
+- **Every search answers 500 after an auto-pull**: a data file is broken, by the merge or by a hand edit. The dev server log names the file and the line. Fix the file and commit it, the server needs no restart. For `page ... has two images, delete one line` in `mnemonic-images.jsonl`, delete one of the two lines.
+- **A new subject from a fresh download does not show**: the server reads the subject files once at start. Restart the dev server after a pull that changes them.
 
 ## For AI agents
 

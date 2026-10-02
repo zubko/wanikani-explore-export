@@ -28,6 +28,18 @@ describe("getKanji", () => {
     const k = await getKanji(noVisSim!.id);
     expect(k!.visuallySimilarKanji).toEqual([]);
   });
+
+  test("returns null for a hidden kanji (昌, id=2285)", async () => {
+    const k = await getKanji(2285);
+    expect(k).toBeNull();
+  });
+
+  test("leaves a hidden kanji out of visually similar (冒 lists 1316 and the hidden 2285)", async () => {
+    const k = await getKanji(992);
+
+    expect(k!.visuallySimilarKanji.map((reference) => reference.id)).toEqual([1316]);
+    expect(k!.visuallySimilarSubjectIds).toEqual([1316]);
+  });
 });
 
 describe("getKanjis", () => {
@@ -46,6 +58,11 @@ describe("getKanjis", () => {
     const result = await getKanjis([]);
     expect(result).toEqual([]);
   });
+
+  test("skips a hidden kanji (昌, id=2285)", async () => {
+    const result = await getKanjis([2285, 658]);
+    expect(result.map((k) => k.id)).toEqual([658]);
+  });
 });
 
 describe("findKanjiByCharacters", () => {
@@ -60,6 +77,11 @@ describe("findKanjiByCharacters", () => {
 
   test("returns null for no match", async () => {
     const k = await findKanjiByCharacters("zzz");
+    expect(k).toBeNull();
+  });
+
+  test("never finds a hidden kanji (昌, id=2285)", async () => {
+    const k = await findKanjiByCharacters("昌");
     expect(k).toBeNull();
   });
 });
@@ -78,6 +100,11 @@ describe("findKanjiByMeaning", () => {
 
   test("returns null for no match", async () => {
     const k = await findKanjiByMeaning("nonexistent_meaning");
+    expect(k).toBeNull();
+  });
+
+  test("never finds a hidden kanji (Prosperous, id=2285)", async () => {
+    const k = await findKanjiByMeaning("prosperous");
     expect(k).toBeNull();
   });
 });

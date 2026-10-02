@@ -25,6 +25,11 @@ describe("getRadical", () => {
     expect(radical).toBeNull();
   });
 
+  test("returns null for a hidden radical (亼, id=225)", async () => {
+    const radical = await getRadical(225);
+    expect(radical).toBeNull();
+  });
+
   test("image-only radical has null characters and populated characterImages", async () => {
     const radical = await getRadical(8766);
 
@@ -60,6 +65,11 @@ describe("getRadicals", () => {
     const result = await getRadicals([]);
     expect(result).toEqual([]);
   });
+
+  test("skips a hidden radical (亼, id=225)", async () => {
+    const result = await getRadicals([225, 1]);
+    expect(result.map((radical) => radical.id)).toEqual([1]);
+  });
 });
 
 describe("findRadicalByCharacters", () => {
@@ -74,6 +84,11 @@ describe("findRadicalByCharacters", () => {
 
   test("returns null for no match", async () => {
     const radical = await findRadicalByCharacters("zzz");
+    expect(radical).toBeNull();
+  });
+
+  test("never finds a hidden radical (亼, id=225)", async () => {
+    const radical = await findRadicalByCharacters("亼");
     expect(radical).toBeNull();
   });
 });
@@ -96,6 +111,11 @@ describe("findRadicalByName", () => {
 
   test("returns null for no match", async () => {
     const radical = await findRadicalByName("nonexistent_radical_name");
+    expect(radical).toBeNull();
+  });
+
+  test("never finds a hidden radical (Drawer, id=70)", async () => {
+    const radical = await findRadicalByName("drawer");
     expect(radical).toBeNull();
   });
 });

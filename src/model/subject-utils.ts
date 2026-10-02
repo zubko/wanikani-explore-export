@@ -24,6 +24,18 @@ export function findByIds<T extends { id: number }>(items: T[], ids: number[]): 
     .filter((item): item is T => item !== undefined);
 }
 
+/** WaniKani hides an old subject from its site, but the API still returns it. */
+export function isVisibleSubject(subject: { data: { hidden_at: string | null } }): boolean {
+  return subject.data.hidden_at === null;
+}
+
+export function findVisibleByIds<T extends { id: number; data: { hidden_at: string | null } }>(
+  items: T[],
+  ids: number[]
+): T[] {
+  return findByIds(items, ids).filter(isVisibleSubject);
+}
+
 export function getExtraMeanings(meanings: Meaning[]): string {
   return acceptedAlternatives(meanings).join(", ");
 }
@@ -126,6 +138,7 @@ type SubjectDataWithReadings = {
   id: number;
   data: {
     characters: string | null;
+    hidden_at: string | null;
     readings: { reading: string; primary: boolean }[];
     meanings: { meaning: string; primary: boolean }[];
   };
@@ -135,7 +148,7 @@ export function buildSubjectReferences(
   allItems: SubjectDataWithReadings[],
   ids: number[]
 ): SubjectReference[] {
-  return findByIds(allItems, ids).map((item) =>
+  return findVisibleByIds(allItems, ids).map((item) =>
     buildSubjectReference({
       id: item.id,
       characters: item.data.characters,

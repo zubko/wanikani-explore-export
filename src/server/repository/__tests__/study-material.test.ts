@@ -1,20 +1,16 @@
 import { describe, test, expect, beforeAll, beforeEach, afterEach } from "bun:test";
+import { unlink } from "fs/promises";
 import type { LocalStudyMaterial } from "@/model/wanikani.ts";
-import { writeCalls, setFileContent, setFsError } from "@/test/preload.ts";
+import { holdFsOp, writeCalls, resetFsMock, setFileContent, setFsError } from "@/test/preload.ts";
 import {
   lastWrite,
-  loadStudyMaterialFixture,
-  resetStudyMaterialState,
   setStudyMaterialFile,
   studyMaterialFixture as fixture,
 } from "@/test/study-material-fixture.ts";
-import {
-  findSubjectTypeById,
-  localStudyMaterials,
-  LOCAL_STUDY_MATERIALS_PATH,
-} from "../data-loader.ts";
+import { findSubjectTypeById, getLocalStudyMaterials } from "../data-loader.ts";
+import { LOCAL_STUDY_MATERIALS_PATH } from "../data-paths.ts";
 import { getKanji } from "../kanji.ts";
-import { upsertLocalStudyMaterial } from "../study-material.ts";
+import { LOCAL_STUDY_MATERIAL_SAVE_ATTEMPTS, upsertLocalStudyMaterial } from "../study-material.ts";
 import { ensureRepositoryInitialized, installFetchMock } from "./setup.ts";
 
 installFetchMock();
@@ -33,13 +29,11 @@ function expectNoBlankValues(file: Record<string, LocalStudyMaterial>) {
   }
 }
 
-beforeAll(async () => {
-  await ensureRepositoryInitialized();
-  await loadStudyMaterialFixture();
-});
+beforeAll(ensureRepositoryInitialized);
 
-beforeEach(resetStudyMaterialState);
-afterEach(resetStudyMaterialState);
+// The fs mock is process-global, so a saved record must not reach the next test or file
+beforeEach(resetFsMock);
+afterEach(resetFsMock);
 
 describe("findSubjectTypeById", () => {
   test("finds each subject type", () => {
@@ -54,13 +48,30 @@ describe("findSubjectTypeById", () => {
   });
 });
 
+describe("getLocalStudyMaterials", () => {
+  test("reads the records of the file", async () => {
+    expect(await getLocalStudyMaterials()).toEqual(fixture);
+  });
+
+  test("a file removed while the server runs fails the next read and the next save", async () => {
+    await unlink(LOCAL_STUDY_MATERIALS_PATH);
+
+    await expect(upsertLocalStudyMaterial(1, { meaning_note: "New note" })).rejects.toThrow(
+      `${LOCAL_STUDY_MATERIALS_PATH} is missing`
+    );
+    expect(writeCalls).toHaveLength(0);
+    await expect(getKanji(456)).rejects.toThrow(`${LOCAL_STUDY_MATERIALS_PATH} is missing`);
+  });
+});
+
 describe("upsertLocalStudyMaterial", () => {
   test("creates a new entry and keeps the other entries", async () => {
     const saved = await upsertLocalStudyMaterial(2484, { meaning_note: "Chi + kara = power" });
 
+    const records = await getLocalStudyMaterials();
     expect(saved).toEqual({ meaning_note: "Chi + kara = power" });
-    expect(localStudyMaterials["2484"]).toEqual({ meaning_note: "Chi + kara = power" });
-    expect(localStudyMaterials["456"]).toEqual(fixture["456"]!);
+    expect(records["2484"]).toEqual({ meaning_note: "Chi + kara = power" });
+    expect(records["456"]).toEqual(fixture["456"]!);
     expect(lastWrite()["2484"]).toEqual({ meaning_note: "Chi + kara = power" });
   });
 
@@ -92,7 +103,7 @@ describe("upsertLocalStudyMaterial", () => {
     const saved = await upsertLocalStudyMaterial(456, { reading_note: "" });
 
     expect(saved).toBeNull();
-    expect(localStudyMaterials["456"]).toBeUndefined();
+    expect((await getLocalStudyMaterials())["456"]).toBeUndefined();
     expect(lastWrite()).not.toHaveProperty("456");
   });
 
@@ -113,11 +124,12 @@ describe("upsertLocalStudyMaterial", () => {
       add_synonym: " ",
     });
 
-    expect(localStudyMaterials["2478"]).toEqual({ meaning_synonyms: ["yank"] });
-    expect(localStudyMaterials["958"]).toEqual({
+    const records = await getLocalStudyMaterials();
+    expect(records["2478"]).toEqual({ meaning_synonyms: ["yank"] });
+    expect(records["958"]).toEqual({
       meaning_note: "Evening comes after the sun goes down",
     });
-    expect(localStudyMaterials["1"]).toBeUndefined();
+    expect(records["1"]).toBeUndefined();
     expectNoBlankValues(lastWrite());
   });
 
@@ -137,31 +149,31 @@ describe("upsertLocalStudyMaterial", () => {
 
     expect(writeCalls).toHaveLength(1);
     expect(writeCalls[0]!.path).toBe(LOCAL_STUDY_MATERIALS_PATH);
-    expect(writeCalls[0]!.data.endsWith("\n")).toBe(true);
+    expect(String(writeCalls[0]!.data).endsWith("\n")).toBe(true);
     expect(writeCalls.some((call) => call.path.endsWith(".tmp"))).toBe(false);
   });
 });
 
 describe("upsertLocalStudyMaterial write failures", () => {
-  test("a writeFile error keeps the memory state and leaves no temp file", async () => {
+  test("a writeFile error keeps the old records and leaves no temp file", async () => {
     setFsError("writeFile", new Error("disk full"));
 
     await expect(upsertLocalStudyMaterial(1, { meaning_note: "New note" })).rejects.toThrow(
       "disk full"
     );
 
-    expect(localStudyMaterials["1"]).toEqual(fixture["1"]!);
+    expect((await getLocalStudyMaterials())["1"]).toEqual(fixture["1"]!);
     expect(writeCalls).toHaveLength(0);
   });
 
-  test("a rename error keeps the memory state and removes the temp file", async () => {
+  test("a rename error keeps the old records and removes the temp file", async () => {
     setFsError("rename", new Error("rename failed"));
 
     await expect(upsertLocalStudyMaterial(1, { meaning_note: "New note" })).rejects.toThrow(
       "rename failed"
     );
 
-    expect(localStudyMaterials["1"]).toEqual(fixture["1"]!);
+    expect((await getLocalStudyMaterials())["1"]).toEqual(fixture["1"]!);
     expect(writeCalls).toHaveLength(0);
   });
 
@@ -186,7 +198,7 @@ describe("upsertLocalStudyMaterial with the file changed outside the app", () =>
     const file = lastWrite();
     expect(file["2484"]).toEqual({ meaning_note: "Typed by hand" });
     expect(file["958"]).toEqual(saved!);
-    expect(localStudyMaterials["2484"]).toEqual({ meaning_note: "Typed by hand" });
+    expect((await getLocalStudyMaterials())["2484"]).toEqual({ meaning_note: "Typed by hand" });
   });
 
   test("a synonym added outside survives an add from a client with an old list", async () => {
@@ -208,6 +220,41 @@ describe("upsertLocalStudyMaterial with the file changed outside the app", () =>
     });
   });
 
+  test("a change between the read and the rename makes the save start again", async () => {
+    const write = holdFsOp("writeFile");
+    const save = upsertLocalStudyMaterial(958, { reading_note: "Ban the night curfew" });
+    await write.reached;
+    setStudyMaterialFile({ ...fixture, "2484": { meaning_note: "Pulled from git" } });
+    write.release();
+
+    const saved = await save;
+
+    const file = lastWrite();
+    expect(file["2484"]).toEqual({ meaning_note: "Pulled from git" });
+    expect(file["958"]).toEqual(saved!);
+    expect(writeCalls.map((call) => call.path)).toEqual([LOCAL_STUDY_MATERIALS_PATH]);
+  });
+
+  test("a file that changes during every attempt fails the save and keeps the change", async () => {
+    let write = holdFsOp("writeFile");
+    const save = upsertLocalStudyMaterial(958, { reading_note: "Ban the night curfew" });
+    for (let attempt = 1; attempt <= LOCAL_STUDY_MATERIAL_SAVE_ATTEMPTS; attempt++) {
+      await write.reached;
+      setStudyMaterialFile({ ...fixture, "2484": { meaning_note: `Pull ${attempt}` } });
+      write.release();
+      if (attempt < LOCAL_STUDY_MATERIAL_SAVE_ATTEMPTS) write = holdFsOp("writeFile");
+    }
+
+    await expect(save).rejects.toThrow("Nothing was saved");
+
+    expect(writeCalls).toHaveLength(0);
+    const records = await getLocalStudyMaterials();
+    expect(records["2484"]).toEqual({
+      meaning_note: `Pull ${LOCAL_STUDY_MATERIAL_SAVE_ATTEMPTS}`,
+    });
+    expect(records["958"]).toEqual(fixture["958"]!);
+  });
+
   test("an unreadable file fails the save and writes nothing", async () => {
     setFileContent(LOCAL_STUDY_MATERIALS_PATH, "{ broken");
 
@@ -216,7 +263,7 @@ describe("upsertLocalStudyMaterial with the file changed outside the app", () =>
     );
 
     expect(writeCalls).toHaveLength(0);
-    expect(localStudyMaterials["1"]).toEqual(fixture["1"]!);
+    await expect(getLocalStudyMaterials()).rejects.toThrow("Cannot read");
   });
 });
 

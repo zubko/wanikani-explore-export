@@ -1,36 +1,36 @@
 import { describe, test, expect, beforeAll, beforeEach, afterEach } from "bun:test";
-import { setLocalStudyMaterials } from "@server/repository/data-loader.ts";
 import {
-  loadStudyMaterialFixture,
-  resetStudyMaterialState,
+  setStudyMaterialFile,
   studyMaterialFixture as fixture,
 } from "@/test/study-material-fixture.ts";
 import {
   installFetchInterceptor,
   resetFetchInterceptor,
   ankiCalls,
+  externalFetches,
   setAnkiError,
   setAnkiResponse,
+  setMediaContentType,
   setMediaStatus,
   setModelFields,
 } from "@/test/fetch-interceptor.ts";
-import { ensureRepositoryInitialized, resetRandom } from "@/test/preload.ts";
+import { ensureRepositoryInitialized, resetFsMock, writeCalls } from "@/test/preload.ts";
 import { VOCABULARY_MODEL_NAME, VOCABULARY_EXPECTED_FIELDS } from "@/model/anki-models.ts";
+import { getRadicalSvgUrl } from "@/model/radical-utils.ts";
+import { vocabulary as vocabularyData } from "@server/repository/data-loader.ts";
+import { MEDIA_ROOT_PATH, MNEMONIC_IMAGES_PATH } from "@server/repository/data-paths.ts";
+import { getRadical } from "@server/repository/radical.ts";
+import { getVocabulary } from "@server/repository/vocabulary.ts";
 import { api } from "../api.ts";
 
-process.env.AZURE_TTS_KEY = "test-key";
-process.env.AZURE_TTS_REGION = "eastus";
-process.env.AZURE_TTS_VOICES = "ja-JP-TestNeural";
-
 installFetchInterceptor();
-beforeAll(async () => {
-  await ensureRepositoryInitialized();
-  await loadStudyMaterialFixture();
-});
+beforeAll(ensureRepositoryInitialized);
+// An add writes media files and registry lines, which must not reach the next test or file
 beforeEach(() => {
   resetFetchInterceptor();
-  resetRandom();
+  resetFsMock();
 });
+afterEach(resetFsMock);
 
 type AddBody = { id: number; type: string; sync?: boolean };
 
@@ -66,11 +66,25 @@ function findVocabularyFields(action: string, characters: string): Record<string
   return findNoteFields({ action, field: "characters", value: characters });
 }
 
-function storedAudioFilenames(): string[] {
+function storedMediaFilenames(): string[] {
   return ankiCalls
     .filter((c) => c.action === "storeMediaFile")
-    .map((c) => String(c.params.filename))
-    .filter((name) => name.endsWith(".mp3"));
+    .map((c) => String(c.params.filename));
+}
+
+/** The name and the base64 bytes of every file sent to Anki. */
+function storedMedia(): { filename: unknown; data: unknown }[] {
+  return ankiCalls
+    .filter((c) => c.action === "storeMediaFile")
+    .map((c) => ({ filename: c.params.filename, data: c.params.data }));
+}
+
+function storedAudioFilenames(): string[] {
+  return storedMediaFilenames().filter((name) => name.endsWith(".mp3"));
+}
+
+function cachedMediaPaths(): string[] {
+  return writeCalls.map((call) => call.path).filter((path) => path.startsWith(MEDIA_ROOT_PATH));
 }
 
 describe("add-to-anki API", () => {
@@ -82,6 +96,13 @@ describe("add-to-anki API", () => {
 
   test("non-existent subject returns 404", async () => {
     const response = await addToAnki({ id: 999999, type: "radical" });
+    expect(response.status).toBe(404);
+    expect(await response.json()).toEqual({ ok: false, error: "Subject not found" });
+    expect(ankiCalls).toEqual([]);
+  });
+
+  test("a hidden subject returns 404 (昌, id=2285)", async () => {
+    const response = await addToAnki({ id: 2285, type: "kanji" });
     expect(response.status).toBe(404);
     expect(await response.json()).toEqual({ ok: false, error: "Subject not found" });
     expect(ankiCalls).toEqual([]);
@@ -178,7 +199,7 @@ describe("add-to-anki API", () => {
       [
         "1003_平壌_male_3af1ead2.mp3",
         "1003_平壌_male_d10a9de1.mp3",
-        "1003_平壌_sentence.mp3",
+        "1003_平壌_b85cd9d7.mp3",
       ]
     `);
   });
@@ -194,18 +215,26 @@ describe("add-to-anki API", () => {
     );
   });
 
-  test("failed audio download returns error", async () => {
+  test("failed audio download returns error and caches nothing", async () => {
+    const vocabulary = await getVocabulary(3766);
+    const audioUrls = vocabulary?.pronunciationAudios.map((audio) => audio.url);
     setMediaStatus(404);
     const result = await addToAnkiJson({ id: 3766, type: "vocabulary" });
     expect(result.ok).toBe(false);
-    expect(result.error).toContain("Failed to download audio (404)");
+    const failedUrl = externalFetches.at(-1);
+    expect(audioUrls).toContain(failedUrl);
+    expect(result.error).toBe(`Failed to download media (404): ${failedUrl}`);
+    expect(cachedMediaPaths()).toEqual([]);
   });
 
-  test("failed SVG download returns error", async () => {
+  test("failed SVG download returns error and caches nothing", async () => {
+    const radical = await getRadical(8766);
+    const svgUrl = radical && getRadicalSvgUrl(radical);
     setMediaStatus(500);
     const result = await addToAnkiJson({ id: 8766, type: "radical" });
     expect(result.ok).toBe(false);
-    expect(result.error).toContain("Failed to download SVG (500)");
+    expect(result.error).toBe(`Failed to download media (500): ${svgUrl}`);
+    expect(cachedMediaPaths()).toEqual([]);
   });
 
   test("add verb vocabulary (入る, id=2480) fills masu_form", async () => {
@@ -294,12 +323,213 @@ describe("add-to-anki API", () => {
   });
 });
 
-describe("alternative_meanings", () => {
-  beforeEach(resetStudyMaterialState);
-  afterEach(resetStudyMaterialState);
+describe("media cache", () => {
+  test("a radical add stores the mnemonic picture as an <img> tag (一)", async () => {
+    const result = await addToAnkiJson({ id: 1, type: "radical" });
+    expect(result.ok).toBe(true);
 
+    const [ankiFilename] = storedMediaFilenames();
+    expect(storedMediaFilenames()).toMatchInlineSnapshot(`
+      [
+        "1001_ground_mnemonic_f09eea31.svg",
+      ]
+    `);
+    expect(cachedMediaPaths()).toMatchInlineSnapshot(`
+      [
+        "./data/userdata/media/mnemonics/ground_mnemonic_f09eea31.svg",
+      ]
+    `);
+    const fields = findNoteFields({ action: "addNote", field: "character", value: "一" });
+    expect(fields.mnemonic_image).toBe(`<img src="${ankiFilename}" class="mnemonic-img">`);
+  });
+
+  test("a second radical add reads the mnemonic picture from disk (一)", async () => {
+    await addToAnkiJson({ id: 1, type: "radical" });
+    const firstStored = storedMedia();
+    resetFetchInterceptor();
+
+    const result = await addToAnkiJson({ id: 1, type: "radical" });
+    expect(result.ok).toBe(true);
+    expect(externalFetches).toEqual([]);
+    expect(storedMedia()).toEqual(firstStored);
+  });
+
+  test("a picture answered as PNG is cached and stored as .png (一)", async () => {
+    setMediaContentType("image/png");
+
+    const result = await addToAnkiJson({ id: 1, type: "radical" });
+    expect(result.ok).toBe(true);
+
+    expect(cachedMediaPaths()).toEqual([
+      `${MEDIA_ROOT_PATH}/mnemonics/ground_mnemonic_f09eea31.png`,
+    ]);
+    const fields = findNoteFields({ action: "addNote", field: "character", value: "一" });
+    expect(fields.mnemonic_image).toBe(
+      `<img src="1001_ground_mnemonic_f09eea31.png" class="mnemonic-img">`
+    );
+  });
+
+  test("a failed picture download fails the add, names the registry and caches nothing (一)", async () => {
+    const radical = await getRadical(1);
+    setMediaStatus(404);
+
+    const result = await addToAnkiJson({ id: 1, type: "radical" });
+    expect(result.ok).toBe(false);
+    expect(result.error).toBe(
+      `Failed to download media (404): ${radical?.mnemonicImageUrl}. It is the mnemonic picture of ${radical?.documentUrl}. To scrape that page again, delete its line in ${MNEMONIC_IMAGES_PATH}`
+    );
+    expect(cachedMediaPaths()).toEqual([]);
+    expect(ankiCalls.map((c) => c.action)).not.toContain("addNote");
+  });
+
+  test("a picture with an unknown content type fails the add with its URL (一)", async () => {
+    const radical = await getRadical(1);
+    setMediaContentType("text/html");
+
+    const result = await addToAnkiJson({ id: 1, type: "radical" });
+    expect(result.ok).toBe(false);
+    expect(result.error).toStartWith(
+      `Unknown media content type (text/html): ${radical?.mnemonicImageUrl}. It is the mnemonic picture of`
+    );
+    expect(cachedMediaPaths()).toEqual([]);
+  });
+
+  test("a picture with no content type fails the add (一)", async () => {
+    setMediaContentType(null);
+
+    const result = await addToAnkiJson({ id: 1, type: "radical" });
+    expect(result.ok).toBe(false);
+    expect(result.error).toStartWith("Unknown media content type (null)");
+    expect(cachedMediaPaths()).toEqual([]);
+  });
+
+  test("a second radical add reads the SVG from disk (8766)", async () => {
+    await addToAnkiJson({ id: 8766, type: "radical" });
+    expect(cachedMediaPaths()).toMatchInlineSnapshot(`
+      [
+        "./data/userdata/media/radicals/beggar_ee00622d.svg",
+      ]
+    `);
+    const firstStored = storedMedia();
+    resetFetchInterceptor();
+
+    const result = await addToAnkiJson({ id: 8766, type: "radical" });
+    expect(result.ok).toBe(true);
+    expect(externalFetches).toEqual([]);
+    expect(storedMedia()).toEqual(firstStored);
+    const [ankiFilename] = storedMediaFilenames();
+    expect(storedMediaFilenames()).toMatchInlineSnapshot(`
+      [
+        "1001_beggar_ee00622d.svg",
+      ]
+    `);
+    const fields = findNoteFields({
+      action: "addNote",
+      field: "character",
+      value: `<img src="${ankiFilename}">`,
+    });
+    expect(fields.primary_name).toBe("Beggar");
+  });
+
+  test("a second kanji add reads every file from disk (写)", async () => {
+    const first = await addToAnkiJson({ id: 531, type: "kanji" });
+    expect(first.ok).toBe(true);
+    expect(cachedMediaPaths()).toMatchInlineSnapshot(`
+      [
+        "./data/userdata/media/radicals/beggar_ee00622d.svg",
+        "./data/userdata/media/mnemonics/ground_mnemonic_f09eea31.svg",
+      ]
+    `);
+    expect(storedMediaFilenames()).toMatchInlineSnapshot(`
+      [
+        "1001_beggar_ee00622d.svg",
+        "1001_ground_mnemonic_f09eea31.svg",
+        "1002_beggar_ee00622d.svg",
+      ]
+    `);
+    const firstStored = storedMedia();
+    resetFetchInterceptor();
+
+    const result = await addToAnkiJson({ id: 531, type: "kanji" });
+    expect(result.ok).toBe(true);
+    expect(externalFetches).toEqual([]);
+    expect(storedMedia()).toEqual(firstStored);
+  });
+});
+
+describe("media cache for a word", () => {
+  test("an add caches the reading clips and the sentence clip with no deck id (毎晩)", async () => {
+    const result = await addToAnkiJson({ id: 3766, type: "vocabulary" });
+    expect(result.ok).toBe(true);
+
+    expect(cachedMediaPaths()).toMatchInlineSnapshot(`
+      [
+        "./data/userdata/media/readings/毎晩_female_a03eecb8.mp3",
+        "./data/userdata/media/sentences/毎晩_982a186a.mp3",
+      ]
+    `);
+    expect(storedAudioFilenames()).toMatchInlineSnapshot(`
+      [
+        "1003_毎晩_female_a03eecb8.mp3",
+        "1003_毎晩_982a186a.mp3",
+      ]
+    `);
+    const fields = findVocabularyFields("addNote", "毎晩");
+    expect(fields.sentence_jap_audio).toMatch(/^\[sound:1003_毎晩_[0-9a-f]{8}\.mp3\]$/);
+  });
+
+  test("a second add reads every clip from disk (毎晩)", async () => {
+    await addToAnkiJson({ id: 3766, type: "vocabulary" });
+    const firstStored = storedMedia();
+    const firstFields = findVocabularyFields("addNote", "毎晩");
+    resetFetchInterceptor();
+
+    const result = await addToAnkiJson({ id: 3766, type: "vocabulary" });
+    expect(result.ok).toBe(true);
+    expect(externalFetches).toEqual([]);
+    expect(storedMedia()).toEqual(firstStored);
+    const fields = findVocabularyFields("addNote", "毎晩");
+    expect(fields.reading_audio_female).toBe(firstFields.reading_audio_female);
+    expect(fields.reading_audio_male).toBe(firstFields.reading_audio_male);
+    expect(fields.sentence_jap_audio).toBe(firstFields.sentence_jap_audio);
+  });
+
+  test("a missing Azure value fails the add before any note or file is written", async () => {
+    const key = process.env.AZURE_TTS_KEY;
+    delete process.env.AZURE_TTS_KEY;
+    try {
+      const result = await addToAnkiJson({ id: 3766, type: "vocabulary" });
+      expect(result.ok).toBe(false);
+      expect(result.error).toBe("Missing AZURE_TTS_KEY in the root env file");
+      expect(ankiCalls.map((c) => c.action)).toEqual(["sync"]);
+      expect(cachedMediaPaths()).toEqual([]);
+    } finally {
+      process.env.AZURE_TTS_KEY = key;
+    }
+  });
+
+  test("a word with no context sentence gets no sentence clip (毎晩)", async () => {
+    const data = vocabularyData.find((item) => item.id === 3766)!.data;
+    const sentences = data.context_sentences;
+    data.context_sentences = [];
+    try {
+      const result = await addToAnkiJson({ id: 3766, type: "vocabulary" });
+      expect(result.ok).toBe(true);
+
+      const fields = findVocabularyFields("addNote", "毎晩");
+      expect(fields.sentence_jap).toBe("");
+      expect(fields.sentence_jap_audio).toBe("");
+      expect(externalFetches.some((url) => url.includes(".tts.speech.microsoft.com"))).toBe(false);
+      expect(cachedMediaPaths().some((path) => path.includes("/sentences/"))).toBe(false);
+    } finally {
+      data.context_sentences = sentences;
+    }
+  });
+});
+
+describe("alternative_meanings", () => {
   test("a local synonym equal to a WaniKani meaning is listed once (毎晩)", async () => {
-    setLocalStudyMaterials({ ...fixture, "3766": { meaning_synonyms: ["nightly", "Nights"] } });
+    setStudyMaterialFile({ ...fixture, "3766": { meaning_synonyms: ["nightly", "Nights"] } });
 
     const result = await addToAnkiJson({ id: 3766, type: "vocabulary" });
     expect(result.ok).toBe(true);
@@ -314,7 +544,7 @@ describe("alternative_meanings", () => {
   });
 
   test("WaniKani and local synonyms are joined, a case variant is listed once (アメリカ人)", async () => {
-    setLocalStudyMaterials({ ...fixture, "2478": { meaning_synonyms: ["USA Person", "yankee"] } });
+    setStudyMaterialFile({ ...fixture, "2478": { meaning_synonyms: ["USA Person", "yankee"] } });
 
     const result = await addToAnkiJson({ id: 2478, type: "vocabulary" });
     expect(result.ok).toBe(true);
@@ -330,7 +560,7 @@ describe("alternative_meanings", () => {
 
   test("an updated kanji note gets its synonyms (晩)", async () => {
     setAnkiResponse("findNotes", [1]);
-    setLocalStudyMaterials({ ...fixture, "958": { meaning_synonyms: ["dusk"] } });
+    setStudyMaterialFile({ ...fixture, "958": { meaning_synonyms: ["dusk"] } });
 
     const result = await addToAnkiJson({ id: 958, type: "kanji" });
     expect(result.ok).toBe(true);
@@ -348,8 +578,7 @@ describe("alternative_meanings", () => {
 
 describe("HTML in a local note", () => {
   beforeEach(() => {
-    resetStudyMaterialState();
-    setLocalStudyMaterials({
+    setStudyMaterialFile({
       ...fixture,
       "1": {
         meaning_note: "use < for the smaller one & > for the bigger",
@@ -362,8 +591,6 @@ describe("HTML in a local note", () => {
       },
     });
   });
-
-  afterEach(resetStudyMaterialState);
 
   test("a radical note and its synonyms reach Anki escaped", async () => {
     const result = await addToAnkiJson({ id: 1, type: "radical" });
@@ -388,7 +615,7 @@ describe("HTML in a local note", () => {
   });
 
   test("a vocabulary note and its synonyms reach Anki escaped", async () => {
-    setLocalStudyMaterials({
+    setStudyMaterialFile({
       ...fixture,
       "3766": { meaning_note: "every evening & night", meaning_synonyms: ["a < b"] },
     });
