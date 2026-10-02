@@ -7,11 +7,23 @@ import { installDom } from "./dom.ts";
 // react-dom reads the DOM globals when it loads, so this must run before any test file imports it
 installDom();
 
-type FsOp = "readFile" | "writeFile" | "appendFile" | "rename" | "unlink" | "stat" | "readdir";
+type FsOp =
+  | "readFile"
+  | "writeFile"
+  | "appendFile"
+  | "rename"
+  | "unlink"
+  | "stat"
+  | "readdir"
+  | "mkdir";
 
 type FileData = string | Buffer;
 
 type MockFile = { data: FileData; version: number };
+
+type FsHold = { markReached: () => void; released: Promise<void>; release: () => void };
+
+export const STUDY_MATERIALS_FIXTURE_PATH = "src/test/fixtures/study_materials_extra.json";
 
 // Checked-in fixtures under the real paths, so no test depends on user-specific state
 const SEEDED_FILES = [
@@ -21,7 +33,7 @@ const SEEDED_FILES = [
   },
   {
     path: "./data/userdata/study_materials_extra.json",
-    fixturePath: "src/test/fixtures/study_materials_extra.json",
+    fixturePath: STUDY_MATERIALS_FIXTURE_PATH,
   },
 ];
 
@@ -31,8 +43,10 @@ const SEEDED_PATHS = new Set(SEEDED_FILES.map(({ path }) => normalize(path)));
 const MEDIA_FOLDER = normalize("./data/userdata/media/");
 
 export const writeCalls: { path: string; data: FileData }[] = [];
+export const mkdirCalls: { path: string; recursive: boolean }[] = [];
 
 const fsErrors = new Map<FsOp, Error>();
+const fsHolds = new Map<FsOp, FsHold>();
 // Holds the written files, so a read after a write sees the new content like a real disk does
 const files = new Map<string, MockFile>();
 // Never reset, so a file seeded again after a reset still looks changed to a reader that holds the old one
@@ -40,22 +54,41 @@ let lastVersion = 0;
 
 seedFixtures();
 
-/** Drops the recorded writes, the written files and the injected errors, then seeds the fixtures again. */
+/** Drops the recorded calls, the written files, the injected errors and the held ops, then seeds the fixtures again. */
 export function resetFsMock() {
   writeCalls.length = 0;
+  mkdirCalls.length = 0;
   files.clear();
   fsErrors.clear();
+  for (const hold of fsHolds.values()) hold.release();
+  fsHolds.clear();
   seedFixtures();
 }
 
 /** Puts content under a path without recording a write, for a change made outside the app. */
 export function setFileContent(path: string, data: FileData) {
-  putFile(path, data);
+  lastVersion += 1;
+  files.set(fileKey(path), { data, version: lastVersion });
 }
 
 export function setFsError(op: FsOp, err: Error | null) {
   if (err) fsErrors.set(op, err);
   else fsErrors.delete(op);
+}
+
+/**
+ * Makes every call of the op wait until `release()`. `reached` resolves when the first call
+ * waits, so a test can act while the op is in the middle of its work.
+ */
+export function holdFsOp(op: FsOp): { reached: Promise<void>; release: () => void } {
+  const reached = Promise.withResolvers<void>();
+  const released = Promise.withResolvers<void>();
+  const release = () => {
+    fsHolds.delete(op);
+    released.resolve();
+  };
+  fsHolds.set(op, { markReached: reached.resolve, released: released.promise, release });
+  return { reached: reached.promise, release };
 }
 
 function seedFixtures() {
@@ -64,17 +97,17 @@ function seedFixtures() {
   }
 }
 
-function putFile(path: string, data: FileData) {
-  lastVersion += 1;
-  files.set(fileKey(path), { data, version: lastVersion });
-}
-
 // `./data/x` and `data/x` name one file
 function fileKey(path: string): string {
   return normalize(String(path));
 }
 
-function throwWhenSet(op: FsOp) {
+async function startOp(op: FsOp) {
+  const hold = fsHolds.get(op);
+  if (hold) {
+    hold.markReached();
+    await hold.released;
+  }
   const err = fsErrors.get(op);
   if (err) throw err;
 }
@@ -91,7 +124,7 @@ mock.module("fs/promises", () => ({
     path: string,
     options?: BufferEncoding | { encoding?: BufferEncoding | null }
   ) => {
-    throwWhenSet("readFile");
+    await startOp("readFile");
     const key = fileKey(path);
     const file = files.get(key);
     if (file === undefined) {
@@ -105,41 +138,42 @@ mock.module("fs/promises", () => ({
     return encoding ? bytes.toString(encoding) : bytes;
   },
   writeFile: async (path: string, data: FileData) => {
-    throwWhenSet("writeFile");
-    putFile(path, data);
+    await startOp("writeFile");
+    setFileContent(path, data);
     writeCalls.push({ path: String(path), data });
   },
   appendFile: async (path: string, data: FileData) => {
-    throwWhenSet("appendFile");
+    await startOp("appendFile");
     const current = files.get(fileKey(path))?.data ?? "";
-    putFile(path, Buffer.concat([Buffer.from(current), Buffer.from(data)]));
+    setFileContent(path, Buffer.concat([Buffer.from(current), Buffer.from(data)]));
     writeCalls.push({ path: String(path), data });
   },
   rename: async (from: string, to: string) => {
-    throwWhenSet("rename");
+    await startOp("rename");
     const file = files.get(fileKey(from));
     if (file !== undefined) {
       files.delete(fileKey(from));
-      putFile(to, file.data);
+      setFileContent(to, file.data);
     }
     const entry = writeCalls.find((call) => fileKey(call.path) === fileKey(from));
     if (entry) entry.path = String(to);
   },
   unlink: async (path: string) => {
-    throwWhenSet("unlink");
+    await startOp("unlink");
     files.delete(fileKey(path));
     const index = writeCalls.findIndex((call) => fileKey(call.path) === fileKey(path));
     if (index >= 0) writeCalls.splice(index, 1);
   },
-  // The version stands in for the mtime, so every change of a file gives it a new one
+  // The version stands in for the mtime, so every change of a file gives it a new one. The inode
+  // never changes, so a test sees a change through the mtime and the size alone.
   stat: async (path: string) => {
-    throwWhenSet("stat");
+    await startOp("stat");
     const file = files.get(fileKey(path));
     if (file === undefined) throw missingFileError("stat", path);
-    return { mtimeMs: file.version, size: Buffer.byteLength(file.data) };
+    return { ino: 0, mtimeMs: file.version, size: Buffer.byteLength(file.data) };
   },
   readdir: async (path: string) => {
-    throwWhenSet("readdir");
+    await startOp("readdir");
     const folder = fileKey(path);
     const names = [...files.keys()]
       .filter((key) => dirname(key) === folder)
@@ -147,7 +181,10 @@ mock.module("fs/promises", () => ({
     if (names.length === 0) throw missingFileError("readdir", path);
     return names;
   },
-  mkdir: async () => {},
+  mkdir: async (path: string, options?: { recursive?: boolean }) => {
+    await startOp("mkdir");
+    mkdirCalls.push({ path: String(path), recursive: options?.recursive ?? false });
+  },
 }));
 
 // Plain assignments: bun test loads the root env file, and its real voice list would change the

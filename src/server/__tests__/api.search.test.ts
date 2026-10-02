@@ -11,19 +11,15 @@ import {
   writeCalls,
 } from "@/test/preload.ts";
 import {
-  loadStudyMaterialFixture,
   setStudyMaterialFile,
   studyMaterialFixture as fixture,
 } from "@/test/study-material-fixture.ts";
-import { LOCAL_STUDY_MATERIALS_PATH } from "../repository/data-loader.ts";
+import { getLocalStudyMaterials, LOCAL_STUDY_MATERIALS_PATH } from "../repository/data-loader.ts";
 import { MNEMONIC_IMAGES_PATH } from "../repository/mnemonic-image-fetcher.ts";
 import { api } from "../api.ts";
 
 installFetchInterceptor();
-beforeAll(async () => {
-  await ensureRepositoryInitialized();
-  await loadStudyMaterialFixture();
-});
+beforeAll(ensureRepositoryInitialized);
 beforeEach(resetFetchInterceptor);
 // Earlier tests and files may already have appended a page to the registry
 beforeEach(resetFsMock);
@@ -158,6 +154,9 @@ describe("search API with the local study materials changed outside the app", ()
   test("a broken file fails the next search, a fixed file answers again (川)", async () => {
     setFileContent(LOCAL_STUDY_MATERIALS_PATH, "{ broken");
     expect((await searchApi("type=kanji&q=川")).status).toBe(500);
+    await expect(getLocalStudyMaterials()).rejects.toThrow(
+      `Cannot read ${LOCAL_STUDY_MATERIALS_PATH}`
+    );
 
     setStudyMaterialFile(fixture);
     const response = await searchApi("type=kanji&q=川");

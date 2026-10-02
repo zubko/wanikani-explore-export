@@ -1,11 +1,9 @@
 import { describe, test, expect, beforeAll, beforeEach, afterEach } from "bun:test";
 import { unlink } from "fs/promises";
 import type { LocalStudyMaterial } from "@/model/wanikani.ts";
-import { writeCalls, setFileContent, setFsError } from "@/test/preload.ts";
+import { writeCalls, resetFsMock, setFileContent, setFsError } from "@/test/preload.ts";
 import {
   lastWrite,
-  loadStudyMaterialFixture,
-  resetStudyMaterialState,
   setStudyMaterialFile,
   studyMaterialFixture as fixture,
 } from "@/test/study-material-fixture.ts";
@@ -34,13 +32,11 @@ function expectNoBlankValues(file: Record<string, LocalStudyMaterial>) {
   }
 }
 
-beforeAll(async () => {
-  await ensureRepositoryInitialized();
-  await loadStudyMaterialFixture();
-});
+beforeAll(ensureRepositoryInitialized);
 
-beforeEach(resetStudyMaterialState);
-afterEach(resetStudyMaterialState);
+// The fs mock is process-global, so a saved record must not reach the next test or file
+beforeEach(resetFsMock);
+afterEach(resetFsMock);
 
 describe("findSubjectTypeById", () => {
   test("finds each subject type", () => {

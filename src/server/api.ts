@@ -43,14 +43,9 @@ import {
   isFieldMismatchError,
   syncAnkiWeb,
 } from "./services/anki-connect.ts";
+import { getErrorMessage } from "./utils/error-utils.ts";
 
 const ANKI_DECK_TYPES: AnkiDeckType[] = ["radical", "kanji", "vocabulary"];
-
-function getErrorMessage(err: unknown): string {
-  if (err instanceof Error) return err.message;
-  if (typeof err === "object" && err !== null && "message" in err) return String(err.message);
-  return String(err);
-}
 
 async function findSubjectForAnki(id: number, type: SubjectType): Promise<Subject | null> {
   if (type === "radical") return getRadical(id);

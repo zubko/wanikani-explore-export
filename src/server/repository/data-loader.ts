@@ -34,7 +34,8 @@ const localStudyMaterialsFile = createReloadingFile({
   path: LOCAL_STUDY_MATERIALS_PATH,
   parse: (content) => {
     const records = parseLocalStudyMaterialsFile(content);
-    checkLocalStudyMaterialSubjects(records);
+    // The subject arrays are read once at start, and the other machine may hold a newer download
+    checkLocalStudyMaterialSubjects({ records, unknownSubject: "skip" });
     return records;
   },
 });
@@ -58,8 +59,11 @@ export async function initRepository(): Promise<void> {
     readJson<Record<string, SentenceReadingEntry>>("./data/sentence_readings.json"),
   ]);
   await ensureLocalStudyMaterialsFile();
-  // Read once here, so a bad file fails the start
-  await getLocalStudyMaterials();
+  // Read once here, so a bad file or a record of an unknown subject fails the start
+  checkLocalStudyMaterialSubjects({
+    records: await readLocalStudyMaterials(),
+    unknownSubject: "fail",
+  });
   await loadMnemonicImageRegistry();
 }
 
@@ -76,24 +80,36 @@ export function findSubjectTypeById(id: number): SubjectType | null {
 }
 
 /**
- * The rules that need the subject arrays, so they run on every reread of the file and not in
- * `readLocalStudyMaterials`. That one runs on every save, where a hand-written record of another
- * subject must not fail the write.
+ * The rules that need the subject arrays, so they are not part of `readLocalStudyMaterials`. That
+ * one runs on every save, where a hand-written record of another subject must not fail the write.
+ * A record of a subject the arrays do not know is kept with `"skip"`: nothing looks it up, and a
+ * restart that loads the newer subjects finds it.
  */
-export function checkLocalStudyMaterialSubjects(records: Record<string, LocalStudyMaterial>): void {
+export function checkLocalStudyMaterialSubjects(params: {
+  records: Record<string, LocalStudyMaterial>;
+  unknownSubject: "fail" | "skip";
+}): void {
+  const { records, unknownSubject } = params;
   for (const [subjectId, record] of Object.entries(records)) {
     const id = subjectIdOfKey(subjectId);
     if (id === null) throw invalidFile(`key ${subjectId} is not a subject id`);
 
     const type = findSubjectTypeById(id);
-    if (!type) throw invalidFile(`subject ${subjectId} is not a WaniKani subject`);
+    if (!type) {
+      if (unknownSubject === "fail") {
+        throw invalidFile(`subject ${subjectId} is not a WaniKani subject`);
+      }
+      console.warn(
+        `[Repository] ${LOCAL_STUDY_MATERIALS_PATH}: subject ${subjectId} is not in the WaniKani data loaded at start. A restart loads the newer data.`
+      );
+      continue;
+    }
 
     const problem = "reading_note" in record ? readingNoteProblem(type) : null;
     if (problem) throw invalidFile(`subject ${subjectId} field reading_note ${problem}`);
   }
 }
 
-/** Only `initRepository` calls this, before the first read. */
 export async function ensureLocalStudyMaterialsFile(): Promise<void> {
   try {
     await stat(LOCAL_STUDY_MATERIALS_PATH);

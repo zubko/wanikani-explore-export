@@ -18,6 +18,8 @@ type AnkiCall = {
 
 type AnkiErrorOverride = { message: string; onCall?: number };
 
+const SVG_CONTENT_TYPE = "image/svg+xml";
+
 export const ankiCalls: AnkiCall[] = [];
 /** Every URL fetched that is not AnkiConnect, so a test can check that a cache hit made no request. */
 export const externalFetches: string[] = [];
@@ -27,6 +29,7 @@ const errorOverrides = new Map<string, AnkiErrorOverride>();
 const callCounts = new Map<string, number>();
 const modelFieldOverrides = new Map<string, string[]>();
 let mediaStatus = 200;
+let mediaContentType: string | null = SVG_CONTENT_TYPE;
 
 let nextNoteId = 1000000;
 
@@ -68,9 +71,11 @@ export function installFetchInterceptor() {
     externalFetches.push(url);
 
     if (url.includes("files.wanikani.com")) {
+      const headers = new Headers();
+      if (mediaContentType !== null) headers.set("Content-Type", mediaContentType);
       return new Response(mediaStatus === 200 ? "<svg></svg>" : "Not Found", {
         status: mediaStatus,
-        headers: { "Content-Type": "image/svg+xml" },
+        headers,
       });
     }
 
@@ -107,6 +112,11 @@ export function setMediaStatus(status: number) {
   mediaStatus = status;
 }
 
+/** Only the mnemonic picture reads it, the other media kinds know their type up front. */
+export function setMediaContentType(contentType: string | null) {
+  mediaContentType = contentType;
+}
+
 export function resetFetchInterceptor() {
   ankiCalls.length = 0;
   externalFetches.length = 0;
@@ -115,6 +125,7 @@ export function resetFetchInterceptor() {
   callCounts.clear();
   modelFieldOverrides.clear();
   mediaStatus = 200;
+  mediaContentType = SVG_CONTENT_TYPE;
   nextNoteId = 1000000;
 }
 

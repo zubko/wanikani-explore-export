@@ -8,7 +8,7 @@ import {
   restoreFetchMock,
 } from "./setup.ts";
 import { createFetchMock, resolveUrl } from "@/test/fetch-utils.ts";
-import { setFileContent, setFsError } from "@/test/preload.ts";
+import { holdFsOp, setFileContent, setFsError } from "@/test/preload.ts";
 import {
   getMnemonicImageUrl,
   MNEMONIC_IMAGES_PATH,
@@ -92,6 +92,35 @@ describe("getMnemonicImageUrl", () => {
     expect(results).toEqual([IMAGE, IMAGE]);
     expect(mockState.fetchCalls).toEqual([PAGE]);
     expect(mockState.writeCalls).toHaveLength(1);
+  });
+
+  test("a lookup while the line is appended waits and does not scrape again", async () => {
+    setFetchResponse(PAGE, buildMnemonicImageHtml(IMAGE));
+    const append = holdFsOp("appendFile");
+
+    const first = getMnemonicImageUrl(PAGE);
+    await append.reached;
+    const second = getMnemonicImageUrl(PAGE);
+    // One macrotask, so the second lookup is past its check before the append ends
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    append.release();
+
+    expect(await Promise.all([first, second])).toEqual([IMAGE, IMAGE]);
+    expect(mockState.fetchCalls).toEqual([PAGE]);
+  });
+
+  test("a registry with no final newline gets a new line of its own", async () => {
+    setFileContent(MNEMONIC_IMAGES_PATH, registryLine(FIXTURE_PAGE, FIXTURE_IMAGE).trimEnd());
+    setFetchResponse(PAGE, buildMnemonicImageHtml(IMAGE));
+
+    expect(await getMnemonicImageUrl(PAGE)).toBe(IMAGE);
+
+    expect(mockState.writeCalls).toEqual([
+      { path: MNEMONIC_IMAGES_PATH, data: "\n" + registryLine(PAGE, IMAGE) },
+    ]);
+    expect(await getMnemonicImageUrl(FIXTURE_PAGE)).toBe(FIXTURE_IMAGE);
+    expect(await getMnemonicImageUrl(PAGE)).toBe(IMAGE);
+    expect(mockState.fetchCalls).toEqual([PAGE]);
   });
 
   test("a failed scrape appends nothing, answers null and is retried", async () => {

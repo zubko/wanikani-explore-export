@@ -1,11 +1,11 @@
 import { describe, test, expect, beforeAll, beforeEach, afterEach } from "bun:test";
-import { ensureRepositoryInitialized, writeCalls, setFsError } from "@/test/preload.ts";
 import {
-  lastWrite,
-  loadStudyMaterialFixture,
-  resetStudyMaterialState,
-  studyMaterialFixture as fixture,
-} from "@/test/study-material-fixture.ts";
+  ensureRepositoryInitialized,
+  resetFsMock,
+  writeCalls,
+  setFsError,
+} from "@/test/preload.ts";
+import { lastWrite, studyMaterialFixture as fixture } from "@/test/study-material-fixture.ts";
 import { getLocalStudyMaterials, LOCAL_STUDY_MATERIALS_PATH } from "../repository/data-loader.ts";
 import { api } from "../api.ts";
 
@@ -18,13 +18,11 @@ async function patchJson(body: unknown, rawBody?: string) {
   return { status: response.status, json: await response.json() };
 }
 
-beforeAll(async () => {
-  await ensureRepositoryInitialized();
-  await loadStudyMaterialFixture();
-});
+beforeAll(ensureRepositoryInitialized);
 
-beforeEach(resetStudyMaterialState);
-afterEach(resetStudyMaterialState);
+// The fs mock is process-global, so a saved record must not reach the next test or file
+beforeEach(resetFsMock);
+afterEach(resetFsMock);
 
 describe("study-materials API validation", () => {
   test("missing id returns 400", async () => {

@@ -1,28 +1,12 @@
+import { readFileSync } from "fs";
 import type { LocalStudyMaterial } from "@/model/wanikani.ts";
-import { readJson } from "@server/utils/json-utils.ts";
 import { LOCAL_STUDY_MATERIALS_PATH } from "@server/repository/data-loader.ts";
-import { resetFsMock, setFileContent, writeCalls } from "./preload.ts";
+import { setFileContent, STUDY_MATERIALS_FIXTURE_PATH, writeCalls } from "./preload.ts";
 
-const FIXTURE_PATH = "src/test/fixtures/study_materials_extra.json";
-
-/** Filled by `loadStudyMaterialFixture`, so a test can compare against the untouched records. */
-export const studyMaterialFixture: Record<string, LocalStudyMaterial> = {};
-
-export async function loadStudyMaterialFixture(): Promise<void> {
-  Object.assign(
-    studyMaterialFixture,
-    await readJson<Record<string, LocalStudyMaterial>>(FIXTURE_PATH)
-  );
-}
-
-/**
- * Every test file that writes local study materials calls this in `beforeEach` and in `afterEach`,
- * because bun runs all files in one process and the fs mock is process-global. The reset seeds the
- * fixture file again, and the repository rereads it on the next get.
- */
-export function resetStudyMaterialState(): void {
-  resetFsMock();
-}
+/** The untouched records, so a test can compare against them. */
+export const studyMaterialFixture = JSON.parse(
+  readFileSync(STUDY_MATERIALS_FIXTURE_PATH, "utf-8")
+) as Record<string, LocalStudyMaterial>;
 
 /** Changes the file behind the repository, like a hand edit or a git pull does. */
 export function setStudyMaterialFile(file: Record<string, LocalStudyMaterial>): void {

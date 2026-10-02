@@ -1,5 +1,6 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
-import { resetFsMock, setFileContent, setFsError, writeCalls } from "@/test/preload.ts";
+import { readdir } from "fs/promises";
+import { mkdirCalls, resetFsMock, setFileContent, setFsError, writeCalls } from "@/test/preload.ts";
 import {
   extensionOfContentType,
   getOrFetchMedia,
@@ -8,7 +9,9 @@ import {
 } from "../media-cache.ts";
 
 const NAME = "barb_ab12cd34";
-const FILE_PATH = `${MEDIA_ROOT_PATH}/radicals/${NAME}.svg`;
+const FOLDER_PATH = `${MEDIA_ROOT_PATH}/radicals`;
+const FILE_PATH = `${FOLDER_PATH}/${NAME}.svg`;
+const PICTURE_URL = "https://files.wanikani.com/barb-mnemonic";
 // 0xff is no valid UTF-8, so a round trip through a string would change it
 const BYTES = Buffer.from([0x3c, 0xff, 0x3e]);
 
@@ -36,6 +39,43 @@ describe("getOrFetchMedia", () => {
 
     expect(calls).toHaveLength(1);
     expect(writeCalls).toEqual([{ path: FILE_PATH, data: BYTES }]);
+  });
+
+  // A fresh clone has no media folder
+  test("a miss creates the folder first", async () => {
+    await getBarb(createFetch().fetch);
+
+    expect(mkdirCalls).toEqual([{ path: FOLDER_PATH, recursive: true }]);
+  });
+
+  test("a folder create error throws and does not fetch", async () => {
+    setFsError("mkdir", Object.assign(new Error("permission denied"), { code: "EACCES" }));
+    const { fetch, calls } = createFetch();
+
+    await expect(getBarb(fetch)).rejects.toThrow("permission denied");
+
+    expect(calls).toHaveLength(0);
+  });
+
+  test("an empty answer throws and writes nothing", async () => {
+    const { fetch } = createFetch({ data: Buffer.alloc(0), extension: "svg" });
+
+    await expect(getBarb(fetch)).rejects.toThrow(`Empty media answer for radicals/${NAME}.svg`);
+
+    expect(writeCalls).toHaveLength(0);
+  });
+
+  test("two misses of one name at the same time both answer the file and leave no temp file", async () => {
+    const { fetch, calls } = createFetch();
+
+    const results = await Promise.all([getBarb(fetch), getBarb(fetch)]);
+
+    expect(results).toEqual([
+      { fileName: `${NAME}.svg`, data: BYTES },
+      { fileName: `${NAME}.svg`, data: BYTES },
+    ]);
+    expect(calls).toHaveLength(2);
+    expect(await readdir(FOLDER_PATH)).toEqual([`${NAME}.svg`]);
   });
 
   test("a second call is a hit with the same bytes and no fetch", async () => {
@@ -121,24 +161,28 @@ describe("getOrFetchMedia", () => {
 });
 
 describe("extensionOfContentType", () => {
+  function extensionOf(contentType: string | null): string {
+    return extensionOfContentType({ contentType, url: PICTURE_URL });
+  }
+
   test("maps the four known types", () => {
-    expect(extensionOfContentType("image/svg+xml")).toBe("svg");
-    expect(extensionOfContentType("image/png")).toBe("png");
-    expect(extensionOfContentType("image/jpeg")).toBe("jpg");
-    expect(extensionOfContentType("image/gif")).toBe("gif");
+    expect(extensionOf("image/svg+xml")).toBe("svg");
+    expect(extensionOf("image/png")).toBe("png");
+    expect(extensionOf("image/jpeg")).toBe("jpg");
+    expect(extensionOf("image/gif")).toBe("gif");
   });
 
   test("drops the parameters after the semicolon", () => {
-    expect(extensionOfContentType("image/svg+xml; charset=utf-8")).toBe("svg");
+    expect(extensionOf("image/svg+xml; charset=utf-8")).toBe("svg");
   });
 
-  test("throws on an unknown type", () => {
-    expect(() => extensionOfContentType("text/html")).toThrow(
-      "Unknown media content type: text/html"
+  test("throws on an unknown type with the URL", () => {
+    expect(() => extensionOf("text/html")).toThrow(
+      `Unknown media content type (text/html): ${PICTURE_URL}`
     );
   });
 
-  test("throws on a missing header", () => {
-    expect(() => extensionOfContentType(null)).toThrow("Unknown media content type: null");
+  test("throws on a missing header with the URL", () => {
+    expect(() => extensionOf(null)).toThrow(`Unknown media content type (null): ${PICTURE_URL}`);
   });
 });

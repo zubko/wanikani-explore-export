@@ -1,13 +1,17 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { unlink } from "fs/promises";
 import type { LocalStudyMaterial } from "@/model/wanikani.ts";
-import { resetFsMock, setFileContent, writeCalls } from "@/test/preload.ts";
+import { resetFsMock, setFileContent, setFsError, writeCalls } from "@/test/preload.ts";
+import { setStudyMaterialFile, studyMaterialFixture } from "@/test/study-material-fixture.ts";
 import {
   checkLocalStudyMaterialSubjects,
   ensureLocalStudyMaterialsFile,
+  getLocalStudyMaterials,
+  initRepository,
   LOCAL_STUDY_MATERIALS_PATH,
   readLocalStudyMaterials,
 } from "../data-loader.ts";
+import { MNEMONIC_IMAGES_PATH } from "../mnemonic-image-fetcher.ts";
 import { ensureRepositoryInitialized } from "./setup.ts";
 
 function setFile(content: unknown): void {
@@ -93,7 +97,7 @@ describe("readLocalStudyMaterials", () => {
     const error = await readError();
     expect(error).toContain(`Cannot read ${LOCAL_STUDY_MATERIALS_PATH}`);
     expect(error).toContain("JSON");
-    expect(error).not.toContain("Create it with");
+    expect(error).not.toContain("is missing");
   });
 });
 
@@ -112,14 +116,25 @@ describe("ensureLocalStudyMaterialsFile", () => {
 
     expect(writeCalls).toHaveLength(0);
   });
+
+  test("a stat error other than a missing file throws and creates nothing", async () => {
+    setFsError("stat", Object.assign(new Error("permission denied"), { code: "EACCES" }));
+
+    await expect(ensureLocalStudyMaterialsFile()).rejects.toThrow("permission denied");
+
+    expect(writeCalls).toHaveLength(0);
+  });
 });
 
 describe("checkLocalStudyMaterialSubjects", () => {
   beforeAll(ensureRepositoryInitialized);
 
-  function subjectError(records: Record<string, LocalStudyMaterial>): string {
+  function subjectError(
+    records: Record<string, LocalStudyMaterial>,
+    unknownSubject: "fail" | "skip" = "fail"
+  ): string {
     try {
-      checkLocalStudyMaterialSubjects(records);
+      checkLocalStudyMaterialSubjects({ records, unknownSubject });
       return "no error";
     } catch (error) {
       return String(error);
@@ -140,6 +155,16 @@ describe("checkLocalStudyMaterialSubjects", () => {
   test("an id that is no WaniKani subject is refused", () => {
     expect(subjectError({ "999999": { meaning_note: "Typo" } })).toContain(
       "subject 999999 is not a WaniKani subject"
+    );
+  });
+
+  test("an unknown id passes with skip, the other rules still apply", () => {
+    expect(subjectError({ "999999": { reading_note: "Newer" } }, "skip")).toBe("no error");
+    expect(subjectError({ "1": { reading_note: "Ichi" } }, "skip")).toContain(
+      "subject 1 field reading_note a radical has no reading"
+    );
+    expect(subjectError({ ground: { meaning_note: "Typo" } }, "skip")).toContain(
+      "key ground is not a subject id"
     );
   });
 
@@ -168,5 +193,54 @@ describe("checkLocalStudyMaterialSubjects", () => {
     expect(subjectError({ "9176": { reading_note: "Koko" } })).toContain(
       "subject 9176 field reading_note a kana_vocabulary has no reading"
     );
+  });
+});
+
+describe("getLocalStudyMaterials", () => {
+  beforeAll(ensureRepositoryInitialized);
+
+  test("a reread runs the subject rules", async () => {
+    setStudyMaterialFile({ ...studyMaterialFixture, "1": { reading_note: "Ichi" } });
+
+    await expect(getLocalStudyMaterials()).rejects.toThrow(
+      "subject 1 field reading_note a radical has no reading"
+    );
+  });
+
+  // The other machine may have downloaded newer subjects than the arrays loaded at start
+  test("a reread keeps a record of a subject the loaded data does not know", async () => {
+    const file = { ...studyMaterialFixture, "999999": { meaning_note: "Newer subject" } };
+    setStudyMaterialFile(file);
+
+    expect(await getLocalStudyMaterials()).toEqual(file);
+  });
+});
+
+describe("initRepository", () => {
+  // Each call loads the same subject files again, so the other tests keep the same arrays
+  test("creates a missing study materials file before it reads it", async () => {
+    await unlink(LOCAL_STUDY_MATERIALS_PATH);
+
+    await initRepository();
+
+    expect(writeCalls).toEqual([{ path: LOCAL_STUDY_MATERIALS_PATH, data: "{}\n" }]);
+  });
+
+  test("a broken study materials file fails the start", async () => {
+    setFileContent(LOCAL_STUDY_MATERIALS_PATH, "{ broken");
+
+    await expect(initRepository()).rejects.toThrow(`Cannot read ${LOCAL_STUDY_MATERIALS_PATH}`);
+  });
+
+  test("a record of an unknown subject fails the start", async () => {
+    setStudyMaterialFile({ ...studyMaterialFixture, "999999": { meaning_note: "Typo" } });
+
+    await expect(initRepository()).rejects.toThrow("subject 999999 is not a WaniKani subject");
+  });
+
+  test("a broken registry line fails the start", async () => {
+    setFileContent(MNEMONIC_IMAGES_PATH, "{ broken\n");
+
+    await expect(initRepository()).rejects.toThrow(`Invalid ${MNEMONIC_IMAGES_PATH} line 1`);
   });
 });

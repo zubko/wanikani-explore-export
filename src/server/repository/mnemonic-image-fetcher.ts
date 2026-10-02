@@ -1,4 +1,5 @@
-import { appendFile } from "fs/promises";
+import { appendFile, readFile } from "fs/promises";
+import { isMissingFile } from "@server/utils/json-utils.ts";
 import { createReloadingFile } from "@server/utils/reloading-file.ts";
 
 type MnemonicImageLine = { page: string; image: string | null };
@@ -62,9 +63,22 @@ async function scrapeAndRecord(documentUrl: string): Promise<string | null> {
     console.error(`[Repository] Mnemonic image scrape failed: ${documentUrl}. ${String(error)}`);
     return null;
   }
-  await appendFile(MNEMONIC_IMAGES_PATH, JSON.stringify({ page: documentUrl, image }) + "\n");
+  const line = JSON.stringify({ page: documentUrl, image }) + "\n";
+  // A hand edit can drop the last newline, and the new line must not join the last one
+  const separator = (await lacksFinalNewline(MNEMONIC_IMAGES_PATH)) ? "\n" : "";
+  await appendFile(MNEMONIC_IMAGES_PATH, separator + line);
   console.log(`[Repository] Mnemonic image recorded: ${documentUrl} -> ${image ?? "none"}`);
   return image;
+}
+
+async function lacksFinalNewline(path: string): Promise<boolean> {
+  try {
+    const content = await readFile(path, "utf-8");
+    return content !== "" && !content.endsWith("\n");
+  } catch (error) {
+    if (isMissingFile(error)) return false;
+    throw error;
+  }
 }
 
 async function fetchMnemonicImageUrl(documentUrl: string): Promise<string | null> {

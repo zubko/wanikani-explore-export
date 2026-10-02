@@ -6,8 +6,8 @@ type ReloadingFile<T> = { get: () => Promise<T> };
 const MISSING_FILE_VERSION = "missing";
 
 /**
- * Reads the file again when its mtime or size changed, because the other machine may change it
- * at any time. `parse` gets `null` for a missing file and decides what empty means.
+ * Reads the file again when its inode, mtime or size changed, because the other machine may change
+ * it at any time. `parse` gets `null` for a missing file and decides what empty means.
  */
 export function createReloadingFile<T>(params: {
   path: string;
@@ -32,8 +32,10 @@ export function createReloadingFile<T>(params: {
 
 async function readFileVersion(path: string): Promise<string> {
   try {
-    const { mtimeMs, size } = await stat(path);
-    return `${mtimeMs}:${size}`;
+    const { ino, mtimeMs, size } = await stat(path);
+    // The mtime can stay the same within one clock tick, but every atomic save and every git
+    // checkout gives the file a new inode
+    return `${ino}:${mtimeMs}:${size}`;
   } catch (error) {
     if (isMissingFile(error)) return MISSING_FILE_VERSION;
     throw error;

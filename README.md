@@ -10,6 +10,7 @@ A web app for creating Anki flashcards from WaniKani data. Search for radicals, 
 - Verb conjugations for vocabulary cards, with the masu form on the answer side
 - Alternative meanings and your own synonyms on the answer side of kanji and vocabulary cards
 - TTS audio for context sentences (via Azure TTS)
+- A media cache in `data/userdata/media/`: every radical image, mnemonic picture and audio clip is downloaded or generated once, so a re-sync of all notes downloads nothing. The radical mnemonic picture is stored in Anki's media folder, so it shows offline too
 - Dark mode support in Anki cards
 
 ## How It Works
@@ -104,6 +105,17 @@ bun run sync-anki-templates
 ```
 
 It first checks that every note type has exactly the fields its template lists. If it reports a missing field, run `bun run sync-anki-fields` in a real terminal to add it, then run `sync-anki-templates` again. If it reports an extra field, remove that field in Anki by hand.
+
+### Updating an existing install
+
+Since the media cache, the radical `mnemonic_image` field holds a full `<img>` tag instead of a URL, and the radical template shows that field as it is. Every sentence clip also has a new name. So after an update, push the templates first and then rewrite all notes, with the dev server running:
+
+```bash
+bun run sync-anki-templates
+bun run sync-anki-notes
+```
+
+`sync-anki-notes` lists the notes it cannot match to WaniKani data under "items not found in WaniKani data". It does not rewrite those, so a radical in that list still shows the old URL as text. Fix such a note by hand in Anki. The old sentence clips are no longer used, and Anki's Check Media removes them.
 
 ## Usage
 

@@ -36,6 +36,8 @@ export async function getOrFetchMedia(params: {
   await mkdir(folderPath, { recursive: true });
   const media = await params.fetch();
   const fileName = `${nameWithoutExtension}.${media.extension}`;
+  // A hit is never fetched again, so an empty file would stay empty forever
+  if (media.data.length === 0) throw new Error(`Empty media answer for ${folder}/${fileName}`);
   // The Linux box commits on a timer, so a half-written file must never sit under the real name
   await writeFileAtomic(`${folderPath}/${fileName}`, media.data);
   const sizeKb = (media.data.length / 1024).toFixed(1);
@@ -43,10 +45,16 @@ export async function getOrFetchMedia(params: {
   return { fileName, data: media.data };
 }
 
-export function extensionOfContentType(contentType: string | null): string {
+export function extensionOfContentType(params: {
+  contentType: string | null;
+  url: string;
+}): string {
+  const { contentType, url } = params;
   const mediaType = contentType?.split(";")[0]?.trim() ?? "";
   const extension = EXTENSIONS_BY_CONTENT_TYPE.get(mediaType);
-  if (extension === undefined) throw new Error(`Unknown media content type: ${contentType}`);
+  if (extension === undefined) {
+    throw new Error(`Unknown media content type (${contentType}): ${url}`);
+  }
   return extension;
 }
 

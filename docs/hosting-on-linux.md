@@ -169,6 +169,9 @@ Stop `anki` before you stop or restart `xvfb-anki`. Stopping the display kills A
 - **`sync` answers "Sync status ... not one of"**: a one-way sync is required, usually after `bun run sync-anki-fields` changed the note types. Open VNC, click Sync and choose the direction. Until then every add fails at its first step, before anything is written.
 - **VNC shows no password field**, or the client refuses: the unit runs with `-rfbauth`, the client must send the stored password.
 - **Upgrading Anki**: unpack the new tarball next to the old one, move the `~/opt/anki` symlink, `systemctl --user restart anki`, check the version with the curl call above.
+- **A data repo pull stops with a conflict under `media/`**: this clone lacks the `ours` merge driver. Run `git -C data/userdata config merge.ours.driver true`, then `git -C data/userdata merge --abort`, and pull again.
+- **Every search answers 500 after an auto-pull**: a data file is broken, by the merge or by a hand edit. The dev server log names the file and the line. Fix the file and commit it, the server needs no restart. For `page ... has two images, delete one line` in `mnemonic-images.jsonl`, delete one of the two lines.
+- **A new subject from a fresh download does not show**: the server reads the subject files once at start. Restart the dev server after a pull that changes them.
 
 ## For AI agents
 

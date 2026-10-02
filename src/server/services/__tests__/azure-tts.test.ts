@@ -70,6 +70,15 @@ describe("readAzureTtsConfig", () => {
     process.env.AZURE_TTS_KEY = "";
     expect(() => readAzureTtsConfig()).toThrow("Missing AZURE_TTS_KEY in the root env file");
   });
+
+  test("an empty entry in the voice list is refused", () => {
+    for (const voices of [`${VOICES[0]},`, `${VOICES[0]},,${VOICES[1]}`, ` , ${VOICES[0]}`]) {
+      process.env.AZURE_TTS_VOICES = voices;
+      expect(() => readAzureTtsConfig()).toThrow(
+        "Empty voice in AZURE_TTS_VOICES in the root env file"
+      );
+    }
+  });
 });
 
 describe("pickSentenceVoice", () => {

@@ -3,12 +3,16 @@ import { hashNumber } from "@/server/utils/hash.ts";
 
 type AzureTtsConfig = { key: string; region: string; voices: string[] };
 
+export const SENTENCE_AUDIO_OUTPUT_FORMAT = "audio-24khz-160kbitrate-mono-mp3";
+
 export function readAzureTtsConfig(): AzureTtsConfig {
   const key = readRequiredEnv("AZURE_TTS_KEY");
   const region = readRequiredEnv("AZURE_TTS_REGION");
   const voices = readRequiredEnv("AZURE_TTS_VOICES")
     .split(",")
     .map((voice) => voice.trim());
+  // The list length picks the voice of each word, so a stray comma would rename most clips
+  if (voices.includes("")) throw new Error("Empty voice in AZURE_TTS_VOICES in the root env file");
   return { key, region, voices };
 }
 
@@ -29,15 +33,14 @@ export async function generateSentenceAudio(ssml: string): Promise<FetchedMedia>
   const { key, region } = readAzureTtsConfig();
   const url = `https://${region}.tts.speech.microsoft.com/cognitiveservices/v1`;
 
-  const spokenText = ssml.replace(/<[^>]*>/g, "").trim();
-  console.log(`[TTS] Generating audio for: ${spokenText.slice(0, 50)}...`);
+  console.log(`[TTS] Generating audio from ${ssml.length} chars of SSML`);
 
   const response = await fetch(url, {
     method: "POST",
     headers: {
       "Ocp-Apim-Subscription-Key": key,
       "Content-Type": "application/ssml+xml",
-      "X-Microsoft-OutputFormat": "audio-24khz-160kbitrate-mono-mp3",
+      "X-Microsoft-OutputFormat": SENTENCE_AUDIO_OUTPUT_FORMAT,
     },
     body: ssml,
   });

@@ -2,7 +2,13 @@ import { parseArgs } from "util";
 
 import type { AnkiAddResult } from "../src/model/wanikani.ts";
 import { formatError } from "./lib/format-error.ts";
-import { pickNotesToRefresh } from "./lib/note-refresh.ts";
+import {
+  pickNotesToRefresh,
+  refreshedKanjiCharacters,
+  refreshedRadicalNames,
+  remainingLimit,
+  takeLimit,
+} from "./lib/note-refresh.ts";
 
 type CliArgs = {
   baseUrl: string;
@@ -137,14 +143,6 @@ function padIndex(index: number, total: number): string {
   return String(index).padStart(width);
 }
 
-function takeLimit<T>(items: T[], limit: number | undefined): T[] {
-  return limit === undefined ? items : items.slice(0, limit);
-}
-
-function remainingLimit(limit: number | undefined, used: number): number | undefined {
-  return limit === undefined ? undefined : limit - used;
-}
-
 async function main(): Promise<void> {
   const args = parseCliArgs();
 
@@ -195,10 +193,9 @@ async function main(): Promise<void> {
   console.log(`\nUpdating ${wordBatch.length} words...\n`);
   const wordResults = await updateNotes(args.baseUrl, wordBatch);
 
-  // A word update also writes its kanji, so only the kanji that no word update wrote need their own
   const kanjiBatch = pickNotesToRefresh({
     notes: kanji,
-    refreshed: new Set(wordResults.flatMap((result) => result.kanji.map((k) => k.character))),
+    refreshed: refreshedKanjiCharacters(wordResults),
     remaining: remainingLimit(args.limit, wordBatch.length),
   });
   if (kanjiBatch.length > 0) {
@@ -206,12 +203,9 @@ async function main(): Promise<void> {
   }
   const kanjiResults = await updateNotes(args.baseUrl, kanjiBatch);
 
-  // A word or kanji update also writes its radicals, so only the radicals that none of them wrote need their own
   const radicalBatch = pickNotesToRefresh({
     notes: radicals,
-    refreshed: new Set(
-      [...wordResults, ...kanjiResults].flatMap((result) => result.radicals.map((r) => r.name))
-    ),
+    refreshed: refreshedRadicalNames([...wordResults, ...kanjiResults]),
     remaining: remainingLimit(args.limit, wordBatch.length + kanjiBatch.length),
   });
   if (radicalBatch.length > 0) {
