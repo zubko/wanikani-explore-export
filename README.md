@@ -115,7 +115,7 @@ bun run sync-anki-templates
 bun run sync-anki-notes
 ```
 
-`sync-anki-notes` lists the notes it cannot match to WaniKani data under "items not found in WaniKani data". It does not rewrite those, so a radical in that list still shows the old URL as text. Fix such a note by hand in Anki. The old sentence clips are no longer used, and Anki's Check Media removes them.
+`sync-anki-notes` lists the notes it cannot match to WaniKani data under "items match no single WaniKani subject". It does not rewrite those, so a radical in that list may still show the old URL as text. A radical name that two WaniKani radicals share, like "Roof", is in that list too. A kanji with that radical may have rewritten the note already, so check the card first. Fix such a note by hand in Anki. The old sentence clips are no longer used, and Anki's Check Media removes them.
 
 ## Usage
 

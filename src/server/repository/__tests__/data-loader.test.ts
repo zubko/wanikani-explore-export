@@ -1,7 +1,7 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { unlink } from "fs/promises";
 import type { LocalStudyMaterial } from "@/model/wanikani.ts";
-import { resetFsMock, setFileContent, setFsError, writeCalls } from "@/test/preload.ts";
+import { holdFsOp, resetFsMock, setFileContent, setFsError, writeCalls } from "@/test/preload.ts";
 import { setStudyMaterialFile, studyMaterialFixture } from "@/test/study-material-fixture.ts";
 import {
   checkLocalStudyMaterialSubjects,
@@ -116,8 +116,23 @@ describe("ensureLocalStudyMaterialsFile", () => {
     expect(writeCalls).toHaveLength(0);
   });
 
-  test("a stat error other than a missing file throws and creates nothing", async () => {
-    setFsError("stat", Object.assign(new Error("permission denied"), { code: "EACCES" }));
+  test("a file that a pull creates during the call is kept", async () => {
+    await unlink(LOCAL_STUDY_MATERIALS_PATH);
+    const write = holdFsOp("writeFile");
+
+    const ensure = ensureLocalStudyMaterialsFile();
+    await write.reached;
+    setStudyMaterialFile(studyMaterialFixture);
+    write.release();
+    await ensure;
+
+    expect(writeCalls).toHaveLength(0);
+    expect(await readLocalStudyMaterials()).toEqual(studyMaterialFixture);
+  });
+
+  test("a write error other than an existing file throws and creates nothing", async () => {
+    await unlink(LOCAL_STUDY_MATERIALS_PATH);
+    setFsError("writeFile", Object.assign(new Error("permission denied"), { code: "EACCES" }));
 
     await expect(ensureLocalStudyMaterialsFile()).rejects.toThrow("permission denied");
 

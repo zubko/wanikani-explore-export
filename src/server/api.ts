@@ -87,9 +87,16 @@ function resolveWkSubject(
   characters: string
 ): { id: number; type: SubjectType } | null {
   if (deckType === "radical") {
-    const found = radicalData.find(
+    const matches = radicalData.filter(
       (r) => r.data.characters === characters || getPrimaryMeaning(r.data.meanings) === characters
     );
+    // The note holds no WaniKani id, so a guess could write the other radical into it
+    if (matches.length > 1) {
+      const ids = matches.map((r) => r.id).join(", ");
+      console.warn(`[API] Radical note "${characters}" matches radicals ${ids} — not resolved`);
+      return null;
+    }
+    const found = matches[0];
     return found ? { id: found.id, type: "radical" } : null;
   }
 

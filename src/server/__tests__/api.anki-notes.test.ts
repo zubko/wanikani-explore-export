@@ -5,7 +5,9 @@ import {
   setAnkiResponse,
 } from "@/test/fetch-interceptor.ts";
 import { ensureRepositoryInitialized } from "@/test/preload.ts";
+import { getPrimaryMeaning } from "@/model/subject-utils.ts";
 import { api } from "../api.ts";
+import { radicals as radicalData } from "../repository/data-loader.ts";
 
 installFetchInterceptor();
 beforeAll(() => ensureRepositoryInitialized());
@@ -147,6 +149,20 @@ describe("anki-notes API", () => {
     expect(result.ok).toBe(true);
     expect(result.data).toEqual([
       { characters: "Ground", meaning: "Ground", wkId: 1, wkType: "radical" },
+    ]);
+  });
+
+  test("a radical name that two radicals share is not resolved", async () => {
+    // WaniKani names both 宀 and 亼 "Roof"
+    expect(
+      radicalData.filter((radical) => getPrimaryMeaning(radical.data.meanings) === "Roof")
+    ).toHaveLength(2);
+    setAnkiResponse("findNotes", [600]);
+    setAnkiResponse("notesInfo", [{ noteId: 600, fields: { primary_name: { value: "Roof" } } }]);
+
+    const result = await getAnkiNotesJson("radical");
+    expect(result.data).toEqual([
+      { characters: "Roof", meaning: "Roof", wkId: null, wkType: null },
     ]);
   });
 });

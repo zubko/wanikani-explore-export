@@ -128,7 +128,7 @@ async function fetchResolvedNotes(baseUrl: string, type: string): Promise<AnkiNo
 
   const unresolved = allNotes.filter((n) => n.wkId === null);
   if (unresolved.length > 0) {
-    console.log(`\n⚠️  ${unresolved.length} ${type} items not found in WaniKani data:`);
+    console.log(`\n⚠️  ${unresolved.length} ${type} items match no single WaniKani subject:`);
     for (const item of unresolved) {
       console.log(`   - ${item.characters}`);
     }

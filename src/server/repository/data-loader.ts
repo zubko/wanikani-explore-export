@@ -10,11 +10,11 @@ import type {
 } from "@/model/wanikani.ts";
 import { LOCAL_STUDY_MATERIAL_FIELDS } from "@/model/wanikani.ts";
 import { localStudyMaterialValueProblem, readingNoteProblem } from "@/model/subject-utils.ts";
-import { readFile, stat } from "fs/promises";
+import { readFile } from "fs/promises";
 import { LOCAL_STUDY_MATERIALS_PATH } from "./data-paths.ts";
 import { loadMnemonicImageRegistry } from "./mnemonic-image-fetcher.ts";
 import { isMissingFile } from "@server/utils/file-utils.ts";
-import { readJson, saveJsonAtomic } from "@server/utils/json-utils.ts";
+import { readJson, saveJsonIfMissing } from "@server/utils/json-utils.ts";
 import { createReloadingFile } from "@server/utils/reloading-file.ts";
 
 type RawVerbConjugations = Omit<VerbConjugations, "type">;
@@ -110,14 +110,11 @@ export function checkLocalStudyMaterialSubjects(params: {
   }
 }
 
+/** No script creates this file, so a fresh checkout starts without it. */
 export async function ensureLocalStudyMaterialsFile(): Promise<void> {
-  try {
-    await stat(LOCAL_STUDY_MATERIALS_PATH);
-  } catch (error) {
-    if (!isMissingFile(error)) throw error;
-    // No script creates this file, so a fresh checkout starts without it
-    console.log(`[Repository] ${LOCAL_STUDY_MATERIALS_PATH} is missing — creating it`);
-    await saveJsonAtomic(LOCAL_STUDY_MATERIALS_PATH, {});
+  // An exclusive create, because a git pull can bring the file at any moment
+  if (await saveJsonIfMissing(LOCAL_STUDY_MATERIALS_PATH, {})) {
+    console.log(`[Repository] ${LOCAL_STUDY_MATERIALS_PATH} was missing — created it`);
   }
 }
 

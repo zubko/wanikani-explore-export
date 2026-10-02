@@ -116,9 +116,12 @@ async function startOp(op: FsOp) {
 }
 
 function missingFileError(op: FsOp, path: string): Error {
-  return Object.assign(new Error(`ENOENT: no such file or directory, ${op} '${path}'`), {
-    code: "ENOENT",
-  });
+  return fsCodeError({ op, path, code: "ENOENT", message: "no such file or directory" });
+}
+
+function fsCodeError(params: { op: string; path: string; code: string; message: string }): Error {
+  const { op, path, code, message } = params;
+  return Object.assign(new Error(`${code}: ${message}, ${op} '${path}'`), { code });
 }
 
 const realReadFile = readFile;
@@ -140,8 +143,11 @@ mock.module("fs/promises", () => ({
     const bytes = Buffer.from(file.data);
     return encoding ? bytes.toString(encoding) : bytes;
   },
-  writeFile: async (path: string, data: FileData) => {
+  writeFile: async (path: string, data: FileData, options?: { flag?: string }) => {
     await startOp("writeFile");
+    if (options?.flag === "wx" && files.has(fileKey(path))) {
+      throw fsCodeError({ op: "open", path, code: "EEXIST", message: "file already exists" });
+    }
     setFileContent(path, data);
     writeCalls.push({ path: String(path), data });
   },

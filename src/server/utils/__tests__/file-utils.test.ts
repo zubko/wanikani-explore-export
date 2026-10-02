@@ -1,12 +1,13 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
 import { readFile } from "fs/promises";
-import { resetFsMock, setFileContent, writeCalls } from "@/test/preload.ts";
+import { resetFsMock, setFileContent, setFsError, writeCalls } from "@/test/preload.ts";
 import {
   isMissingFile,
   MISSING_FILE_VERSION,
   readFileVersion,
   writeFileAtomic,
   writeFileAtomicIfUnchanged,
+  writeFileIfMissing,
 } from "../file-utils.ts";
 
 const PATH = "./data/userdata/file-utils-test.bin";
@@ -55,6 +56,29 @@ describe("writeFileAtomicIfUnchanged", () => {
     expect(await writeFileAtomicIfUnchanged({ path: PATH, data: "new", fileVersion })).toBe(false);
 
     expect(await readFile(PATH, "utf-8")).toBe("created outside");
+  });
+});
+
+describe("writeFileIfMissing", () => {
+  test("creates a missing file", async () => {
+    expect(await writeFileIfMissing(PATH, "new")).toBe(true);
+
+    expect(writeCalls).toEqual([{ path: PATH, data: "new" }]);
+  });
+
+  test("an existing file is kept", async () => {
+    setFileContent(PATH, "created outside");
+
+    expect(await writeFileIfMissing(PATH, "new")).toBe(false);
+
+    expect(await readFile(PATH, "utf-8")).toBe("created outside");
+    expect(writeCalls).toHaveLength(0);
+  });
+
+  test("another write error throws", async () => {
+    setFsError("writeFile", Object.assign(new Error("permission denied"), { code: "EACCES" }));
+
+    await expect(writeFileIfMissing(PATH, "new")).rejects.toThrow("permission denied");
   });
 });
 
