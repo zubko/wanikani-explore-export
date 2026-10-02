@@ -1,7 +1,8 @@
 import type { LocalStudyMaterial, LocalStudyMaterialPatch } from "@/model/wanikani.ts";
 import { applyLocalStudyMaterialPatch } from "@/model/subject-utils.ts";
 import { saveJsonAtomic } from "@server/utils/json-utils.ts";
-import { readLocalStudyMaterials, LOCAL_STUDY_MATERIALS_PATH } from "./data-loader.ts";
+import { LOCAL_STUDY_MATERIALS_PATH } from "./data-paths.ts";
+import { readLocalStudyMaterials } from "./data-loader.ts";
 
 let queue: Promise<unknown> = Promise.resolve();
 

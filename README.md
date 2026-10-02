@@ -108,7 +108,7 @@ It first checks that every note type has exactly the fields its template lists. 
 
 ### Updating an existing install
 
-Since the media cache, the radical `mnemonic_image` field holds a full `<img>` tag instead of a URL, and the radical template shows that field as it is. Every sentence clip also has a new name. So after an update, push the templates first and then rewrite all notes, with the dev server running:
+The media cache changed two things. The radical `mnemonic_image` field now holds a full `<img>` tag instead of a URL, and the radical template shows that field as it is. Every sentence clip also has a new name. So after an update, push the templates first and then rewrite all notes, with the dev server running:
 
 ```bash
 bun run sync-anki-templates

@@ -8,10 +8,9 @@ import {
   ensureLocalStudyMaterialsFile,
   getLocalStudyMaterials,
   initRepository,
-  LOCAL_STUDY_MATERIALS_PATH,
   readLocalStudyMaterials,
 } from "../data-loader.ts";
-import { MNEMONIC_IMAGES_PATH } from "../mnemonic-image-fetcher.ts";
+import { LOCAL_STUDY_MATERIALS_PATH, MNEMONIC_IMAGES_PATH } from "../data-paths.ts";
 import { ensureRepositoryInitialized } from "./setup.ts";
 
 function setFile(content: unknown): void {

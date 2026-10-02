@@ -1,7 +1,7 @@
-import type { FetchedMedia } from "@/server/repository/media-cache.ts";
-import { hashNumber } from "@/server/utils/hash.ts";
+import type { FetchedMedia } from "@server/repository/media-cache.ts";
+import { hashNumber, shortHash } from "@server/utils/hash.ts";
 
-type AzureTtsConfig = { key: string; region: string; voices: string[] };
+export type AzureTtsConfig = { key: string; region: string; voices: string[] };
 
 export const SENTENCE_AUDIO_OUTPUT_FORMAT = "audio-24khz-160kbitrate-mono-mp3";
 
@@ -29,8 +29,17 @@ export function buildSentenceSsml(params: { text: string; voice: string }): stri
   </speak>`;
 }
 
-export async function generateSentenceAudio(ssml: string): Promise<FetchedMedia> {
-  const { key, region } = readAzureTtsConfig();
+/** The hash covers the output format and the SSML, so a change of either gives a new clip. */
+export function sentenceAudioHash(ssml: string): string {
+  return shortHash(`${SENTENCE_AUDIO_OUTPUT_FORMAT}\n${ssml}`);
+}
+
+export async function generateSentenceAudio(params: {
+  ssml: string;
+  config: AzureTtsConfig;
+}): Promise<FetchedMedia> {
+  const { ssml, config } = params;
+  const { key, region } = config;
   const url = `https://${region}.tts.speech.microsoft.com/cognitiveservices/v1`;
 
   console.log(`[TTS] Generating audio from ${ssml.length} chars of SSML`);

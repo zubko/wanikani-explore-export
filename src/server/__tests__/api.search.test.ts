@@ -14,8 +14,8 @@ import {
   setStudyMaterialFile,
   studyMaterialFixture as fixture,
 } from "@/test/study-material-fixture.ts";
-import { getLocalStudyMaterials, LOCAL_STUDY_MATERIALS_PATH } from "../repository/data-loader.ts";
-import { MNEMONIC_IMAGES_PATH } from "../repository/mnemonic-image-fetcher.ts";
+import { getLocalStudyMaterials } from "../repository/data-loader.ts";
+import { LOCAL_STUDY_MATERIALS_PATH, MNEMONIC_IMAGES_PATH } from "../repository/data-paths.ts";
 import { api } from "../api.ts";
 
 installFetchInterceptor();

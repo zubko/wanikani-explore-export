@@ -1,11 +1,11 @@
-import type { PronunciationAudio, ContextSentence } from "./wanikani.ts";
+import type { PronunciationAudio, ContextSentence, VoiceGender } from "./wanikani.ts";
 
 export type VoiceActor = PronunciationAudio["metadata"];
 
 export function selectReadingAudios(params: {
   audios: PronunciationAudio[];
   readings: string[];
-  gender: "male" | "female";
+  gender: VoiceGender;
 }): PronunciationAudio[] {
   const { audios, readings, gender } = params;
   const firstPerReading = new Map<string, PronunciationAudio>();

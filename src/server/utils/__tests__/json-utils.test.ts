@@ -1,7 +1,6 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
-import { readFile } from "fs/promises";
 import { resetFsMock, setFsError, writeCalls } from "@/test/preload.ts";
-import { saveJsonAtomic, writeFileAtomic } from "../json-utils.ts";
+import { saveJsonAtomic } from "../json-utils.ts";
 
 const PATH = "./data/userdata/json-utils-test.json";
 const TEMP_NAME_PATTERN = /\.[0-9a-f-]{36}\.tmp$/;
@@ -45,17 +44,5 @@ describe("saveJsonAtomic", () => {
 
     expect(writeCalls).toHaveLength(2);
     expect(writeCalls[0]?.path).not.toBe(writeCalls[1]?.path);
-  });
-});
-
-describe("writeFileAtomic", () => {
-  test("keeps the bytes of a Buffer", async () => {
-    // 0xff is no valid UTF-8, so a round trip through a string would change it
-    const data = Buffer.from([0xff, 0x00, 0x10]);
-
-    await writeFileAtomic(PATH, data);
-
-    expect(writeCalls).toEqual([{ path: PATH, data }]);
-    expect(await readFile(PATH)).toEqual(data);
   });
 });

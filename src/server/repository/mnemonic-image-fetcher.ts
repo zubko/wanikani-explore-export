@@ -1,10 +1,9 @@
 import { appendFile, readFile } from "fs/promises";
-import { isMissingFile } from "@server/utils/json-utils.ts";
+import { isMissingFile } from "@server/utils/file-utils.ts";
 import { createReloadingFile } from "@server/utils/reloading-file.ts";
+import { MNEMONIC_IMAGES_PATH } from "./data-paths.ts";
 
 type MnemonicImageLine = { page: string; image: string | null };
-
-export const MNEMONIC_IMAGES_PATH = "./data/userdata/mnemonic-images.jsonl";
 
 // Append-only, so git merges the lines of both machines and a pulled line shows on the next lookup
 const registry = createReloadingFile({
@@ -29,6 +28,11 @@ export async function getMnemonicImageUrl(documentUrl: string): Promise<string |
   const lookup = scrapeAndRecord(documentUrl).finally(() => pendingFetches.delete(documentUrl));
   pendingFetches.set(documentUrl, lookup);
   return lookup;
+}
+
+/** A known page is never scraped again, so a dead picture URL stays until its line is gone. */
+export function mnemonicImageErrorHint(documentUrl: string): string {
+  return `It is the mnemonic picture of ${documentUrl}. To scrape that page again, delete its line in ${MNEMONIC_IMAGES_PATH}`;
 }
 
 /**
@@ -59,7 +63,8 @@ async function scrapeAndRecord(documentUrl: string): Promise<string | null> {
   try {
     image = await fetchMnemonicImageUrl(documentUrl);
   } catch (error) {
-    // A `null` in an append-only file stays forever, so only a page that was really read is recorded
+    // A `null` in an append-only file stays forever, so only a page that was really
+    // read is recorded
     console.error(`[Repository] Mnemonic image scrape failed: ${documentUrl}. ${String(error)}`);
     return null;
   }

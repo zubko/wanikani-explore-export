@@ -7,11 +7,8 @@ import {
   setStudyMaterialFile,
   studyMaterialFixture as fixture,
 } from "@/test/study-material-fixture.ts";
-import {
-  findSubjectTypeById,
-  getLocalStudyMaterials,
-  LOCAL_STUDY_MATERIALS_PATH,
-} from "../data-loader.ts";
+import { findSubjectTypeById, getLocalStudyMaterials } from "../data-loader.ts";
+import { LOCAL_STUDY_MATERIALS_PATH } from "../data-paths.ts";
 import { getKanji } from "../kanji.ts";
 import { upsertLocalStudyMaterial } from "../study-material.ts";
 import { ensureRepositoryInitialized, installFetchMock } from "./setup.ts";

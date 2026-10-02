@@ -1,6 +1,6 @@
 import { readFileSync } from "fs";
 import type { LocalStudyMaterial } from "@/model/wanikani.ts";
-import { LOCAL_STUDY_MATERIALS_PATH } from "@server/repository/data-loader.ts";
+import { LOCAL_STUDY_MATERIALS_PATH } from "@server/repository/data-paths.ts";
 import { setFileContent, STUDY_MATERIALS_FIXTURE_PATH, writeCalls } from "./preload.ts";
 
 /** The untouched records, so a test can compare against them. */

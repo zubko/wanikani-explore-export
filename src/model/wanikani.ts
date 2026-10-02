@@ -48,8 +48,10 @@ export type ContextSentence = {
   reading?: string;
 };
 
+export type VoiceGender = "male" | "female";
+
 export type PronunciationAudioMetadata = {
-  gender: "male" | "female";
+  gender: VoiceGender;
   source_id: number;
   pronunciation: string;
   voice_actor_id: number;

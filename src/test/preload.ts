@@ -2,6 +2,11 @@ import { mock } from "bun:test";
 import { readFileSync } from "fs";
 import { readFile } from "fs/promises";
 import { basename, dirname, normalize } from "path";
+import {
+  LOCAL_STUDY_MATERIALS_PATH,
+  MEDIA_ROOT_PATH,
+  MNEMONIC_IMAGES_PATH,
+} from "@server/repository/data-paths.ts";
 import { installDom } from "./dom.ts";
 
 // react-dom reads the DOM globals when it loads, so this must run before any test file imports it
@@ -27,20 +32,14 @@ export const STUDY_MATERIALS_FIXTURE_PATH = "src/test/fixtures/study_materials_e
 
 // Checked-in fixtures under the real paths, so no test depends on user-specific state
 const SEEDED_FILES = [
-  {
-    path: "./data/userdata/mnemonic-images.jsonl",
-    fixturePath: "src/test/fixtures/mnemonic-images.jsonl",
-  },
-  {
-    path: "./data/userdata/study_materials_extra.json",
-    fixturePath: STUDY_MATERIALS_FIXTURE_PATH,
-  },
+  { path: MNEMONIC_IMAGES_PATH, fixturePath: "src/test/fixtures/mnemonic-images.jsonl" },
+  { path: LOCAL_STUDY_MATERIALS_PATH, fixturePath: STUDY_MATERIALS_FIXTURE_PATH },
 ];
 
 // A seeded or media file that is not in the mock must read as missing, never as the user's real
 // file. An exact compare, because a fixture file has the same base name as its seeded path.
 const SEEDED_PATHS = new Set(SEEDED_FILES.map(({ path }) => normalize(path)));
-const MEDIA_FOLDER = normalize("./data/userdata/media/");
+const MEDIA_FOLDER = normalize(`${MEDIA_ROOT_PATH}/`);
 
 export const writeCalls: { path: string; data: FileData }[] = [];
 export const mkdirCalls: { path: string; recursive: boolean }[] = [];
@@ -49,12 +48,16 @@ const fsErrors = new Map<FsOp, Error>();
 const fsHolds = new Map<FsOp, FsHold>();
 // Holds the written files, so a read after a write sees the new content like a real disk does
 const files = new Map<string, MockFile>();
-// Never reset, so a file seeded again after a reset still looks changed to a reader that holds the old one
+// Never reset, so a file seeded again after a reset still looks changed to a reader that holds
+// the old one
 let lastVersion = 0;
 
 seedFixtures();
 
-/** Drops the recorded calls, the written files, the injected errors and the held ops, then seeds the fixtures again. */
+/**
+ * Drops the recorded calls, the written files, the injected errors and the held ops, then seeds
+ * the fixtures again.
+ */
 export function resetFsMock() {
   writeCalls.length = 0;
   mkdirCalls.length = 0;

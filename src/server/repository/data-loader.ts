@@ -11,15 +11,15 @@ import type {
 import { LOCAL_STUDY_MATERIAL_FIELDS } from "@/model/wanikani.ts";
 import { localStudyMaterialValueProblem, readingNoteProblem } from "@/model/subject-utils.ts";
 import { readFile, stat } from "fs/promises";
+import { LOCAL_STUDY_MATERIALS_PATH } from "./data-paths.ts";
 import { loadMnemonicImageRegistry } from "./mnemonic-image-fetcher.ts";
-import { isMissingFile, readJson, saveJsonAtomic } from "@server/utils/json-utils.ts";
+import { isMissingFile } from "@server/utils/file-utils.ts";
+import { readJson, saveJsonAtomic } from "@server/utils/json-utils.ts";
 import { createReloadingFile } from "@server/utils/reloading-file.ts";
 
 type RawVerbConjugations = Omit<VerbConjugations, "type">;
 
 export type SentenceReadingEntry = { ja: string; reading: string };
-
-export const LOCAL_STUDY_MATERIALS_PATH = "./data/userdata/study_materials_extra.json";
 
 export let radicals: RadicalData[];
 export let kanji: KanjiData[];
@@ -133,8 +133,8 @@ export async function readLocalStudyMaterials(): Promise<Record<string, LocalStu
 }
 
 function parseLocalStudyMaterialsFile(content: string | null): Record<string, LocalStudyMaterial> {
-  // initRepository creates the file and a git pull never deletes it, so it was deleted by hand.
-  // A save must not quietly write a new file with one record.
+  // The file exists from the start, and a git pull never deletes it. So a missing file was deleted
+  // by hand, and a new file would drop every record.
   if (content === null) throw new Error(`${LOCAL_STUDY_MATERIALS_PATH} is missing`);
 
   let parsed: unknown;

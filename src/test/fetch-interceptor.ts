@@ -21,7 +21,7 @@ type AnkiErrorOverride = { message: string; onCall?: number };
 const SVG_CONTENT_TYPE = "image/svg+xml";
 
 export const ankiCalls: AnkiCall[] = [];
-/** Every URL fetched that is not AnkiConnect, so a test can check that a cache hit made no request. */
+/** Every fetched URL that is not AnkiConnect, so a test can see a cache hit made no request. */
 export const externalFetches: string[] = [];
 
 const responseOverrides = new Map<string, unknown>();

@@ -1,5 +1,5 @@
 import { readFile, stat } from "fs/promises";
-import { isMissingFile } from "./json-utils.ts";
+import { isMissingFile } from "./file-utils.ts";
 
 type ReloadingFile<T> = { get: () => Promise<T> };
 

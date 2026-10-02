@@ -1,11 +1,10 @@
 import { mkdir, readdir, readFile } from "fs/promises";
-import { isMissingFile, writeFileAtomic } from "@server/utils/json-utils.ts";
+import { isMissingFile, writeFileAtomic } from "@server/utils/file-utils.ts";
+import { MEDIA_ROOT_PATH } from "./data-paths.ts";
 
 export type MediaFolder = "radicals" | "mnemonics" | "readings" | "sentences";
 
 export type FetchedMedia = { data: Buffer; extension: string };
-
-export const MEDIA_ROOT_PATH = "./data/userdata/media";
 
 const EXTENSIONS_BY_CONTENT_TYPE = new Map([
   ["image/svg+xml", "svg"],

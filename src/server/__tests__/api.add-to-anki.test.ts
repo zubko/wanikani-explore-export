@@ -18,8 +18,7 @@ import { ensureRepositoryInitialized, resetFsMock, writeCalls } from "@/test/pre
 import { VOCABULARY_MODEL_NAME, VOCABULARY_EXPECTED_FIELDS } from "@/model/anki-models.ts";
 import { getRadicalSvgUrl } from "@/model/radical-utils.ts";
 import { vocabulary as vocabularyData } from "@server/repository/data-loader.ts";
-import { MEDIA_ROOT_PATH } from "@server/repository/media-cache.ts";
-import { MNEMONIC_IMAGES_PATH } from "@server/repository/mnemonic-image-fetcher.ts";
+import { MEDIA_ROOT_PATH, MNEMONIC_IMAGES_PATH } from "@server/repository/data-paths.ts";
 import { getRadical } from "@server/repository/radical.ts";
 import { getVocabulary } from "@server/repository/vocabulary.ts";
 import { api } from "../api.ts";

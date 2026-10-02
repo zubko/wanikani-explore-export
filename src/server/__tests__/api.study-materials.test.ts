@@ -6,7 +6,8 @@ import {
   setFsError,
 } from "@/test/preload.ts";
 import { lastWrite, studyMaterialFixture as fixture } from "@/test/study-material-fixture.ts";
-import { getLocalStudyMaterials, LOCAL_STUDY_MATERIALS_PATH } from "../repository/data-loader.ts";
+import { getLocalStudyMaterials } from "../repository/data-loader.ts";
+import { LOCAL_STUDY_MATERIALS_PATH } from "../repository/data-paths.ts";
 import { api } from "../api.ts";
 
 async function patchJson(body: unknown, rawBody?: string) {

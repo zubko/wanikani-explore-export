@@ -9,11 +9,8 @@ import {
 } from "./setup.ts";
 import { createFetchMock, resolveUrl } from "@/test/fetch-utils.ts";
 import { holdFsOp, setFileContent, setFsError } from "@/test/preload.ts";
-import {
-  getMnemonicImageUrl,
-  MNEMONIC_IMAGES_PATH,
-  parseMnemonicImageLines,
-} from "../mnemonic-image-fetcher.ts";
+import { MNEMONIC_IMAGES_PATH } from "../data-paths.ts";
+import { getMnemonicImageUrl, parseMnemonicImageLines } from "../mnemonic-image-fetcher.ts";
 
 const PAGE = "https://www.wanikani.com/radicals/barb";
 const IMAGE = "https://files.wanikani.com/barb-mnemonic.png";
@@ -47,7 +44,7 @@ function parseError(content: string): string {
 
 afterAll(() => restoreFetchMock());
 
-// The bad-line test leaves a broken registry in the shared fs mock, so it must not reach the next file
+// The bad-line test breaks the registry in the shared fs mock, so it must not reach the next file
 beforeEach(() => {
   installFetchMock();
   resetMockState();

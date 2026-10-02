@@ -1,12 +1,8 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
 import { readdir } from "fs/promises";
 import { mkdirCalls, resetFsMock, setFileContent, setFsError, writeCalls } from "@/test/preload.ts";
-import {
-  extensionOfContentType,
-  getOrFetchMedia,
-  MEDIA_ROOT_PATH,
-  type FetchedMedia,
-} from "../media-cache.ts";
+import { MEDIA_ROOT_PATH } from "../data-paths.ts";
+import { extensionOfContentType, getOrFetchMedia, type FetchedMedia } from "../media-cache.ts";
 
 const NAME = "barb_ab12cd34";
 const FOLDER_PATH = `${MEDIA_ROOT_PATH}/radicals`;
@@ -19,12 +15,12 @@ beforeEach(resetFsMock);
 afterEach(resetFsMock);
 
 function createFetch(media: FetchedMedia = { data: BYTES, extension: "svg" }) {
-  const calls: number[] = [];
+  let callCount = 0;
   const fetch = async () => {
-    calls.push(1);
+    callCount += 1;
     return media;
   };
-  return { fetch, calls };
+  return { fetch, callCount: () => callCount };
 }
 
 function getBarb(fetch: () => Promise<FetchedMedia>) {
@@ -33,11 +29,11 @@ function getBarb(fetch: () => Promise<FetchedMedia>) {
 
 describe("getOrFetchMedia", () => {
   test("a miss fetches once and writes the file under its real name", async () => {
-    const { fetch, calls } = createFetch();
+    const { fetch, callCount } = createFetch();
 
     expect(await getBarb(fetch)).toEqual({ fileName: `${NAME}.svg`, data: BYTES });
 
-    expect(calls).toHaveLength(1);
+    expect(callCount()).toBe(1);
     expect(writeCalls).toEqual([{ path: FILE_PATH, data: BYTES }]);
   });
 
@@ -50,11 +46,11 @@ describe("getOrFetchMedia", () => {
 
   test("a folder create error throws and does not fetch", async () => {
     setFsError("mkdir", Object.assign(new Error("permission denied"), { code: "EACCES" }));
-    const { fetch, calls } = createFetch();
+    const { fetch, callCount } = createFetch();
 
     await expect(getBarb(fetch)).rejects.toThrow("permission denied");
 
-    expect(calls).toHaveLength(0);
+    expect(callCount()).toBe(0);
   });
 
   test("an empty answer throws and writes nothing", async () => {
@@ -66,7 +62,7 @@ describe("getOrFetchMedia", () => {
   });
 
   test("two misses of one name at the same time both answer the file and leave no temp file", async () => {
-    const { fetch, calls } = createFetch();
+    const { fetch, callCount } = createFetch();
 
     const results = await Promise.all([getBarb(fetch), getBarb(fetch)]);
 
@@ -74,48 +70,46 @@ describe("getOrFetchMedia", () => {
       { fileName: `${NAME}.svg`, data: BYTES },
       { fileName: `${NAME}.svg`, data: BYTES },
     ]);
-    expect(calls).toHaveLength(2);
+    expect(callCount()).toBe(2);
     expect(await readdir(FOLDER_PATH)).toEqual([`${NAME}.svg`]);
   });
 
   test("a second call is a hit with the same bytes and no fetch", async () => {
-    const { fetch, calls } = createFetch();
+    const { fetch, callCount } = createFetch();
     await getBarb(fetch);
 
     expect(await getBarb(fetch)).toEqual({ fileName: `${NAME}.svg`, data: BYTES });
 
-    expect(calls).toHaveLength(1);
+    expect(callCount()).toBe(1);
     expect(writeCalls).toHaveLength(1);
   });
 
   test("a temp file next to the name is no hit", async () => {
     setFileContent(`${FILE_PATH}.0d6f2b8e-4c1a-4f3e-9b7d-2a5c8e1f0b3d.tmp`, "half");
-    const { fetch, calls } = createFetch();
+    const { fetch, callCount } = createFetch();
 
     expect(await getBarb(fetch)).toEqual({ fileName: `${NAME}.svg`, data: BYTES });
 
-    expect(calls).toHaveLength(1);
+    expect(callCount()).toBe(1);
   });
 
   test("a file that only starts with the name is no hit", async () => {
-    setFileContent(`${MEDIA_ROOT_PATH}/radicals/${NAME}_mnemonic.svg`, "other");
-    const { fetch, calls } = createFetch();
+    setFileContent(`${FOLDER_PATH}/${NAME}_mnemonic.svg`, "other");
+    const { fetch, callCount } = createFetch();
 
     await getBarb(fetch);
 
-    expect(calls).toHaveLength(1);
+    expect(callCount()).toBe(1);
   });
 
   test("two files with the same name and different extensions throw", async () => {
     setFileContent(FILE_PATH, "<svg></svg>");
-    setFileContent(`${MEDIA_ROOT_PATH}/radicals/${NAME}.png`, "png");
-    const { fetch, calls } = createFetch();
+    setFileContent(`${FOLDER_PATH}/${NAME}.png`, "png");
+    const { fetch, callCount } = createFetch();
 
-    await expect(getBarb(fetch)).rejects.toThrow(
-      `Two cached files for ${MEDIA_ROOT_PATH}/radicals/${NAME}`
-    );
+    await expect(getBarb(fetch)).rejects.toThrow(`Two cached files for ${FOLDER_PATH}/${NAME}`);
 
-    expect(calls).toHaveLength(0);
+    expect(callCount()).toBe(0);
   });
 
   test("a failed fetch writes nothing and throws", async () => {
@@ -143,20 +137,20 @@ describe("getOrFetchMedia", () => {
   test("a read error on a hit throws and does not fetch", async () => {
     setFileContent(FILE_PATH, "<svg></svg>");
     setFsError("readFile", new Error("permission denied"));
-    const { fetch, calls } = createFetch();
+    const { fetch, callCount } = createFetch();
 
     await expect(getBarb(fetch)).rejects.toThrow("permission denied");
 
-    expect(calls).toHaveLength(0);
+    expect(callCount()).toBe(0);
   });
 
   test("a folder read error other than a missing folder throws and does not fetch", async () => {
     setFsError("readdir", Object.assign(new Error("permission denied"), { code: "EACCES" }));
-    const { fetch, calls } = createFetch();
+    const { fetch, callCount } = createFetch();
 
     await expect(getBarb(fetch)).rejects.toThrow("permission denied");
 
-    expect(calls).toHaveLength(0);
+    expect(callCount()).toBe(0);
   });
 });
 
