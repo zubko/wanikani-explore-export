@@ -82,7 +82,7 @@ Steps marked **root** need sudo. An AI agent can do the rest.
    curl 127.0.0.1:8765 -d '{"action":"sync","version":6}'         # {"result": null, "error": null}
    ```
 
-9. The app. `bun install` in the repo, then `scp` `.env` and `scripts/.env` from the main machine. `.env` is for Azure TTS, without it sentence audio is skipped.
+9. The app. `bun install` in the repo, then `scp` `.env` and `scripts/.env` from the main machine. `.env` holds the three Azure TTS values and is required. Without one of them the dev server still starts, but the first API request fails, and the dev server log names the missing variable. Keep `AZURE_TTS_VOICES` the same on both machines: the voice is part of the sentence clip name, so a different list makes each machine create its own clip for most words.
 
 ## Unit files
 

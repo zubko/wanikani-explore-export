@@ -29,12 +29,17 @@ src/
       useLocalStudyMaterial.ts # Shared store of the saved local notes / synonyms
     utils/              # Client-side utility functions (non-React)
   server/               # Hono backend
-    index.ts            # Server entry: repository init, then createApp()
+    index.ts            # Server entry: Azure config check, repository init, then createApp()
     app.ts              # Hono app: logger, CORS, /api routes
     api.ts              # API routes (exports ApiType for client)
     utils/              # Server-side utility functions
+      hash.ts           # shortHash (first 8 hex chars of SHA-1) and hashNumber
+      json-utils.ts     # readJson, writeFileAtomic, saveJsonAtomic
+      reloading-file.ts # createReloadingFile: reads a file again when its mtime or size changed
     repository/         # Data access layer (singleton, use initRepository() first)
                         #   study-material.ts: local notes / synonyms, saved with saveJsonAtomic
+                        #   mnemonic-image-fetcher.ts: mnemonic image registry, an append-only JSONL file
+                        #   media-cache.ts: getOrFetchMedia, the media files in data/userdata/media/
     services/           # Server services (AnkiConnect integration, Azure TTS)
   config/               # Shared configuration (theme colors)
   utils/                # Shared utility functions (mnemonic-utils)
@@ -75,15 +80,22 @@ scripts/                # Utility scripts. Top level holds only entry points, sh
     vocabulary-data.ts           # Shared by the two LLM scripts: load vocabulary, primary reading
     sentence-reading-check.ts    # Order check of a kana reading against its sentence (unit-tested)
     iknow-vocab.ts               # Pure parts of the iKnow import: parsing, course rollover (unit-tested)
+    note-refresh.ts              # pickNotesToRefresh for the kanji and radical passes of sync-anki-notes (unit-tested)
     __tests__/                   # Unit tests for the pure script helpers, fixtures in fixtures/
   .env                  # Script-specific env vars (WANIKANI_API_TOKEN, LLM_BASE_URL, LLM_API_KEY, LLM_MODEL)
                         # Loaded via --env-file in package.json scripts
 
 data/                   # Data files
-  userdata/             # User-specific data, gitignored
-                        #   Downloaded WaniKani subjects, study materials, mnemonic image cache
+  userdata/             # User-specific data, gitignored, its own git repo (see "Two Machines")
+                        #   Downloaded WaniKani subjects, study materials
                         #   Populated via download scripts
                         #   study_materials_extra.json: local notes and synonyms, written by the app (see below)
+                        #   mnemonic-images.jsonl: mnemonic image registry, one line per page, written by the app
+    media/              # Media cache, written by the app, one file per item
+      radicals/         # Radical SVGs
+      mnemonics/        # Radical mnemonic pictures
+      readings/         # WaniKani reading clips
+      sentences/        # Azure TTS sentence clips
   wanikani-fixes.yaml     # Hand-written corrections for wrong WaniKani API data (see below)
   verb_conjugations.json  # Verb conjugations keyed by vocabulary ID (LLM-generated)
   sentence_readings.json  # Kana readings for context sentences keyed by vocabulary ID (LLM-generated)
@@ -147,14 +159,48 @@ Patching `data/userdata/` changes two checked-in snapshots (`radical.test.ts.sna
 
 Current contents: seven patches for WaniKani's 2026-08-27 content update, which changed the radicals of 万, 別 and 成 on the website but not in the API. Reported at https://community.wanikani.com/t/75554 and to hello@wanikani.com. Delete the file and the script once WaniKani fixes it and no patch is left.
 
+### Two Machines
+
+Two servers read and write `data/userdata/`: the Mac by hand, and the Linux box through an auto-pull job that commits every few minutes. Correctness beats speed here. One person uses the app at a time, so a `stat` per request is fine.
+
+Design rules:
+
+- A file the server reads and the other machine may change is never kept in memory for the whole process. `createReloadingFile({ path, parse })` in `src/server/utils/reloading-file.ts` runs a `stat` on every `get()` and reads the file again when its mtime or size changed. `parse` gets `null` for a missing file and decides what empty means. The value is kept only after `parse` succeeded.
+- A bad data file that shows up while the server runs (a hand edit, a pull) fails every request that needs it, loudly, until the file is fixed. No restart is needed after the fix. A bad file at startup still fails the start.
+- A write is an append of one line, or an atomic write and rename. It is never a rewrite of a whole file from a memory copy. `writeFileAtomic(path, data)` in `src/server/utils/json-utils.ts` writes `<path>.<uuid>.tmp` and renames it over the file, so two writes of one path never share a temp file. `saveJsonAtomic` calls it.
+- The reading gender and the sentence voice come from hashes, not from `Math.random`. So a word always gets the same file names, on both machines, as long as both hold the same `AZURE_TTS_VOICES` list.
+
+The mnemonic image registry, `data/userdata/mnemonic-images.jsonl`:
+
+- One line per WaniKani page: `{"page": string, "image": string | null}`. `getMnemonicImageUrl(documentUrl)` in `src/server/repository/mnemonic-image-fetcher.ts` reads it through `createReloadingFile` before every lookup. So a line pulled from the other machine is found with no scrape.
+- On a miss it scrapes the page once and appends one line. A second lookup of the same page waits for the first one and does not scrape again. A failed append fails the request.
+- A failed scrape or a bad HTTP status appends nothing, and the subject builds with no picture. The next search tries again. A `null` line in an append-only file of two machines stays forever, so only a page that was really read is recorded.
+- Git's union merge puts the lines of both sides in no fixed order, so the parser never looks at the order. Two equal lines are fine, and a URL beats `null`. Two different URLs for one page fail the read with the page in the message. The user then deletes one line.
+- `initRepository` reads the registry once, so a broken line fails the start. The error names the line number.
+
+The media cache, `data/userdata/media/`:
+
+- `getOrFetchMedia({ folder, nameWithoutExtension, fetch })` in `src/server/repository/media-cache.ts`. A hit reads the file from disk and never touches the network. A miss calls `fetch`, writes the file with `writeFileAtomic` and returns it. So an add or a re-sync goes to the network only once per file, and a card still builds when WaniKani drops a file.
+- Four folders: `radicals/` (radical SVGs), `mnemonics/` (radical mnemonic pictures), `readings/` (WaniKani reading clips), `sentences/` (Azure sentence clips).
+- A hit is a file named `<nameWithoutExtension>.<ext>` with no dot in `ext`, so a `.tmp` file is never a hit. Two such files throw `Two cached files for ...`, the cache never picks one. A read error on a hit throws, it never falls back to the network.
+- The file names on disk carry no deck id: radical SVG `{slug}_{urlHash}.svg`, mnemonic picture `{slug}_mnemonic_{urlHash}.{ext}`, reading clip `{slug}_{gender}_{readingHash}.mp3`, sentence clip `{slug}_{ssmlHash}.mp3`. A changed URL, reading or SSML gives a new name, so the new file is fetched by itself. The Anki name adds the deck id, see "Anki Integration".
+- The mnemonic picture takes its extension from the `Content-Type` of the answer, through `extensionOfContentType`. It knows `svg`, `png`, `jpg` and `gif` and throws on anything else, it never guesses. The other three types are known from the API metadata or the TTS output format.
+
+Git attributes in `data/userdata/.gitattributes`. `data/userdata/README.md` explains them for that repo too.
+
+- `*.jsonl merge=union`: git keeps the new lines of both sides. It needs no setup.
+- `media/** merge=ours`: when both machines add the same media file, git keeps the local copy. Both copies come from the same source, so either one is fine.
+- `ours` is not a built-in merge driver. Every clone needs `git -C data/userdata config merge.ours.driver true` once. Without it git ignores the attribute, and a media file that both machines added stops the pull with a conflict.
+
 ### Local Study Materials
 
 Local notes and synonyms for any subject, written in the web UI. They never touch the WaniKani data. There is no script for this, the app writes the file.
 
 - The file is `data/userdata/study_materials_extra.json`. It is an object keyed by the subject id as a string. WaniKani subject ids are unique across all types, so the file holds no type. A record has `meaning_note`, `reading_note` and `meaning_synonyms`, all optional.
-- `data-loader.ts` reads it into `localStudyMaterials` in the same `Promise.all` as the other data files. A missing file is created with `{}` and the start goes on. This is the one data file the app itself writes, so it can make its own empty one; every other data file still fails the start, because only a download script can fill those. Any other read error still fails the start. The path is one exported constant, `LOCAL_STUDY_MATERIALS_PATH`. An exported `let` cannot be assigned from another module, so `setLocalStudyMaterials(next)` sits next to it.
+- `getLocalStudyMaterials()` in `data-loader.ts` answers the records. It reads the file through `createReloadingFile`, so a hand edit or a `git pull` shows on the next request with no restart. A bad file fails every request that needs it until it is fixed. `initRepository` reads it once after the subject arrays, so a bad file still fails the start. The path is one exported constant, `LOCAL_STUDY_MATERIALS_PATH`.
+- A file that is missing at start is created with `{}` by `ensureLocalStudyMaterialsFile()`, which only `initRepository` calls. This is the one data file the app itself writes, so it can make its own empty one; every other data file still fails the start, because only a download script can fill those. After the start a missing file is an error, `<path> is missing`: a git pull never deletes it, so it was deleted by hand. The getter fails, and a save fails and writes nothing instead of a new file with one record.
 - The file is hand-written, so the load refuses everything the PATCH route refuses. Both sides use the same rules from `src/model/subject-utils.ts`: `localStudyMaterialValueProblem(field, value)` for the value, `readingNoteProblem(type)` for a `reading_note` on a type that has no reading. The field lists live in `src/model/wanikani.ts`: `LOCAL_STUDY_MATERIAL_FIELDS` for a stored record, `LOCAL_STUDY_MATERIAL_PATCH_FIELDS` for a patch. An entry with no field is refused too, because the app deletes such an entry and would never look at it.
-- The subject rules need the loaded subject arrays, so they are not part of `readLocalStudyMaterials`. `checkLocalStudyMaterialSubjects(records)` runs at the end of `initRepository` and refuses an id that is no WaniKani subject, and a `reading_note` on a radical or on kana vocabulary. It is a separate step because `readLocalStudyMaterials` also runs inside every save, where a bad record of another subject must not fail the write. `findSubjectTypeById(id)` lives in `data-loader.ts` next to the arrays it scans, so this check needs no import cycle.
+- The subject rules need the loaded subject arrays, so they are not part of `readLocalStudyMaterials`. `checkLocalStudyMaterialSubjects(records)` runs on every reread of the file, inside the `parse` of the reloading file, and refuses an id that is no WaniKani subject, and a `reading_note` on a radical or on kana vocabulary. It is a separate step because `readLocalStudyMaterials` also runs inside every save, where a bad record of another subject must not fail the write. `findSubjectTypeById(id)` lives in `data-loader.ts` next to the arrays it scans, so this check needs no import cycle.
 - Every enriched subject carries two records: `studyMaterial` from WaniKani and `localStudyMaterial` from this file. The server sends both. `mergeStudyMaterial(wanikani, local)` in `src/model/subject-utils.ts` joins them: a local note replaces the WaniKani note, local synonyms are appended to the WaniKani ones and duplicates are dropped.
 - The client gets both records on purpose. Local synonyms need a remove button, and clearing a local note must show the WaniKani note again with no re-fetch.
 - The three Anki note builders in `src/server/services/anki-connect.ts` call the same helper, so a note built now holds the merged values. A note that is already in the deck keeps its old text until the next `add-to-anki` or `bun run sync-anki-notes`.
@@ -162,10 +208,10 @@ Local notes and synonyms for any subject, written in the web UI. They never touc
 - `MergedStudyMaterial` uses camelCase, because it is our own computed shape, like `meaningMnemonic`. `LocalStudyMaterial` stays snake_case, because it mirrors the WaniKani record field by field. Do not "fix" one to match the other.
 - A patch never carries the synonym list. It names one word in `add_synonym` or in `remove_synonym`, and the server applies it to the record it just read from the file. So a client that holds an old record cannot delete a synonym it never saw, and no client-side reconciling of lists is needed. A patch that holds both fields removes first and adds after, and the editor only ever sends one of them. The notes stay whole values: a note is one text the user typed, and writing it over the old one is the point.
 - `applyLocalStudyMaterialPatch(current, patch)` in `src/model/subject-utils.ts` is the one place that merges a patch into a record. The server writes its result, the client shows it while the request runs. It trims the notes and the added word, drops blank and repeated synonyms, deletes a field that ends up empty and returns `null` when no field is left. It cleans the whole merged record, not only the patched fields, so the file never holds an empty string, an empty list or an empty entry.
-- `upsertLocalStudyMaterial` in `src/server/repository/study-material.ts` writes the whole object with `saveJsonAtomic` from `src/server/utils/json-utils.ts` (write `<path>.tmp`, rename it over the real file, unlink the temp file when a step throws), then publishes it with `setLocalStudyMaterials`. A failed write leaves both the file and the memory unchanged.
+- `upsertLocalStudyMaterial` in `src/server/repository/study-material.ts` writes the whole object with `saveJsonAtomic` from `src/server/utils/json-utils.ts` (write `<path>.<uuid>.tmp`, rename it over the real file, unlink the temp file when a step throws). It keeps no memory copy: the next `getLocalStudyMaterials()` sees the new mtime and reads the file again. A failed write leaves the file unchanged.
 - `saveJsonAtomic` exists twice, here and in `scripts/lib/llm-utils.ts`. The scripts must not import from `src/server/`, so the copy stays on purpose. Change both when you change one.
 - Every upsert runs in one module-level promise queue. Two saves at the same time would otherwise start from the same old object, and one change would be lost. The caller's promise stays out of the chain (`const run = queue.then(step); queue = run.catch(() => {}); return run;`). So the caller sees the error, and the next save still starts from the last good state.
-- The upsert reads the file again inside that queue and merges the patch onto the fresh content, it never writes the memory copy. The user also edits this file by hand and pulls it from git while the server runs, and the memory copy is only filled at startup. A read error fails the save, because writing the stale map would drop those edits with no error.
+- The upsert reads the file again inside that queue with `readLocalStudyMaterials()` and merges the patch onto the fresh content. The user also edits this file by hand and pulls it from git while the server runs. A read error fails the save, because writing an old copy would drop those edits with no error.
 - `findSubjectTypeById(id)` in `data-loader.ts` scans the four subject arrays. The route calls it before the write, because a `reading_note` for a radical or for kana vocabulary is a 400. The upsert itself trusts the id.
 - The web UI edits the values in place. `NoteSection.tsx` has a pencil button and a textarea, Esc cancels and Cmd+Enter saves. `UserSynonymsRow.tsx` has an inline input and a small × on every local chip. Both are optimistic: they show the new value at once, send the patch, and on an error put the old value back and show a `toast.error`.
 - One subject can render on several cards at once. A radical under two kanji of one word gets one card per kanji. So the saved records live in one module-level store, `src/client/hooks/useLocalStudyMaterial.ts`, and not in the components. Per-card state would show one card a value the other card saved a moment ago. A card reads the store first and falls back to the record the server sent.
@@ -256,7 +302,7 @@ Adding or re-syncing a word always creates or refreshes its component kanji and 
 
 Two `.env` files, each with a `.env.example` to copy from:
 
-- **`.env`** (project root) — Azure TTS credentials for context sentence audio. Optional — if missing, sentence audio is silently skipped. `AZURE_TTS_VOICES` holds the Dragon HD voices `ja-JP-Nanami:DragonHDLatestNeural,ja-JP-Masaru:DragonHDLatestNeural`, the region must support them (`westeurope` does). Output is MP3 at 24 kHz, 160 kbit/s.
+- **`.env`** (project root) — Azure TTS credentials for context sentence audio. Required: `AZURE_TTS_KEY`, `AZURE_TTS_REGION` and `AZURE_TTS_VOICES` must all be set. `readAzureTtsConfig()` throws `Missing <name> in the root env file` for the first one that is missing. `bun run preview` then fails at start. `bun run dev` starts, because vite loads the server entry only on the first `/api` request, so that first request fails and the dev server log names the missing variable. `AZURE_TTS_VOICES` holds the Dragon HD voices `ja-JP-Nanami:DragonHDLatestNeural,ja-JP-Masaru:DragonHDLatestNeural`, the region must support them (`westeurope` does). Both machines need the same `AZURE_TTS_VOICES` list, because the voice is part of the sentence clip name. Output is MP3 at 24 kHz, 160 kbit/s.
 - **`scripts/.env`** — WaniKani API token (required for download scripts) and the LLM settings `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL` (for verb conjugation / sentence reading generation). `LLM_MODEL` must be a model the endpoint offers, the scripts fail at the first request otherwise.
 
 Get your WaniKani token from: https://www.wanikani.com/settings/personal_access_tokens
@@ -277,10 +323,11 @@ AnkiConnect client is in `src/server/services/anki-connect.ts`. Card templates a
 - The source of truth for what an AnkiConnect action does is the installed add-on, `~/Library/Application Support/Anki2/addons21/2055492159/__init__.py`. The FooSoft copy on GitHub is old, the add-on moved to git.sr.ht. Read the installed file before trusting a claim about an action; a reviewer cited the old copy and got `sync` wrong
 - Two Anki clients write the same collection, the Mac and the Linux box. `findNotes` only sees the local collection and AnkiWeb never merges two notes into one, so the server syncs with AnkiWeb before every note lookup. The sync makes the lookup current, it is not a lock: a `sync: false` add trusts the caller, and two adds of the same subject on both machines at the same second can still create two notes. One person uses both machines, so both are accepted. A batch caller sends `sync: false` and syncs once before its first lookup and once after its last write. The installed AnkiConnect `sync` calls `col.sync_collection` and returns after the collection sync is done (verified in the add-on source, Nov 2025 build), so the lookup right after it sees AnkiWeb's state
 - Use `toast.promise()` from `react-hot-toast` for async operations with loading/success/error feedback. The optimistic editors are the exception: they show the new value at once, so they need no loading toast and only call `toast.error` when the save fails
-- Store media files with deck ID prefix to avoid filename collisions: `{deckId}_{slug}.svg`
+- Store media files in Anki with a deck ID prefix to avoid file name collisions: `{deckId}_{slug}_{urlHash}.svg`. The file in `data/userdata/media/` has no prefix, so one cached file serves every deck (see "Two Machines"). `shortHash` (the first 8 hex chars of the SHA-1) and `hashNumber` live in `src/server/utils/hash.ts`
 - An audio field holds the complete `[sound:name.mp3]` tag, never a bare file name, and the template renders the field as is. Anki's Check Media keeps only files that a field references by a `[sound:]` tag or an `<img>`, and deletes the rest. On 2026-09-07 it deleted every sentence clip because that field held bare names
-- Reading audio: one gender per card, picked at random, the other gender when the first has no MP3. All readings of it go into the one `reading_audio_*` field as `[sound:]` tags separated by a space, primary reading first, so Anki plays them in a row. The file name is `{deckId}_{slug}_{gender}_{hash}.mp3`, the hash is the first 8 hex chars of the SHA-1 of the reading
-- Sentence audio: Azure TTS gets the plain kanji sentence, not the kana reading. The generated kana readings in `data/sentence_readings.json` only fill the furigana field. The HD voices read most sentences right but not rare readings, 外面 came out as がいめん. The planned fix is `docs/plans/tts-with-ssml.md`: one `<sub alias>` per kanji block from the reviewed readings
+- The radical `mnemonic_image` field holds the full `<img src="{deckId}_{slug}_mnemonic_{urlHash}.{ext}" class="mnemonic-img">` tag of a media file, like `character` holds the SVG tag, for the same Check Media reason. It is `""` when the radical has no picture
+- Reading audio: one gender per card, picked from the hash of the primary reading (`hashNumber(primaryReading) % 2`), the other gender when the first has no MP3. The reading and not the slug is hashed, so the gender stays independent of the sentence voice. All readings of it go into the one `reading_audio_*` field as `[sound:]` tags separated by a space, primary reading first, so Anki plays them in a row. The file name is `{deckId}_{slug}_{gender}_{hash}.mp3`, the hash is `shortHash` of the reading
+- Sentence audio: the voice is `pickSentenceVoice(voices, slug)`, picked from the hash of the slug, so a word always gets the same voice. The clip name is `{deckId}_{slug}_{ssmlHash}.mp3`, the hash covers the exact SSML from `buildSentenceSsml`. A changed sentence, voice list or SSML format gives a new clip by itself. Azure TTS gets the plain kanji sentence, not the kana reading. The generated kana readings in `data/sentence_readings.json` only fill the furigana field. The HD voices read most sentences right but not rare readings, 外面 came out as がいめん. The planned fix is `docs/plans/tts-with-ssml.md`: one `<sub alias>` per kanji block from the reviewed readings
 - Mnemonic HTML tags (`<radical>`, `<kanji>`, etc.) must be pre-styled using `styleMnemonicHtml()` before storing
 - Anki templates support JavaScript for dynamic behavior (e.g., font scaling, keyboard shortcuts)
 - Variable-length data (like radical lists) should be pre-rendered as styled HTML for consistency
@@ -315,7 +362,6 @@ AnkiConnect client is in `src/server/services/anki-connect.ts`. Card templates a
   - Example: `findByIds(items, ids)` not `findByIds(ids, items)`
 - Repository module uses module-level singleton data (initialized via `initRepository()`)
   - Callers must call `initRepository()` before using repository functions
-  - Call `saveCache()` at the end to persist any cache changes
   - Repository functions don't take a context parameter - they access module-level data directly
 
 ### Architecture
@@ -348,7 +394,7 @@ All routes are prefixed with `/api`.
 | ------ | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | GET    | `/search?type=&q=`  | Search by type (`radical`, `kanji`, `vocabulary`) and query string. Falls back to name/meaning search if character search fails. 400 if params missing, 404 if not found, 200 with `{ found: true, data }` on success                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | GET    | `/anki-notes?type=` | List all Anki notes for a subject type (`radical`, `kanji`, `vocabulary`). Returns `{ ok: true, data: AnkiNoteItem[] }`. 400 if type missing/invalid.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| POST   | `/add-to-anki`      | Add subject to Anki. Body: `{ id: number, type: SubjectType, sync?: boolean }`. Looks up enriched subject, creates/updates Anki notes for the subject and its components (radicals, kanji), downloads media. Syncs with AnkiWeb before the note lookup and again after the write unless `sync` is `false`. A failed sync before the write answers `{ ok: false, error }` and writes nothing. 400 if params missing, 404 if subject not found, 200 with `{ ok: true, data: AnkiAddResult }` on success, 200 with `{ ok: false, error }` on AnkiConnect failure, with `reason: "fields"` added when a note type field list does not match `*_EXPECTED_FIELDS`                                                        |
+| POST   | `/add-to-anki`      | Add subject to Anki. Body: `{ id: number, type: SubjectType, sync?: boolean }`. Looks up enriched subject, creates/updates Anki notes for the subject and its components (radicals, kanji), reads each media file from `data/userdata/media/` or downloads it once. Syncs with AnkiWeb before the note lookup and again after the write unless `sync` is `false`. A failed sync before the write answers `{ ok: false, error }` and writes nothing. 400 if params missing, 404 if subject not found, 200 with `{ ok: true, data: AnkiAddResult }` on success, 200 with `{ ok: false, error }` on AnkiConnect failure, with `reason: "fields"` added when a note type field list does not match `*_EXPECTED_FIELDS` |
 | POST   | `/anki-sync`        | Sync the Anki collection to AnkiWeb once. No body. 200 with `{ ok: true }`, 200 with `{ ok: false, error }` on AnkiConnect failure. The batch scripts add every note with `sync: false` and call this once before their first lookup and once at the end                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | PATCH  | `/study-materials`  | Save a local note or one synonym for one subject. Body: `{ id: number, meaning_note?: string, reading_note?: string, add_synonym?: string, remove_synonym?: string }`. The synonym list is never sent, the server applies the operation to the record it reads from the file. A note sent as `""` is deleted, an entry with no field left is removed. 400 if `id` is not an integer, no field besides `id` is sent, a key is unknown (`meaning_synonyms` is), a value is not a string, or `reading_note` is sent for a radical or kana vocabulary. 404 if the subject is not found. 500 if the write fails. 200 with `{ ok: true, data: LocalStudyMaterial \| null }`, `data` is `null` when the entry was removed |
 
@@ -378,7 +424,7 @@ return c.json({ found: true as const, data: {...} });
 
 ### Server Logging
 
-Server code should be meaningfully verbose about the steps it performs. Log high-level operations (search requests, Anki add/update flow, media downloads) with `[API]` or `[Anki]` prefixes so the process is easy to follow in the console. Avoid logging large data blobs (base64, full field objects) — log sizes instead. Each key step (looking up a note, creating/updating, downloading media, syncing) should produce a short log line.
+Server code should be meaningfully verbose about the steps it performs. Log high-level operations (search requests, Anki add/update flow, media downloads) with `[API]` or `[Anki]` prefixes, and every media cache hit or miss with `[Media]`, so the process is easy to follow in the console. Avoid logging large data blobs (base64, full field objects) — log sizes instead. Each key step (looking up a note, creating/updating, downloading media, syncing) should produce a short log line.
 
 ### Server Code Compatibility
 
@@ -391,7 +437,13 @@ const data = JSON.parse(await readFile("./data/userdata/file.json", "utf-8"));
 
 ### Caching with Parallel Operations
 
-When using `Promise.all` with functions that read/modify/write a cache file, there's a race condition - concurrent writes overwrite each other. Solution: load cache once, accumulate changes in memory, save once at the end. See `MnemonicImageFetcher` class in `src/server/api.ts` for the pattern.
+A file the server writes must stay right when two requests run at once, and when the other machine changes it. Never load such a file once and write the whole memory copy back later: one writer drops the change of the other, and a pulled change is overwritten. Use one of these instead:
+
+- An append-only file, read through `createReloadingFile` from `src/server/utils/reloading-file.ts`. The mnemonic image registry in `src/server/repository/mnemonic-image-fetcher.ts` appends one JSONL line per scraped page. Its `pendingFetches` map lets two lookups of one page at the same time share one scrape.
+- One file per item, written with `writeFileAtomic`, like the media cache in `src/server/repository/media-cache.ts`.
+- A read, merge and write inside a module-level promise queue, with `saveJsonAtomic`, like `upsertLocalStudyMaterial`.
+
+See "Two Machines" for the full rules.
 
 ### Preserving Order in ID Lookups
 
@@ -442,7 +494,7 @@ After making code changes:
 The project has two git repositories: the main one and `data/userdata/`. A request to commit, push or pull covers both of them, unless the user names one.
 
 - Pull both repos first, with a merge (`git pull --no-rebase`). A server also commits and pushes `data/userdata/`, so the local copy is often behind.
-- When a local change in `data/userdata/` touches a file the pull also changes, commit it first and then pull. The JSON caches like `mnemonic-images.json` then conflict, but both sides only add keys. Resolve such a conflict as the union of both key sets, and stop if one key has two different values.
+- When a local change in `data/userdata/` touches a file the pull also changes, commit it first and then pull. `mnemonic-images.jsonl` then merges by itself through `merge=union`, and a media file that both sides added merges through `merge=ours` (see "Two Machines"). A conflict in `media/` means the clone misses `git config merge.ours.driver true`. Any other conflict, like one in `study_materials_extra.json`, is resolved by hand.
 - Commit and push each repo on its own.
 - Afterwards, return the working directory to the main project root.
 
@@ -462,22 +514,23 @@ The project has two git repositories: the main one and `data/userdata/`. A reque
 ### Test Architecture
 
 - `bunfig.toml` configures `src/test/preload.ts` as a shared preload for all tests
-- Preload handles `mock.module("fs/promises")` (real readFile, mock writeFile) and lazy repository init — Bun's `mock.module()` is process-global, so it must live in one place
-- The preload redirects reads of `mnemonic-images.json` and `study_materials_extra.json` to `src/test/fixtures/`, so no test depends on user-specific data
-- The `fs/promises` mock keeps the written files in a map, so a read after a write sees the new content like a real disk does. The study material upsert reads the file on every save, so without it a second save would start from the fixture again. `setFileContent(path, data)` puts content there without recording a write, for a change made outside the app; `setStudyMaterialFile(file)` in `src/test/study-material-fixture.ts` wraps it for that one file
-- The `fs/promises` mock also has `rename` and `unlink`, so an atomic save shows up in `writeCalls` under the real path: `writeFile` records the `.tmp` path, `rename` moves that entry to the real path, `unlink` drops it. A failed save leaves no `.tmp` entry behind
-- `setFsError(op, err)` makes the mocked `writeFile`, `rename` or `unlink` throw. It is the only way to test a failed write, because `mock.module` is process-global and set once. `resetFsMock()` clears it again
-- `bun test` runs every file in one process, so module-level state survives a file. A file that changes `localStudyMaterials` or `writeCalls` resets them in `afterEach` too, not only in `beforeEach`
+- Preload handles `mock.module("fs/promises")` (an in-memory file map in front of the real `readFile`) and lazy repository init — Bun's `mock.module()` is process-global, so it must live in one place
+- The preload seeds the two fixtures from `src/test/fixtures/` into the mock under their real paths, `./data/userdata/mnemonic-images.jsonl` and `./data/userdata/study_materials_extra.json`. It seeds them at start and again in `resetFsMock()`, so no test depends on user-specific data. A read of those two paths, or of a path under `data/userdata/media/`, never reaches the real disk: a removed entry answers `ENOENT`. The check compares the exact path, because a fixture file has the same base name as its seeded path
+- The `fs/promises` mock keeps the written files in a map, so a read after a write sees the new content like a real disk does. The study material upsert reads the file on every save, so without it a second save would start from the fixture again. The map keys go through `path.normalize`, so `./data/x` and `data/x` are one file. The map holds `string | Buffer`, and `readFile` without an encoding answers a `Buffer`. `setFileContent(path, data)` puts content there without recording a write, for a change made outside the app; `setStudyMaterialFile(file)` in `src/test/study-material-fixture.ts` wraps it for that one file
+- The `fs/promises` mock also has `appendFile`, `rename`, `unlink`, `stat`, `readdir` and a no-op `mkdir`. An atomic save shows up in `writeCalls` under the real path: `writeFile` records the `<path>.<uuid>.tmp` path, `rename` moves that entry to the real path, `unlink` drops it. A failed save leaves no `.tmp` entry behind. `writeCalls[].data` is `string | Buffer`, so a test wraps it in `String()` before it parses it
+- The mocked `stat` answers `{ mtimeMs, size }`. `mtimeMs` is a version number that grows on every `writeFile`, `appendFile`, `rename` and `setFileContent`, and `resetFsMock()` never resets it. So `createReloadingFile` sees every change, also the seed after a reset. `readdir` lists the files of the map directly under a folder
+- `setFsError(op, err)` makes one mocked op throw: `readFile`, `writeFile`, `appendFile`, `rename`, `unlink`, `stat` or `readdir`. It is the only way to test a failed read or write, because `mock.module` is process-global and set once. `resetFsMock()` clears it again
+- `bun test` runs every file in one process, so module-level state survives a file. A file that writes through the fs mock, or changes a seeded file, calls `resetFsMock()` in `beforeEach` and in `afterEach`. Otherwise its media files, registry lines and study material records leak into the next file
 - **Repository tests** (`src/server/repository/__tests__/`): test repository functions directly, use a simple fetch mock from `setup.ts`
 - **Script unit tests** (`scripts/lib/__tests__/`): test the pure script helpers directly, no mock needed
 - **API E2E tests** (`src/server/__tests__/`): test full API through `api.request()` (Hono handles directly, no HTTP server), use `src/test/fetch-interceptor.ts` which routes by URL pattern (AnkiConnect, WaniKani SVGs/audio/pages)
-- The fetch interceptor answers every AnkiConnect action with success. `setAnkiError({ action, message, onCall })` makes one action answer an error. `onCall` picks one call of it, counted from 1, so a test can fail the second `sync` of an add and keep the first. `resetFetchInterceptor()` clears it and the call counts
+- The fetch interceptor answers every AnkiConnect action with success. `setAnkiError({ action, message, onCall })` makes one action answer an error. `onCall` picks one call of it, counted from 1, so a test can fail the second `sync` of an add and keep the first. `resetFetchInterceptor()` clears it and the call counts. `externalFetches` lists every URL that is not AnkiConnect, so a test can check that a cache hit made no request
 - The preload also calls `installDom()` from `src/test/dom.ts`, which puts one happy-dom window on `globalThis`. It must run before any test file imports `react-dom`: react-dom reads the DOM globals when it loads, and without them its change events never reach `onChange`
 - **Client tests** (`src/client/**/__tests__/`): the api layer installs its own `createFetchMock` from `src/test/fetch-utils.ts`. A view state is checked with `renderToStaticMarkup` from `react-dom/server`. For behavior, `src/test/render.tsx` has `mount`, `click`, `typeInto`, `pressKey` and `settle`: it renders with `createRoot`, dispatches real DOM events inside `flushSync`, and `settle()` awaits the save. `mountCard(element)` wraps the card in a `SearchContext.Provider`, on the first render and on every `rerender`, because `RelatedSubjectsSection` throws without one
 - `installApiMock()` from `src/test/api-mock.ts` answers the study material saves. It is called once at the top of a test file and registers the whole lifecycle of that file: it clears itself and the client store before each test, unmounts every mounted view and clears the store after each test, and puts the old `fetch` back at the end. So a failed assertion still leaves no live React root and no saved record behind. Its `answerLater(id, data)` and `failLater(id, message)` hold an answer back until the test calls `resolve()`, which is how the store tests put two saves in flight and choose the order of the answers
-- `src/test/study-material-fixture.ts` holds `loadStudyMaterialFixture()`, `lastWrite()` and `resetStudyMaterialState()` for every file that writes local study materials
+- `src/test/study-material-fixture.ts` holds `loadStudyMaterialFixture()`, `setStudyMaterialFile()`, `lastWrite()` and `resetStudyMaterialState()` for every file that writes local study materials. `resetStudyMaterialState()` is just `resetFsMock()`, which seeds the file again
 - Each test type installs its own fetch mock at file top level — no conflict between them
-- The preload also replaces `Math.random` with one seeded generator shared by the whole run, and exports `resetRandom()`. Each vocabulary add consumes two values (voice gender, sentence voice), so a test file that snapshots audio fields must call `resetRandom()` in `beforeEach`. Then test order does not matter and a single test can run alone
+- The preload sets the three `AZURE_TTS_*` values as plain assignments, not `??=`, because every add reads them. `bun test` loads the root env file on its own, and the real voice list would change the sentence clip names in the snapshots from machine to machine. `azure-tts.test.ts` saves and puts back its own values
 
 ### Manual Testing
 

@@ -9,7 +9,7 @@ A web app for creating Anki flashcards from WaniKani data. Search for radicals, 
 - One-click add to Anki — automatically creates component cards (radicals for kanji, kanji for vocabulary)
 - Verb conjugations for vocabulary cards, with the masu form on the answer side
 - Alternative meanings and your own synonyms on the answer side of kanji and vocabulary cards
-- TTS audio for context sentences (optional, via Azure TTS)
+- TTS audio for context sentences (via Azure TTS)
 - Dark mode support in Anki cards
 
 ## How It Works
@@ -67,7 +67,7 @@ Search for a vocabulary word to see its full breakdown — kanji composition, ra
 - [Bun](https://bun.sh)
 - [Anki](https://apps.ankiweb.net/) desktop with the [AnkiConnect](https://ankiweb.net/shared/info/2055492159) plugin
 - A [WaniKani](https://www.wanikani.com/) account and API token
-- (Optional) [Azure TTS](https://docs.microsoft.com/en-us/azure/cognitive-services/speech-service/overview) credentials for context sentence audio
+- [Azure TTS](https://docs.microsoft.com/en-us/azure/cognitive-services/speech-service/overview) credentials for context sentence audio. The server does not run without them
 - (Optional) An OpenAI-compatible LLM endpoint for the two generate scripts (`LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL` in `scripts/.env`)
 
 ## Setup
@@ -82,7 +82,7 @@ Copy the example env files and fill in your values:
 
 ```bash
 cp scripts/.env.example scripts/.env   # WaniKani API token (required), LLM settings (optional)
-cp .env.example .env                   # Azure TTS for sentence audio (optional)
+cp .env.example .env                   # Azure TTS for sentence audio (required)
 ```
 
 Download WaniKani data (saved to `data/userdata/`, which is gitignored):
