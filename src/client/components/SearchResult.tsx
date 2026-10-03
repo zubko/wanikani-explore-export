@@ -55,7 +55,7 @@ export function SearchResult({ type, result, onRetry }: SearchResultProps) {
         <div className="space-y-3">
           <KanjiCard key={kanji.id} kanji={kanji} />
           {kanji.componentRadicals.map((radical) => (
-            <div key={radical.id} id={`radical-${radical.id}`} className="ml-3">
+            <div key={radical.id} id={`radical-${radical.id}`} className="ml-3 max-sm:ml-2">
               <RadicalCard radical={radical} />
             </div>
           ))}
@@ -71,11 +71,11 @@ export function SearchResult({ type, result, onRetry }: SearchResultProps) {
           <VocabularyCard key={vocabulary.id} vocabulary={vocabulary} />
           {componentKanji.map((kanjiItem) => (
             <Fragment key={kanjiItem.id}>
-              <div id={`kanji-${kanjiItem.id}`} className="ml-3">
+              <div id={`kanji-${kanjiItem.id}`} className="ml-3 max-sm:ml-2">
                 <KanjiCard kanji={kanjiItem} />
               </div>
               {kanjiItem.componentRadicals.map((radical) => (
-                <div key={radical.id} id={`radical-${radical.id}`} className="ml-6">
+                <div key={radical.id} id={`radical-${radical.id}`} className="ml-6 max-sm:ml-4">
                   <RadicalCard radical={radical} />
                 </div>
               ))}

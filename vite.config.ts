@@ -9,7 +9,14 @@ export default defineConfig(({ mode }) => {
   // Empty prefix '' loads all vars, not just VITE_-prefixed ones.
   Object.assign(process.env, loadEnv(mode, process.cwd(), ""));
 
+  const port = process.env.PORT ? Number(process.env.PORT) : undefined;
+
   return {
+    server: {
+      port,
+      // The Claude desktop preview passes a free port in PORT and opens exactly that port.
+      strictPort: port !== undefined,
+    },
     plugins: [
       react(),
       tailwindcss(),

@@ -117,6 +117,8 @@ bun run format     # Prettier
 bun run tsc        # TypeScript type checking
 ```
 
+`bun run dev` uses port 5173, or the next free one when 5173 is busy. With `PORT` set it uses exactly that port and fails when the port is busy. `.claude/launch.json` sets `autoPort`, so the Claude desktop preview picks a free port and passes it in `PORT` when another worktree already uses 5173.
+
 ## Data Scripts
 
 ```bash
@@ -472,7 +474,6 @@ const items = findByIds(allItems, ids);
 
 ## Design
 
-- Desktop screen size only (no responsive/mobile layouts)
 - Page titles should put most important info first (e.g., "後 | kanji | WK Cards") since browsers truncate the end
 - Use hugeicons (`@hugeicons/react`, `@hugeicons/core-free-icons`) instead of lucide icons
 - Search for icons at: `https://hugeicons.com/icons?search=X&style=Stroke&type=Rounded` (replace X with search term)
@@ -480,6 +481,17 @@ const items = findByIds(allItems, ids);
 - Use `SubjectTile` component from `components/card-components/` for clickable kanji/vocabulary tiles with character, reading, meaning
 - Use `RelatedSubjectsSection` from `components/card-components/` for collapsible "Found In X" / "Visually Similar" tile sections
 - Pass `onClick` handler to control tile behavior (scroll vs navigate) from outside
+
+### Desktop First
+
+The app is styled for desktop first. The phone gets its own layout through overrides.
+
+- The plain classes are the desktop style. A phone style is a `max-sm:` override next to the desktop class: `p-4 max-sm:p-3`. Never rewrite a desktop class into the mobile-first form (`p-3 sm:p-4`). So a phone change can never move anything on desktop.
+- The phone is everything below Tailwind's `sm` breakpoint, 640px. Media queries use the browser's 16px and not the 125% root font size, so `sm` stays 640px.
+- The phone keeps the desktop font sizes. Only paddings, gaps and the layout change: the page gutter, card padding and nested-card indent get smaller, and `CardHeader` puts the meaning on its own line under the badge, with the icons in the top-right corner.
+- A flex item that holds an input needs `min-w-0`. Without it the input keeps its default width, and the search row grows wider than the screen. This is a fix for every width and changes nothing on desktop, so it has no prefix, like the `whitespace-nowrap` of the type dropdown.
+- Check the phone at 321×695 in the browser pane. That is an iPhone 13 Pro Max (428px) with the bigger text setting the user has on the phone. Test a long word too, like お誕生日おめでとう and the kana word こんにちは, and check that no element is wider than the screen.
+- Check that desktop did not change: save the position, size and padding of every element at 1440px before the change, and compare after it.
 
 ### Typography
 

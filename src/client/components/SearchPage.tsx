@@ -107,7 +107,7 @@ export function SearchPage() {
   return (
     <SearchContext.Provider value={searchContextValue}>
       <div className="space-y-4">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 max-sm:gap-2">
           <TypeDropdown options={TYPE_OPTIONS} value={selectedType} onChange={setSelectedType} />
           <SearchInput
             onSearch={handleSearch}

@@ -34,7 +34,7 @@ export function SearchInput({
   };
 
   return (
-    <div className="flex flex-1 gap-1.5">
+    <div className="flex min-w-0 flex-1 gap-1.5">
       <input
         type="text"
         value={query}
@@ -42,7 +42,7 @@ export function SearchInput({
         onKeyDown={handleKeyDown}
         placeholder={placeholder ?? "Search..."}
         disabled={disabled}
-        className="flex-1 rounded-lg border border-gray-300 px-3 py-1.5 text-lg focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-gray-100"
+        className="min-w-0 flex-1 rounded-lg border border-gray-300 px-3 py-1.5 text-lg focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-gray-100"
       />
       <button
         onClick={handleSubmit}

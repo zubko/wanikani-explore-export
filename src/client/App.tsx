@@ -3,7 +3,7 @@ import { SearchPage } from "./components/SearchPage.tsx";
 export function App() {
   return (
     <div className="min-h-screen bg-gray-50">
-      <main className="mx-auto max-w-7xl px-4 py-6">
+      <main className="mx-auto max-w-7xl px-4 py-6 max-sm:px-3 max-sm:py-4">
         <SearchPage />
       </main>
     </div>

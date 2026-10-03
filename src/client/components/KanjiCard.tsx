@@ -82,7 +82,7 @@ function RadicalCombinationSection({ componentRadicals }: { componentRadicals: R
   if (componentRadicals.length === 0) return null;
 
   return (
-    <div className="p-4">
+    <div className="p-4 max-sm:p-3">
       <SectionTitle>Radical Combination</SectionTitle>
       <div className="flex flex-wrap gap-3">
         {componentRadicals.map((radical) => (
@@ -138,7 +138,7 @@ function MeaningSection({
     .map((m) => m.meaning);
 
   return (
-    <div className="p-4">
+    <div className="p-4 max-sm:p-3">
       <SectionTitle>Meaning</SectionTitle>
       <div className="space-y-3">
         <LabeledRow label="Primary" value={primaryMeaning} bold />
@@ -164,7 +164,7 @@ function ReadingsSection({
   note: NoteSectionProps;
 }) {
   return (
-    <div className="p-4">
+    <div className="p-4 max-sm:p-3">
       <SectionTitle>Readings</SectionTitle>
       <div className="space-y-3">
         <div className="grid grid-cols-3 gap-3">

@@ -25,7 +25,7 @@ export function RelatedSubjectsSection({
   if (items.length === 0) return null;
 
   return (
-    <div className="p-4">
+    <div className="p-4 max-sm:p-3">
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}

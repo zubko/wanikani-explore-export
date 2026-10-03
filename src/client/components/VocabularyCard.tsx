@@ -101,7 +101,7 @@ function MeaningSection({
     .map((m) => m.meaning);
 
   return (
-    <div className="p-4">
+    <div className="p-4 max-sm:p-3">
       <SectionTitle>Meaning</SectionTitle>
       <div className="space-y-3">
         <LabeledRow label="Primary" value={primaryMeaning} bold />
@@ -132,7 +132,7 @@ function ReadingSection({
   const primaryReading = getPrimaryReading(readings);
 
   return (
-    <div className="p-4">
+    <div className="p-4 max-sm:p-3">
       <SectionTitle>Reading</SectionTitle>
       <div className="space-y-3">
         <p className="text-2xl">{primaryReading}</p>
@@ -150,7 +150,7 @@ function AudioButtons({ audios }: { audios: PronunciationAudio[] }) {
   if (voiceActors.length === 0) return null;
 
   return (
-    <div className="flex gap-2">
+    <div className="flex gap-2 max-sm:flex-wrap">
       {voiceActors.map((actor) => (
         <AudioButton key={actor.voice_actor_id} actor={actor} audios={audios} />
       ))}
@@ -186,7 +186,7 @@ function ContextSentencesSection({ sentences }: { sentences: ContextSentence[] }
   if (sentences.length === 0) return null;
 
   return (
-    <div className="p-4">
+    <div className="p-4 max-sm:p-3">
       <SectionTitle>Context Sentences</SectionTitle>
       <div className="space-y-3">
         {sentences.map((sentence, index) => (
@@ -205,7 +205,7 @@ function KanjiCompositionSection({ componentKanji }: { componentKanji: Kanji[] }
   if (componentKanji.length === 0) return null;
 
   return (
-    <div className="p-4">
+    <div className="p-4 max-sm:p-3">
       <SectionTitle>Kanji Composition</SectionTitle>
       <div className="flex flex-wrap gap-2">
         {componentKanji.map((kanjiItem) => (
