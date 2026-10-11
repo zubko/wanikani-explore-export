@@ -246,9 +246,15 @@ Local notes and synonyms for any subject, written in the web UI. They never touc
 
 ### iKnow Vocabulary Import
 
-`bun run add-iknow-vocab -- --limit <n>` walks the iKnow Core 1000 course files in `data/userdata/iknow/` and adds the next words to the Anki vocabulary deck through the dev server API. CLI options: `--base-url <url>`, `--limit <n>` (default 15), `--dry-run`, `--help`.
+`bun run add-iknow-vocab -- --limit <n>` walks the iKnow Core 1000 course files in `data/userdata/iknow/` and adds the next words to the Anki vocabulary deck through the dev server API. CLI options: `--base-url <url>`, `--limit <n>` (default 15), `--known-kanji-only`, `--new-radicals`, `--dry-run`, `--help`.
 
-`data/userdata/iknow-vocabulary-status.json` holds the place: `current` file, `files[name].index` (the **next** item to process), and `problems`. The script saves it with `saveJsonAtomic` after every word, so a stop in the middle loses nothing. It rolls over to the next course file on its own, and one run never spans two files.
+`data/userdata/iknow-vocabulary-status.json` holds the place: `current` file, `files[name].index` (the **next** item to process), and `problems`. The script saves it with `saveJsonAtomic` after every word, so a stop in the middle loses nothing. A normal run rolls over to the next course file on its own, and never spans two files.
+
+`--known-kanji-only` adds only kana words and words whose kanji are all in the Anki kanji deck, so the run creates no new kanji note. It compares the `componentKanji` ids of the search answer with the `wkId` of the kanji notes, because those are the kanji an add writes. It starts at the saved index, walks on into the later course files until the limit, and never writes the status file: the index stays and no `problems` entry is added. A normal run later reaches every skipped word, and skips the added ones as already in Anki.
+
+`--new-radicals` adds no word. For every next word that is not in Anki, it adds the radicals of the word's kanji that are not in the Anki radical deck, in the order of the kanji and their radicals. `--limit` counts radicals, so a run can stop in the middle of a word. It compares radicals by primary name, not by id: a radical note holds no WaniKani id, and an add finds the existing note by `primary_name`. `listNewRadicals` in `scripts/lib/iknow-vocab.ts` builds the list. It starts and walks like `--known-kanji-only` and never writes the status file either. The two flags exclude each other.
+
+`listFilesToWalk` in `scripts/lib/iknow-vocab.ts` picks the files and start indexes for every mode. A word that comes again in a later course file (14 words do) is handled once per run.
 
 Like `sync-anki-notes`, it calls `/api/anki-sync` once at the start, in a dry run too, before it reads the Anki word list, adds every word with `sync: false`, and calls `/api/anki-sync` once more at the end. A failed start sync stops the run, because every lookup after it would be stale. Syncing per word would run a full AnkiWeb sync 15 times, and a failed sync would answer `ok: false` for a word that is already written — so the word would land in `problems` and not use up the budget, and a `--limit 15` run could add more than 15 words.
 

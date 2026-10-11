@@ -1,3 +1,6 @@
+import { getPrimaryMeaning } from "../../src/model/subject-utils.ts";
+import type { Meaning } from "../../src/model/wanikani.ts";
+
 export type IknowItem = {
   word: string;
   reading: string;
@@ -18,8 +21,30 @@ export type VocabStatus = {
   problems: VocabProblem[];
 };
 
+export type FileToWalk = {
+  file: string;
+  startIndex: number;
+};
+
 export function createInitialStatus(firstFile: string): VocabStatus {
   return { current: firstFile, files: {}, problems: [] };
+}
+
+export function listFilesToWalk(params: {
+  status: VocabStatus;
+  courseFiles: string[];
+  acrossFiles: boolean;
+}): FileToWalk[] {
+  const { status, courseFiles, acrossFiles } = params;
+
+  const position = courseFiles.indexOf(status.current);
+  if (position === -1) {
+    throw new Error(`Current file ${status.current} is not in the series`);
+  }
+
+  const first = { file: status.current, startIndex: status.files[status.current]?.index ?? 0 };
+  if (!acrossFiles) return [first];
+  return [first, ...courseFiles.slice(position + 1).map((file) => ({ file, startIndex: 0 }))];
 }
 
 export function parseCourseFiles(series: unknown): string[] {
@@ -77,4 +102,21 @@ export function rollOverToNextFile(params: {
     status: { ...status, current: nextFile ?? current, files },
     nextFile,
   };
+}
+
+// a radical note holds no WaniKani id, and an add finds the note by its primary name
+export function listNewRadicals<Radical extends { meanings: Meaning[] }>(params: {
+  componentKanji: { componentRadicals: Radical[] }[];
+  knownRadicalNames: Set<string>;
+}): Radical[] {
+  const { componentKanji, knownRadicalNames } = params;
+  const seenNames = new Set(knownRadicalNames);
+  const newRadicals: Radical[] = [];
+  for (const radical of componentKanji.flatMap((kanji) => kanji.componentRadicals)) {
+    const name = getPrimaryMeaning(radical.meanings);
+    if (seenNames.has(name)) continue;
+    seenNames.add(name);
+    newRadicals.push(radical);
+  }
+  return newRadicals;
 }

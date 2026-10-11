@@ -1,6 +1,6 @@
 ---
 name: add-iknow-vocab
-description: Add the next batch of iKnow Core 1000 words to the Anki vocabulary deck, then triage the words that failed. Use when the user says "add iknow vocab", "add N iknow words", "add more core 1000 words", or asks to continue the iKnow course import.
+description: Add the next batch of iKnow Core 1000 words to the Anki vocabulary deck, then triage the words that failed. Use when the user says "add iknow vocab", "add N iknow words", "add more core 1000 words", or asks to continue the iKnow course import. Also use it when the user wants only the iKnow words whose kanji are already in Anki, or only the new radicals of the next iKnow words.
 ---
 
 # Add iKnow vocabulary
@@ -12,8 +12,8 @@ Do not write your own loop and do not call the API word by word for the normal p
 
 The skill takes a count. When the user gives none, ask before running.
 
-The count is words really added. The script skips a word that is already in Anki or already in
-`problems` without using up the budget.
+The count is words really added, or radicals with `--new-radicals`. The script skips a word that is
+already in Anki or already in `problems` without using up the budget.
 
 ## 2. Start the dev server
 
@@ -48,10 +48,39 @@ When the script stops with a note type field mismatch, nothing was recorded for 
 retry and do not add words by hand. Pass on the fix steps the script prints. The field step needs a
 real terminal, so the user must run it.
 
+### Only words with known kanji
+
+When the user wants only words that bring no new kanji into Anki, add `--known-kanji-only`:
+
+```bash
+bun run add-iknow-vocab -- --known-kanji-only --limit <count>
+```
+
+It adds kana words and words whose kanji are all in the Anki kanji deck already, and skips the
+rest. It starts at the saved index and walks on into the next course files until the limit. It
+never writes the status file, so the index stays and no `problems` entry is added. A normal run
+later reaches every skipped word, and skips the added ones as already in Anki.
+
+Skip step 5 for such a run. The words it did not find are not recorded, and the normal run that
+reaches them later triages them.
+
+### Only new radicals
+
+When the user wants the radicals of the next words that are not in Anki yet, add `--new-radicals`:
+
+```bash
+bun run add-iknow-vocab -- --new-radicals --limit <count>
+```
+
+It adds no word. For every next word that is not in Anki, it adds the radicals of the word's kanji
+that are not in the Anki radical deck. `--limit` counts radicals, so a run can stop in the middle of
+a word. Like `--known-kanji-only`, it walks on into the next course files and never writes the
+status file. Skip step 5 for this run too. The two flags exclude each other.
+
 ## 4. Report
 
 Pass on the script summary: added, already in Anki, not found, errors, and where the next run starts.
-List the words that were added.
+List the words that were added, or the radicals with the word each one came from.
 
 ## 5. Triage the new failures
 
