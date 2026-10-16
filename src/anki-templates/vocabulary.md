@@ -61,7 +61,7 @@ Configure these templates in Anki: Tools → Manage Note Types → Japanese Voca
     <div class="header-text">
       <h1>{{primary_meaning}}</h1>
       {{#alternative_meanings}}
-      <div class="alt-meanings" id="alt-meanings">({{alternative_meanings}})</div>
+      <div class="alt-meanings" id="alt-meanings">{{alternative_meanings}}</div>
       {{/alternative_meanings}} {{#reading}}
       <div class="reading-top">{{reading}}</div>
       {{/reading}}
