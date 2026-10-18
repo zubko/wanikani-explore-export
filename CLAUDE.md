@@ -528,6 +528,7 @@ The project has two git repositories: the main one and `data/userdata/`. A reque
 - When a local change in `data/userdata/` touches a file the pull also changes, commit it first and then pull. `mnemonic-images.jsonl` then merges by itself through `merge=union`, and a media file that both sides added merges through `merge=ours` (see "Two Machines"). A conflict in `media/` means the clone misses `git config merge.ours.driver true`. Any other conflict, like one in `study_materials_extra.json`, is resolved by hand.
 - Commit and push each repo on its own.
 - Afterwards, return the working directory to the main project root.
+- After an add to Anki, commit and push `data/userdata/` right away, without asking. This is a standing request from the user. An add counts when at least one `/api/add-to-anki` call answered `"ok":true`, by hand or through `add-iknow-vocab`. The commit holds the new media, the registry lines and the status file changes, with a message like `data: add 着く and its media to Anki`. The rule covers only the data repo: the main repo still needs an explicit request for every commit.
 
 ## Testing
 
