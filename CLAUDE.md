@@ -74,6 +74,7 @@ scripts/                # Utility scripts. Top level holds only entry points, sh
   sync-anki-templates.ts         # Sync Anki templates to Anki via AnkiConnect
   sync-anki-notes.ts             # Re-generate all Anki notes through the dev server API
   add-iknow-vocab.ts             # Add the next iKnow Core 1000 words to the Anki vocabulary deck
+  add-references.ts              # Add the items that the new notes mention (needs the dev server)
   lib/                           # Modules shared by the scripts, never run directly
     anki-templates.ts            # Shared by the two sync scripts: template table, ankiInvoke, field diff
     anki-template-fields.ts      # Pure markdown parsing of the template files (unit-tested)
@@ -84,6 +85,7 @@ scripts/                # Utility scripts. Top level holds only entry points, sh
     sentence-reading-check.ts    # Order check of a kana reading against its sentence (unit-tested)
     iknow-vocab.ts               # Pure parts of the iKnow import: parsing, course rollover (unit-tested)
     note-refresh.ts              # Limit and refreshed-name helpers for the passes of sync-anki-notes (unit-tested)
+    references.ts                # Find the items a note mentions and the ones missing in Anki (unit-tested)
     __tests__/                   # Unit tests for the pure script helpers, fixtures in fixtures/
   .env                  # Script-specific env vars (WANIKANI_API_TOKEN, LLM_BASE_URL, LLM_API_KEY, LLM_MODEL)
                         # Loaded via --env-file in package.json scripts
@@ -131,6 +133,7 @@ bun run sync-anki-fields               # Add missing note-type fields to Anki (i
 bun run sync-anki-templates            # Sync Anki templates to Anki
 bun run sync-anki-notes                # Sync all Anki vocabulary notes, kanji notes with no word and radical notes with no kanji (requires dev server running)
 bun run add-iknow-vocab                # Add the next iKnow Core 1000 words (requires dev server running)
+bun run add-references                 # Add the items that today's new notes mention (requires dev server running)
 ```
 
 The verb conjugation script has CLI options: `--limit <n>`, `--batch-size <n>` (default 20), `--dry-run`, `--show-prompt`, `--help`
@@ -267,6 +270,10 @@ An add that fails with a note type field mismatch (`/add-to-anki` answers `reaso
 The search endpoint answers `vocabulary` and `kana_vocabulary` from one pool, so the script sends the type the search reports in `data.object`, never a literal.
 
 The `.claude/skills/add-iknow-vocab/` skill runs the script and triages the new `problems` entries — grammar words WaniKani does not teach vs a different WaniKani spelling (直ぐ for すぐ). It asks before adding an alternative spelling.
+
+The `.claude/skills/add-references/` skill runs after every add. A mnemonic, hint or note often names another item ("The reading comes from 狙い"), and the card needs that item in Anki too. `bun run add-references` (`--days <n>`, default 1, `--base-url`, `--dry-run`) reads the notes added to Anki in that time straight from AnkiConnect, so it also sees adds from the web UI and the phone. It reads only the mnemonic, hint and note fields: a context sentence is full of other words and points to none of them. Each kanji run in them is looked up as a word with exactly these characters first, then a kanji, then a radical. A mention of the note's own characters is skipped. Every item that is not in Anki is added with no question, through `/api/add-to-anki` with `sync: false`, and the new notes are checked the same way until nothing is missing. It syncs with AnkiWeb once at the start and once at the end. The first failed add stops the run with exit 1. The pure parts are in `scripts/lib/references.ts`.
+
+The same script lists the new radicals whose mnemonic only says they are the same as a kanji. Such a mnemonic names the kanji by its meaning, not by its character, so the lookup above never finds it. It marks `ADD KANJI` on a radical with no picture whose kanji is not in Anki. The skill still reads the mnemonic and adds that kanji by hand, because a radical with a story of its own keeps its card alone.
 
 ### Anki Template Development
 
@@ -528,7 +535,7 @@ The project has two git repositories: the main one and `data/userdata/`. A reque
 - When a local change in `data/userdata/` touches a file the pull also changes, commit it first and then pull. `mnemonic-images.jsonl` then merges by itself through `merge=union`, and a media file that both sides added merges through `merge=ours` (see "Two Machines"). A conflict in `media/` means the clone misses `git config merge.ours.driver true`. Any other conflict, like one in `study_materials_extra.json`, is resolved by hand.
 - Commit and push each repo on its own.
 - Afterwards, return the working directory to the main project root.
-- After an add to Anki, commit and push `data/userdata/` right away, without asking. This is a standing request from the user. An add counts when at least one `/api/add-to-anki` call answered `"ok":true`, by hand or through `add-iknow-vocab`. The commit holds the new media, the registry lines and the status file changes, with a message like `data: add 着く and its media to Anki`. The rule covers only the data repo: the main repo still needs an explicit request for every commit.
+- After an add to Anki, commit and push `data/userdata/` right away, without asking. This is a standing request from the user. An add counts when at least one `/api/add-to-anki` call answered `"ok":true`, by hand or through `add-iknow-vocab` or `add-references`. The commit holds the new media, the registry lines and the status file changes, with a message like `data: add 着く and its media to Anki`. The rule covers only the data repo: the main repo still needs an explicit request for every commit.
 
 ## Testing
 

@@ -83,38 +83,18 @@ that are not in the Anki radical deck. `--limit` counts radicals, so a run can s
 a word. Like `--known-kanji-only`, it walks on into the next course files and never writes the
 status file. Skip step 5 for this run too. The two flags exclude each other.
 
-After the run, check every added radical. Some radicals have no story of their own: the mnemonic is
-only `This radical is the same as the kanji. It means <radical>friend</radical>.` and the
-radical has no picture. Such a card teaches nothing without the kanji, so add that kanji too. This
-prints what the check needs, with the primary names of the added radicals:
+### Add the referenced items
 
-```bash
-bun -e '
-const radicals = JSON.parse(await Bun.file("data/userdata/radicals.json").text());
-const kanji = JSON.parse(await Bun.file("data/userdata/kanji.json").text());
-const registry = (await Bun.file("data/userdata/mnemonic-images.jsonl").text()).trim().split("\n").map((l) => JSON.parse(l));
-for (const name of ["Friend", "Fur"]) {
-  const r = radicals.find((r) => !r.data.hidden_at && r.data.meanings.some((m) => m.primary && m.meaning === name));
-  const picture = registry.find((l) => l.page === r.data.document_url)?.image ?? "none";
-  const k = kanji.find((k) => !k.data.hidden_at && k.data.characters === r.data.characters);
-  console.log(r.data.characters, name, "| picture:", picture, "| kanji:", k ? k.id : "none");
-  console.log("  " + r.data.meaning_mnemonic);
-}'
-```
-
-- Add the kanji only when both are true: the picture is `none` or `null`, and the mnemonic only
-  points to the kanji. A radical with a real story keeps its card alone, picture or not.
-- Look up the kanji id in `/api/anki-notes?type=kanji` first. When it is already there, add
-  nothing.
-- Otherwise add it with `{"id": <kanji id>, "type": "kanji"}` and read the answer for `"ok":true`.
-  This kanji does not count against `--limit`.
-- In the report, list every radical that matched and say whether its kanji was added or was already
-  in Anki.
+After every real run, in every mode, follow the `add-references` skill. It adds the items that the
+new notes mention, and checks the new radicals. A word add creates kanji and radicals too, so a
+normal run needs it as much as a `--new-radicals` run. An item it adds does not count against
+`--limit`.
 
 ## 4. Report
 
 Pass on the script summary: added, already in Anki, not found, errors, and where the next run starts.
-List the words that were added, or the radicals with the word each one came from.
+List the words that were added, or the radicals with the word each one came from. List the items
+that `add-references` added too, each with the note that mentioned it.
 
 ## 5. Triage the new failures
 
