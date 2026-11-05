@@ -117,7 +117,7 @@ describe("custom-subjects API reads", () => {
     const { status, json } = await getCustomSubject(UNKNOWN_CUSTOM_ID);
 
     expect(status).toBe(404);
-    expect(json).toEqual({ ok: false, error: `custom subject ${UNKNOWN_CUSTOM_ID} not found` });
+    expect(json).toEqual({ ok: false, error: `Custom subject ${UNKNOWN_CUSTOM_ID} not found` });
   });
 
   test("a read error of the file is a 500 for every route", async () => {
@@ -265,8 +265,8 @@ describe("custom-subjects API refusals", () => {
     setCustomSubjectsFile(customSubjectFixture);
     const cases: { body?: unknown; rawBody?: string; error: string }[] = [
       { body: { object: "kana_vocabulary" }, error: "data must be an object" },
-      { rawBody: "not json", error: "the body must be an object" },
-      { body: [customKanaWordInput], error: "the body must be an object" },
+      { rawBody: "not json", error: "Invalid body: must be a JSON object" },
+      { body: [customKanaWordInput], error: "Invalid body: must be a JSON object" },
       { body: { object: "kana_vocabulary", data: "どうぞ" }, error: "data must be an object" },
     ];
     for (const { body, rawBody, error } of cases) {
@@ -400,7 +400,7 @@ describe("custom-subjects API refusals", () => {
     setCustomSubjectsFile(customSubjectFixture);
 
     for (const id of [UNKNOWN_CUSTOM_ID, hiddenCustomWord.id]) {
-      const error = { ok: false, error: `custom subject ${id} not found` };
+      const error = { ok: false, error: `Custom subject ${id} not found` };
       expect(await updateCustomSubject(id, hiddenCustomWordInput)).toEqual({
         status: 404,
         json: error,

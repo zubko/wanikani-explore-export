@@ -54,7 +54,7 @@ export function VocabularyCard({ vocabulary }: VocabularyCardProps) {
         title={primaryMeaning}
         character={vocabulary.characters}
         documentUrl={vocabulary.documentUrl}
-        badge={vocabulary.isCustom ? "custom" : undefined}
+        sourceLabel={vocabulary.isCustom ? "custom" : undefined}
         actions={<AddToAnkiButton onClick={handleAddToAnki} />}
       />
       <div className="divide-y divide-gray-200">

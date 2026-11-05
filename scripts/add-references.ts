@@ -14,7 +14,7 @@ import type {
   VocabularyData,
 } from "../src/model/wanikani.ts";
 import { ankiInvoke } from "./lib/anki-templates.ts";
-import { CUSTOM_SUBJECTS_FILE } from "./lib/custom-subject-clash.ts";
+import { CUSTOM_SUBJECTS_FILE } from "./lib/data-paths.ts";
 import { formatError } from "./lib/format-error.ts";
 import {
   buildReferenceLookup,

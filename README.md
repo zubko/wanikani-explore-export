@@ -10,7 +10,7 @@ A web app for creating Anki flashcards from WaniKani data. Search for radicals, 
 - Verb conjugations for vocabulary cards, with the masu form on the answer side
 - Alternative meanings and your own synonyms on the answer side of kanji and vocabulary cards
 - TTS audio for context sentences (via Azure TTS)
-- Custom words for words WaniKani does not teach, like どうぞ or くれる. They live in `data/userdata/custom_subjects.json`. The search finds them, the card shows a "custom" badge, and the add to Anki writes them like WaniKani words. Their reading audio comes from Azure TTS. An AI agent adds them through the `/api/custom-subjects` routes and the `add-custom-word` skill
+- Custom words for words WaniKani does not teach, like どうぞ or くれる. They live in `data/userdata/custom_subjects.json`. The search finds them, the card shows a "custom" label, and the add to Anki writes them like WaniKani words. Their reading audio comes from Azure TTS. An AI agent adds them through the `/api/custom-subjects` routes and the `add-custom-word` skill
 - A media cache in `data/userdata/media/`: every radical image, mnemonic picture and audio clip is downloaded or generated once, so a re-sync of all notes downloads nothing. The radical mnemonic picture is stored in Anki's media folder, so it shows offline too
 - Dark mode support in Anki cards
 

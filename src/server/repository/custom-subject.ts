@@ -7,10 +7,9 @@ import {
   validateCustomSubjectInput,
 } from "@/model/custom-subject-utils.ts";
 import { ValidationError } from "@/model/validation-error.ts";
-import { readFileVersion } from "@server/utils/file-utils.ts";
-import { saveJsonAtomicIfUnchanged } from "@server/utils/json-utils.ts";
+import { createSaveQueue, saveJsonWithRetry } from "@server/utils/json-utils.ts";
 import { CUSTOM_SUBJECTS_PATH } from "./data-paths.ts";
-import { getWaniKaniWords, kanji, readCustomSubjects } from "./data-loader.ts";
+import { getVisibleKanjiIds, getWaniKaniWords, readCustomSubjects } from "./data-loader.ts";
 
 type SaveStep = (records: CustomSubject[]) => { records: CustomSubject[]; saved: CustomSubject };
 
@@ -27,12 +26,12 @@ export class CustomSubjectWriteError extends Error {
   }
 }
 
-let queue: Promise<unknown> = Promise.resolve();
+const runInQueue = createSaveQueue();
 
 export function createCustomSubject(input: unknown): Promise<CustomSubject> {
   return runInQueue(async () => {
     const checkedInput = validateInput({ input, keptKanjiIds: [] });
-    return saveWithRetry(`create of ${checkedInput.data.characters}`, (records) => {
+    return saveWithRetry(`the create of ${checkedInput.data.characters}`, (records) => {
       const record = buildCustomRecord({
         id: nextCustomSubjectId(records),
         input: checkedInput,
@@ -47,7 +46,7 @@ export function createCustomSubject(input: unknown): Promise<CustomSubject> {
 /** `object` and `characters` never change: the Anki note is found by its characters. */
 export function updateCustomSubject(id: number, input: unknown): Promise<CustomSubject> {
   return runInQueue(() =>
-    saveWithRetry(`update of ${id}`, (records) => {
+    saveWithRetry(`the update of ${id}`, (records) => {
       const current = findVisibleRecord(records, id);
       refuseIdentityChange({ current, input });
       const record = buildCustomRecord({
@@ -65,7 +64,7 @@ export function updateCustomSubject(id: number, input: unknown): Promise<CustomS
 /** Keeps the record with `hidden_at` set, so the id is never given again. */
 export function deleteCustomSubject(id: number): Promise<CustomSubject> {
   return runInQueue(() =>
-    saveWithRetry(`delete of ${id}`, (records) => {
+    saveWithRetry(`the delete of ${id}`, (records) => {
       const current = findVisibleRecord(records, id);
       const now = new Date().toISOString();
       const record = {
@@ -78,42 +77,21 @@ export function deleteCustomSubject(id: number): Promise<CustomSubject> {
   );
 }
 
-// The caller's promise stays out of the chain, so a rejection reaches the caller and the next
-// save still starts from the last good state
-function runInQueue<T>(step: () => Promise<T>): Promise<T> {
-  const run = queue.then(step);
-  queue = run.catch(() => {});
-  return run;
-}
-
-/**
- * The queue only orders the saves of this server. A git pull of the other server's saves can still
- * land between the read and the rename, so a save that finds the file changed starts again from
- * the read.
- */
-async function saveWithRetry(action: string, step: SaveStep): Promise<CustomSubject> {
-  for (let attempt = 1; attempt <= CUSTOM_SUBJECT_SAVE_ATTEMPTS; attempt++) {
-    // Taken before the read, so a change during the read counts as a change too
-    const fileVersion = await readFileVersion(CUSTOM_SUBJECTS_PATH);
-    const { records, saved } = step(await readCustomSubjects());
-    if (
-      await saveJsonAtomicIfUnchanged({ path: CUSTOM_SUBJECTS_PATH, data: records, fileVersion })
-    ) {
-      return saved;
-    }
-    console.warn(
-      `[Repository] ${CUSTOM_SUBJECTS_PATH} changed during save attempt ${attempt} of ${CUSTOM_SUBJECT_SAVE_ATTEMPTS} for the ${action}`
-    );
-  }
-  throw new Error(
-    `${CUSTOM_SUBJECTS_PATH} changed during each of ${CUSTOM_SUBJECT_SAVE_ATTEMPTS} save attempts. Nothing was saved.`
-  );
+function saveWithRetry(label: string, step: SaveStep): Promise<CustomSubject> {
+  return saveJsonWithRetry({
+    path: CUSTOM_SUBJECTS_PATH,
+    attempts: CUSTOM_SUBJECT_SAVE_ATTEMPTS,
+    label,
+    step: async () => {
+      const { records, saved } = step(await readCustomSubjects());
+      return { data: records, result: saved };
+    },
+  });
 }
 
 function validateInput(params: { input: unknown; keptKanjiIds: number[] }): CustomSubjectInput {
   const { input, keptKanjiIds } = params;
-  const visibleKanjiIds = kanji.filter(isVisibleSubject).map((item) => item.id);
-  const kanjiIds = new Set([...visibleKanjiIds, ...keptKanjiIds]);
+  const kanjiIds = new Set([...getVisibleKanjiIds(), ...keptKanjiIds]);
   try {
     validateCustomSubjectInput({ input, kanjiIds });
   } catch (error) {
@@ -149,7 +127,7 @@ function refuseClash(params: { records: CustomSubject[]; record: CustomSubject }
 function findVisibleRecord(records: CustomSubject[], id: number): CustomSubject {
   const record = findCustomSubject(records, id);
   if (!record || !isVisibleSubject(record)) {
-    throw new CustomSubjectWriteError(404, `custom subject ${id} not found`);
+    throw new CustomSubjectWriteError(404, `Custom subject ${id} not found`);
   }
   return record;
 }

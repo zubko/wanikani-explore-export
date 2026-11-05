@@ -9,7 +9,7 @@ type CardHeaderProps = {
   character?: string | null;
   characterImage?: React.ReactNode;
   documentUrl?: string | null;
-  badge?: string;
+  sourceLabel?: string;
   actions?: React.ReactNode;
 };
 
@@ -19,7 +19,7 @@ export function CardHeader({
   character,
   characterImage,
   documentUrl,
-  badge,
+  sourceLabel,
   actions,
 }: CardHeaderProps) {
   return (
@@ -33,9 +33,9 @@ export function CardHeader({
         </div>
         <h2 className="text-3xl text-gray-900 max-sm:col-span-2 max-sm:row-start-2">
           {title}
-          {badge && (
+          {sourceLabel && (
             <span className="ml-2 inline-block rounded border border-gray-300 px-1.5 align-middle text-sm text-gray-500">
-              {badge}
+              {sourceLabel}
             </span>
           )}
         </h2>

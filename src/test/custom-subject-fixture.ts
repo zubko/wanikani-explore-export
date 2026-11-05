@@ -1,3 +1,4 @@
+import { CUSTOM_SUBJECT_ID_FLOOR } from "@/model/wanikani.ts";
 import type {
   CustomSubject,
   CustomSubjectInput,
@@ -87,11 +88,20 @@ export const hiddenCustomWordInput: CustomSubjectInput = {
   },
 };
 
-export const customKanaWord = buildFixture(1_000_000, customKanaWordInput) as KanaVocabularyData;
-export const customKanaVerb = buildFixture(1_000_001, customKanaVerbInput) as KanaVocabularyData;
-export const customVerb = buildFixture(1_000_002, customVerbInput) as VocabularyData;
+export const customKanaWord = buildFixture(
+  CUSTOM_SUBJECT_ID_FLOOR,
+  customKanaWordInput
+) as KanaVocabularyData;
+export const customKanaVerb = buildFixture(
+  CUSTOM_SUBJECT_ID_FLOOR + 1,
+  customKanaVerbInput
+) as KanaVocabularyData;
+export const customVerb = buildFixture(
+  CUSTOM_SUBJECT_ID_FLOOR + 2,
+  customVerbInput
+) as VocabularyData;
 export const hiddenCustomWord = hide(
-  buildFixture(1_000_003, hiddenCustomWordInput) as VocabularyData
+  buildFixture(CUSTOM_SUBJECT_ID_FLOOR + 3, hiddenCustomWordInput) as VocabularyData
 );
 
 export const customSubjectFixture: CustomSubject[] = [

@@ -309,8 +309,8 @@ describe("validateCustomSubjectRecord", () => {
     const cases: [Record<string, unknown>, string][] = [
       [{ slug: "どうも" }, "data.slug must equal data.characters"],
       [{ document_url: "https://www.wanikani.com" }, "data.document_url must be null"],
-      [{ pronunciation_audios: [{}] }, "data.pronunciation_audios must be an empty array"],
-      [{ pronunciation_audios: null }, "data.pronunciation_audios must be an empty array"],
+      [{ pronunciation_audios: [{}] }, "data.pronunciation_audios must be []"],
+      [{ pronunciation_audios: null }, "data.pronunciation_audios must be []"],
       [{ lesson_position: 1 }, "data.lesson_position must be 0"],
       [{ spaced_repetition_system_id: 1 }, "data.spaced_repetition_system_id must be 0"],
       [{ created_at: "" }, "data.created_at must be a non-empty string"],

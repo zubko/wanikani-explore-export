@@ -1,5 +1,6 @@
 import type { WordForClash } from "../src/model/custom-subject-utils.ts";
-import { CUSTOM_SUBJECTS_FILE, customSubjectClashWarnings } from "./lib/custom-subject-clash.ts";
+import { customSubjectClashWarnings } from "./lib/custom-subject-clash.ts";
+import { CUSTOM_SUBJECTS_FILE } from "./lib/data-paths.ts";
 import { saveJsonAtomic } from "./lib/llm-utils.ts";
 
 const BASE_URL = "https://api.wanikani.com/v2";
@@ -134,7 +135,7 @@ async function main(): Promise<void> {
     path: CUSTOM_SUBJECTS_FILE,
     wanikaniWords: [...grouped.vocabulary, ...grouped.kana_vocabulary].map(toWordForClash),
   });
-  console.log("");
+  if (warnings.length > 0) console.log("");
   for (const line of warnings) console.log(line);
 
   console.log("\nDone!");

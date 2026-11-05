@@ -1,5 +1,9 @@
-import { CUSTOM_SUBJECT_ID_FLOOR } from "./wanikani.ts";
-import type { CustomSubject, CustomSubjectInput } from "./wanikani.ts";
+import {
+  CUSTOM_SUBJECT_COMMON_INPUT_FIELDS,
+  CUSTOM_SUBJECT_ID_FLOOR,
+  CUSTOM_VOCABULARY_ONLY_INPUT_FIELDS,
+} from "./wanikani.ts";
+import type { CustomSubject, CustomSubjectInput, PronunciationAudio } from "./wanikani.ts";
 import { isVisibleSubject } from "./subject-utils.ts";
 import { ValidationError } from "./validation-error.ts";
 
@@ -11,16 +15,17 @@ export type WordForClash = {
 };
 
 const VERB_PARTS_OF_SPEECH = ["ichidan verb", "godan verb"];
-const COMMON_INPUT_FIELDS = [
-  "characters",
-  "meanings",
-  "auxiliary_meanings",
-  "parts_of_speech",
-  "meaning_mnemonic",
-  "context_sentences",
-  "conjugations",
-];
-const VOCABULARY_ONLY_INPUT_FIELDS = ["readings", "reading_mnemonic", "component_subject_ids"];
+const COMMON_INPUT_FIELDS: readonly string[] = CUSTOM_SUBJECT_COMMON_INPUT_FIELDS;
+const VOCABULARY_ONLY_INPUT_FIELDS: readonly string[] = CUSTOM_VOCABULARY_ONLY_INPUT_FIELDS;
+// The data fields a custom record always holds with the same value. `slug`, `created_at` and
+// `hidden_at` vary, so they are checked one by one.
+const FIXED_DATA_FIELDS = {
+  level: 0,
+  document_url: null,
+  pronunciation_audios: [] as PronunciationAudio[],
+  lesson_position: 0,
+  spaced_repetition_system_id: 0,
+};
 const RECORD_FIELDS = ["id", "object", "url", "data_updated_at", "data"];
 const CONJUGATION_FIELDS = ["dictionary", "masu", "te", "nai"];
 // `characters` becomes `slug`, and `slug` is part of the media file names
@@ -48,7 +53,8 @@ export function validateCustomSubjectInput(params: {
   kanjiIds: ReadonlySet<number> | null;
 }): void {
   const { input, kanjiIds } = params;
-  const root = requireObject(input, "the body");
+  if (!isRecord(input)) throw new ValidationError("Invalid body: must be a JSON object");
+  const root = input;
   requireKnownKeys({ value: root, path: "", allowed: ["object", "data"] });
 
   const object = root.object;
@@ -112,30 +118,17 @@ export function validateCustomSubjectRecord(record: unknown): void {
   requireString(root.data_updated_at, "data_updated_at");
 
   const data = requireObject(root.data, "data");
-  const {
-    slug,
-    level,
-    hidden_at,
-    document_url,
-    created_at,
-    pronunciation_audios,
-    lesson_position,
-    spaced_repetition_system_id,
-    ...rest
-  } = data;
+  const { slug, hidden_at, created_at, ...rest } = data;
   requireString(created_at, "data.created_at");
-  if (level !== 0) throw new ValidationError("data.level must be 0");
   if (slug !== data.characters) throw new ValidationError("data.slug must equal data.characters");
   if (hidden_at !== null && typeof hidden_at !== "string") {
     throw new ValidationError("data.hidden_at must be null or a string");
   }
-  if (document_url !== null) throw new ValidationError("data.document_url must be null");
-  if (!Array.isArray(pronunciation_audios) || pronunciation_audios.length > 0) {
-    throw new ValidationError("data.pronunciation_audios must be an empty array");
-  }
-  if (lesson_position !== 0) throw new ValidationError("data.lesson_position must be 0");
-  if (spaced_repetition_system_id !== 0) {
-    throw new ValidationError("data.spaced_repetition_system_id must be 0");
+  for (const [field, value] of Object.entries(FIXED_DATA_FIELDS)) {
+    if (JSON.stringify(rest[field]) !== JSON.stringify(value)) {
+      throw new ValidationError(`data.${field} must be ${JSON.stringify(value)}`);
+    }
+    delete rest[field];
   }
 
   // The kanji ids are not checked: a kanji that WaniKani hides later must not fail the start
@@ -221,14 +214,10 @@ export function buildCustomRecord(params: {
 }): CustomSubject {
   const { id, input, now, createdAt = now } = params;
   const fixedFields = {
+    ...FIXED_DATA_FIELDS,
     created_at: createdAt,
-    level: 0,
     slug: input.data.characters,
     hidden_at: null,
-    document_url: null,
-    pronunciation_audios: [],
-    lesson_position: 0,
-    spaced_repetition_system_id: 0,
   };
   const wrapper = { id, url: null, data_updated_at: now };
   if (input.object === "vocabulary") {

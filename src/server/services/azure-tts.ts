@@ -2,9 +2,14 @@ import type { FetchedMedia } from "@server/repository/media-cache.ts";
 import type { VoiceGender } from "@/model/wanikani.ts";
 import { hashNumber, shortHash } from "@server/utils/hash.ts";
 
-export type AzureTtsConfig = { key: string; region: string; voices: string[] };
+export type AzureTtsConfig = {
+  key: string;
+  region: string;
+  voices: string[];
+  voicesByGender: Record<VoiceGender, string>;
+};
 
-export const SENTENCE_AUDIO_OUTPUT_FORMAT = "audio-24khz-160kbitrate-mono-mp3";
+export const SPEECH_AUDIO_OUTPUT_FORMAT = "audio-24khz-160kbitrate-mono-mp3";
 
 export function readAzureTtsConfig(): AzureTtsConfig {
   const key = readRequiredEnv("AZURE_TTS_KEY");
@@ -14,11 +19,12 @@ export function readAzureTtsConfig(): AzureTtsConfig {
     .map((voice) => voice.trim());
   // The list length picks the voice of each word, so a stray comma would rename most clips
   if (voices.includes("")) throw new Error("Empty voice in AZURE_TTS_VOICES in the root env file");
-  // pickVoiceForGender reads the gender from the position, so a third voice would have none
-  if (voices.length !== 2) {
+  // The env list holds no gender, so the position gives it and a third voice would have none
+  const [female, male] = voices;
+  if (voices.length !== 2 || !female || !male) {
     throw new Error("AZURE_TTS_VOICES needs exactly two voices, female first");
   }
-  return { key, region, voices };
+  return { key, region, voices, voicesByGender: { female, male } };
 }
 
 /** The voice is part of the clip name, so one word must always get the same voice. */
@@ -26,11 +32,7 @@ export function pickSentenceVoice(voices: string[], slug: string): string {
   return voices[hashNumber(slug) % voices.length]!;
 }
 
-export function pickVoiceForGender(voices: string[], gender: VoiceGender): string {
-  return gender === "female" ? voices[0]! : voices[1]!;
-}
-
-export function buildSentenceSsml(params: { text: string; voice: string }): string {
+export function buildSpeechSsml(params: { text: string; voice: string }): string {
   const { text, voice } = params;
   const language = voice.split("-").slice(0, 2).join("-");
   return `<speak version='1.0' xml:lang='${language}'>
@@ -39,11 +41,11 @@ export function buildSentenceSsml(params: { text: string; voice: string }): stri
 }
 
 /** The hash covers the output format and the SSML, so a change of either gives a new clip. */
-export function sentenceAudioHash(ssml: string): string {
-  return shortHash(`${SENTENCE_AUDIO_OUTPUT_FORMAT}\n${ssml}`);
+export function speechAudioHash(ssml: string): string {
+  return shortHash(`${SPEECH_AUDIO_OUTPUT_FORMAT}\n${ssml}`);
 }
 
-export async function generateSentenceAudio(params: {
+export async function generateSpeechAudio(params: {
   ssml: string;
   config: AzureTtsConfig;
 }): Promise<FetchedMedia> {
@@ -58,7 +60,7 @@ export async function generateSentenceAudio(params: {
     headers: {
       "Ocp-Apim-Subscription-Key": key,
       "Content-Type": "application/ssml+xml",
-      "X-Microsoft-OutputFormat": SENTENCE_AUDIO_OUTPUT_FORMAT,
+      "X-Microsoft-OutputFormat": SPEECH_AUDIO_OUTPUT_FORMAT,
     },
     body: ssml,
   });

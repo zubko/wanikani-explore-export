@@ -14,7 +14,7 @@ Decisions from the brainstorm of 2026-11-05, do not reopen:
 - The file is read through `createReloadingFile`, like the local notes, and merged into the WaniKani pool on every request. A `git pull` on the other machine shows a new word with no restart. The four WaniKani arrays stay read once at start.
 - Back links (a kanji card lists the custom words that use it) are computed at load from the custom word's own kanji ids. Nothing is written into the WaniKani files and no patch is needed.
 - POST stores only. The reading clips and the sentence clip are made on the first add to Anki through the media cache, like today.
-- A custom word has `level: 0`. The web UI shows a "custom" badge. The Anki vocabulary note has no level field, so Anki changes nothing here.
+- A custom word has `level: 0`. The web UI shows a "custom" label. The Anki vocabulary note has no level field, so Anki changes nothing here.
 - A clash is "same `characters` as a visible WaniKani word", vocabulary and kana vocabulary as one pool. POST refuses it with 409, PUT cannot change the characters, the loader and the download script only warn.
 - Reading audio of a custom word comes from Azure TTS, one clip per reading, with the gender hash of today and the voice at that gender's position in `AZURE_TTS_VOICES` (female first, male second).
 
@@ -27,7 +27,7 @@ Decisions from the brainstorm of 2026-11-05, do not reopen:
 - `BaseSubjectDataFields` in `src/model/wanikani.ts` holds `document_url: string` for all four types. The wrapper field `url` is read nowhere in `src/` or `scripts/`.
 - `vocabulary.ts` fills `conjugations` from `verbConjugations[id]` and the sentence `reading` from `sentenceReadings[id]`, both keyed by id from the two LLM files in `data/`.
 - `src/server/repository/study-material.ts`: the write pattern to copy. One module-level `queue`, `LOCAL_STUDY_MATERIAL_SAVE_ATTEMPTS = 3`, `readFileVersion` before the read, `saveJsonAtomicIfUnchanged` after the merge, a log line per failed attempt.
-- `src/server/services/anki-connect.ts`: `preferredReadingGender(vocabulary)` hashes `reading-gender:${primaryReading}`; `pickReadingAudios` picks the WaniKani clips by gender; `storeReadingAudio` caches `readings/{slug}_{gender}_{shortHash(pronunciation)}.mp3`; `storeSentenceAudio` builds SSML with `buildSentenceSsml`, names the clip with `sentenceAudioHash(ssml)` and fetches with `generateSentenceAudio({ ssml, config })`.
+- `src/server/services/anki-connect.ts`: `preferredReadingGender(vocabulary)` hashes `reading-gender:${primaryReading}`; `pickReadingAudios` picks the WaniKani clips by gender; `storeReadingAudio` caches `readings/{slug}_{gender}_{shortHash(pronunciation)}.mp3`; `storeSentenceAudio` builds SSML with `buildSpeechSsml`, names the clip with `speechAudioHash(ssml)` and fetches with `generateSpeechAudio({ ssml, config })`.
 - `src/server/services/azure-tts.ts`: `readAzureTtsConfig()` splits `AZURE_TTS_VOICES` and refuses an empty entry. `pickSentenceVoice(voices, slug)` hashes the slug.
 - `src/model/wanikani.ts`: `VocabularyData` / `KanaVocabularyData` wrap `data` with `document_url: string`, and the enriched `Vocabulary` / `KanaVocabulary` have `documentUrl: string`. `VerbConjugations` is `{ type: "verb", dictionary, masu, te, nai }`.
 - `src/model/anki-models.ts`: `VOCABULARY_EXPECTED_FIELDS` has no level field.
@@ -64,7 +64,7 @@ Decisions from the brainstorm of 2026-11-05, do not reopen:
 - **unit tests**: `src/model/__tests__/custom-subject-utils.test.ts` for the pure checks and helpers, with an in-file fixture.
 - **integration tests** (the API E2E tests through `api.request()`): the project has them in `src/server/__tests__/`, so every create, update and delete path gets one there. `api.custom-subjects.test.ts` covers POST, PUT, DELETE and GET, the 409 and 400 answers, the atomic write through `writeCalls`, and a GET after an outside change through `setFileContent`. `api.search.test.ts` and `api.add-to-anki.test.ts` get one custom word each.
 - **repository tests**: `data-loader.test.ts` for the parse and the start checks, `custom-subject.test.ts` for the write queue and the version retry, `vocabulary.test.ts` and `kanji.test.ts` for the merged getters and the back links.
-- **client tests**: `VocabularyCard.test.tsx` for the badge and the hidden link.
+- **client tests**: `VocabularyCard.test.tsx` for the label and the hidden link.
 - **fixtures**: `src/test/fixtures/custom_subjects.json` holds `[]`. A test that needs a custom word writes it with `setFileContent(CUSTOM_SUBJECTS_PATH, ...)` from a shared helper `src/test/custom-subject-fixture.ts`, so the fixture records live in one place.
 - no e2e browser tests in this project.
 
@@ -179,7 +179,7 @@ The two existing helpers in `src/model/subject-utils.ts` get the same shape in t
 
 `src/server/repository/custom-subject.ts`:
 
-- `createCustomSubject(input)`, `updateCustomSubject(id, input)`, `deleteCustomSubject(id)`. Every one runs `runInQueue(step)` with the same queue shape as the notes: `const run = queue.then(step); queue = run.catch(() => {}); return run;`.
+- `createCustomSubject(input)`, `updateCustomSubject(id, input)`, `deleteCustomSubject(id)`. Every one runs `runInQueue(step)` with the same queue shape as the notes: `const run = queue.then(step); queue = run.catch(() => {}); return run;`. The queue and the retry loop are shared with the notes: `createSaveQueue()` and `saveJsonWithRetry({ path, attempts, label, step })` in `src/server/utils/json-utils.ts`.
 - A step, up to `CUSTOM_SUBJECT_SAVE_ATTEMPTS = 3` times: `readFileVersion`, `readCustomSubjects()` (the raw read and `validateCustomSubjects`, shared with the loader, no kanji check), compute the new list, `saveJsonAtomicIfUnchanged`. A changed version logs and retries, three changes fail with nothing written.
 - The create step runs `validateCustomSubjectInput` with the visible kanji ids, then the clash check of the new `characters` against the visible records of the file and the visible WaniKani pool, picks the id with `nextCustomSubjectId`, builds the record with `now`, and answers it.
 - The update step refuses an unknown or hidden id (404), a changed `object` or a changed `characters` (400), or an input problem (400), then builds the record again with the old `created_at` and a new `data_updated_at`. `characters` is immutable because the Anki note is found by its characters, not by the id: a new spelling would leave the old note behind and create a second one. A new spelling is a DELETE and a POST. With `object` and `characters` fixed, an update needs no clash check.
@@ -211,15 +211,15 @@ Every error answer is `{ ok: false, error }` with `as const`. The id of GET by i
 
 `anki-connect.ts`:
 
-- `pickReadingAudios` stays for WaniKani words. A new branch for `isCustom` in `addOrUpdateVocabularyCore`: `readings` of a `vocabulary` word (primary first), or `[characters]` of a kana word. The gender is `preferredReadingGender(vocabulary)`. For every reading: `voice = pickVoiceForGender(voices, gender)`, `ssml = buildSentenceSsml({ text: reading, voice })`, `storeCachedMedia({ deckId, folder: "readings", nameWithoutExtension: \`${slug}_${gender}\_${sentenceAudioHash(ssml)}\`, fetch: () => generateSentenceAudio({ ssml, config }) })`. The tags go into the field of that gender, space separated, like today.
-- `azure-tts.ts`: `pickVoiceForGender(voices, gender)` answers `voices[0]` for female and `voices[1]` for male. `readAzureTtsConfig` fails with `AZURE_TTS_VOICES needs exactly two voices, female first` for any other count. A third voice would have no gender.
+- `pickReadingAudios` stays for WaniKani words. A new branch for `isCustom` in `addOrUpdateVocabularyCore`: `readings` of a `vocabulary` word (primary first), or `[characters]` of a kana word. The gender is `preferredReadingGender(vocabulary)`. For every reading: `voice = config.voicesByGender[gender]`, `ssml = buildSpeechSsml({ text: reading, voice })`, `storeCachedMedia({ deckId, folder: "readings", nameWithoutExtension: \`${slug}_${gender}\_${speechAudioHash(ssml)}\`, fetch: () => generateSpeechAudio({ ssml, config }) })`. The tags go into the field of that gender, space separated, like today.
+- `azure-tts.ts`: `readAzureTtsConfig` also answers `voicesByGender`, `voices[0]` for female and `voices[1]` for male. `readAzureTtsConfig` fails with `AZURE_TTS_VOICES needs exactly two voices, female first` for any other count. A third voice would have no gender.
 - `src/test/preload.ts` sets two test voices, `ja-JP-TestFemaleNeural,ja-JP-TestMaleNeural`. `pickSentenceVoice` then picks by hash from two, so every sentence clip name in the snapshots changes. The WaniKani reading clip names do not change, the test checks that.
 - `src/test/fetch-interceptor.ts` records the body of every TTS call in `ttsRequests`, so a test can assert the reading text and the voice name in the SSML, and the order of the calls.
 - A custom word logs `[Anki] Reading audio <slug>: TTS (custom word)` so the console tells the two paths apart.
 
 ### Web UI
 
-- `CardHeader` takes `documentUrl?: string | null` and a new `badge?: string`. `VocabularyCard` passes `badge="custom"` when `isCustom`. The badge is a small rounded label with `text-gray-500` and a gray border, rendered inside the same element as the title, so it moves with the title on the phone (row 2 of the grid). Desktop first: the plain classes are the desktop style, `max-sm:` overrides only when a phone check shows a need.
+- `CardHeader` takes `documentUrl?: string | null` and a new `sourceLabel?: string`. `VocabularyCard` passes `sourceLabel="custom"` when `isCustom`. The label is a small rounded label with `text-gray-500` and a gray border, rendered inside the same element as the title, so it moves with the title on the phone (row 2 of the grid). Desktop first: the plain classes are the desktop style, `max-sm:` overrides only when a phone check shows a need.
 
 ### Download warning
 
@@ -361,16 +361,16 @@ Every error answer is `{ ok: false, error }` with `as const`. The id of GET by i
 - Modify: `src/server/services/__tests__/azure-tts.test.ts`
 - Modify: `src/server/__tests__/api.add-to-anki.test.ts`
 
-- [x] `azure-tts.ts`: `pickVoiceForGender(voices, gender)`, and the exactly-two-voices rule in `readAzureTtsConfig`, checked after the empty-entry rule so the existing `${VOICES[0]},,${VOICES[1]}` test keeps its "Empty voice" error
+- [x] `azure-tts.ts`: `voicesByGender` in the config, and the exactly-two-voices rule in `readAzureTtsConfig`, checked after the empty-entry rule so the existing `${VOICES[0]},,${VOICES[1]}` test keeps its "Empty voice" error
 - [x] `src/test/preload.ts`: two test voices, female first; `src/test/fetch-interceptor.ts`: `ttsRequests` with the SSML body of every TTS call, cleared by `resetFetchInterceptor()`
 - [x] update the snapshots that the second voice changed, scoped: `bun test src/server/__tests__/api.add-to-anki.test.ts --update-snapshots`; read the diff and expect only new sentence clip names, no changed WaniKani reading clip name
 - [x] `anki-connect.ts`: the `isCustom` branch that makes one clip per reading through `storeCachedMedia` in `readings/` with the SSML hash name, primary first, into the field of the picked gender; the Azure config is read before the first write like today, so the two-voice rule fails the add with no note written
-- [x] write tests in `azure-tts.test.ts`: `pickVoiceForGender` both genders; `readAzureTtsConfig` fails on one voice and on three
+- [x] write tests in `azure-tts.test.ts`: `voicesByGender` both genders; `readAzureTtsConfig` fails on one voice and on three
 - [x] write tests in `api.add-to-anki.test.ts`: add the fixture verb with two readings (the primary listed second), snapshot the note fields (a `[sound:]` tag per reading in one gender field, primary first, the other field empty, `meaning_explanation` from the record) and the cached `readings/` paths in `writeCalls`; assert `ttsRequests` holds the primary reading first, then the other, then the sentence, with the voice of the hashed gender; a second add writes no `readings/` file and makes no TTS call (cache hit); add the fixture kana word with the characters as the one reading; a one-voice config fails the add with `ok: false` and no `addNote` call
 - [x] update the new snapshots scoped with the same command; read the diff and expect only the new cases
 - [x] run `bun test`, `bun run tsc`, `bun run lint:fix` - must pass before task 7
 
-### Task 7: The custom badge in the web UI
+### Task 7: The custom label in the web UI
 
 **Files:**
 
@@ -378,10 +378,10 @@ Every error answer is `{ ok: false, error }` with `as const`. The id of GET by i
 - Modify: `src/client/components/VocabularyCard.tsx`
 - Modify: `src/client/components/__tests__/VocabularyCard.test.tsx`
 
-- [x] `CardHeader`: `documentUrl?: string | null`, a `badge?: string` rendered inside the title element with `text-gray-500` and a gray border
-- [x] `VocabularyCard`: `badge="custom"` when `isCustom`
-- [x] write tests: a custom word renders the badge and no WaniKani link; a WaniKani word renders the link and no badge
-- [x] check the phone layout at 321×695 and the desktop at 1440px in the browser with a long custom word, no element wider than the screen (NOT DONE. Left for a manual look by the user: open a long custom word at 321×695 and at 1440px and check the badge. The automated run could not reach a dev server from the browser: ERR_CONNECTION_REFUSED on localhost and [::1])
+- [x] `CardHeader`: `documentUrl?: string | null`, a `sourceLabel?: string` rendered inside the title element with `text-gray-500` and a gray border
+- [x] `VocabularyCard`: `sourceLabel="custom"` when `isCustom`
+- [x] write tests: a custom word renders the label and no WaniKani link; a WaniKani word renders the link and no label
+- [x] check the phone layout at 321×695 and the desktop at 1440px in the browser with a long custom word, no element wider than the screen (NOT DONE. Left for a manual look by the user: open a long custom word at 321×695 and at 1440px and check the label. The automated run could not reach a dev server from the browser: ERR_CONNECTION_REFUSED on localhost and [::1])
 - [x] run `bun test src/client`, `bun run tsc`, `bun run lint:fix` - must pass before task 8
 
 ### Task 8: The download warning

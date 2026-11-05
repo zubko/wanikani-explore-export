@@ -4,8 +4,6 @@ import type { WordForClash } from "../../src/model/custom-subject-utils.ts";
 import type { CustomSubject } from "../../src/model/wanikani.ts";
 import { formatError } from "./format-error.ts";
 
-export const CUSTOM_SUBJECTS_FILE = "./data/userdata/custom_subjects.json";
-
 /**
  * The lines to print after a download. A missing or broken file gives one line and never throws,
  * because the download before it is the long step.
@@ -21,9 +19,9 @@ export async function customSubjectClashWarnings(params: {
     customSubjects = parsed as CustomSubject[];
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-      return ["No custom_subjects.json, skipped the custom subject check"];
+      return [`No ${params.path}, skipped the custom subject check`];
     }
-    return [`Could not read custom_subjects.json: ${formatError(error)}`];
+    return [`Could not read ${params.path}: ${formatError(error)}`];
   }
 
   const clashes = findWaniKaniClash({ customSubjects, wanikaniWords: params.wanikaniWords });

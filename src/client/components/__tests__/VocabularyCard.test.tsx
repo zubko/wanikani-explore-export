@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
+import { CUSTOM_SUBJECT_ID_FLOOR } from "@/model/wanikani.ts";
 import type { KanaVocabulary, Vocabulary } from "@/model/wanikani.ts";
 import { installApiMock } from "@/test/api-mock.ts";
 import { VocabularyCard } from "@client/components/VocabularyCard.tsx";
@@ -85,10 +86,15 @@ describe("VocabularyCard note editors", () => {
 });
 
 describe("VocabularyCard header", () => {
-  it("shows the custom badge and no WaniKani link for a custom word", () => {
+  it("shows the custom label and no WaniKani link for a custom word", () => {
     const html = renderToStaticMarkup(
       <VocabularyCard
-        vocabulary={{ ...kanaVocabulary, id: 1000000, isCustom: true, documentUrl: null }}
+        vocabulary={{
+          ...kanaVocabulary,
+          id: CUSTOM_SUBJECT_ID_FLOOR,
+          isCustom: true,
+          documentUrl: null,
+        }}
       />
     );
 
@@ -96,7 +102,7 @@ describe("VocabularyCard header", () => {
     expect(html).not.toContain("wanikani.com");
   });
 
-  it("shows the WaniKani link and no badge for a WaniKani word", () => {
+  it("shows the WaniKani link and no label for a WaniKani word", () => {
     const html = renderToStaticMarkup(<VocabularyCard vocabulary={vocabulary} />);
 
     expect(html).toContain('href="https://www.wanikani.com/vocabulary/毎晩"');

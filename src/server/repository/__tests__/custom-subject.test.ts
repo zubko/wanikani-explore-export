@@ -222,7 +222,7 @@ describe("updateCustomSubject", () => {
     );
 
     expect([unknown.status, hidden.status]).toEqual([404, 404]);
-    expect(hidden.message).toBe(`custom subject ${hiddenCustomWord.id} not found`);
+    expect(hidden.message).toBe(`Custom subject ${hiddenCustomWord.id} not found`);
     expect(writeCalls).toHaveLength(0);
   });
 

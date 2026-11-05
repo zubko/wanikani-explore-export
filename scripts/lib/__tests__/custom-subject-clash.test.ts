@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { join, normalize } from "path";
+import { join } from "path";
 import {
   customKanaWord,
   customSubjectFixture,
@@ -7,8 +7,7 @@ import {
   hiddenCustomWord,
 } from "@/test/custom-subject-fixture.ts";
 import { resetFsMock, setFileContent, setFsError } from "@/test/preload.ts";
-import { CUSTOM_SUBJECTS_PATH } from "@server/repository/data-paths.ts";
-import { CUSTOM_SUBJECTS_FILE, customSubjectClashWarnings } from "../custom-subject-clash.ts";
+import { customSubjectClashWarnings } from "../custom-subject-clash.ts";
 
 const CUSTOM_PATH = "./data/custom-subject-clash-test.json";
 
@@ -47,12 +46,10 @@ describe("customSubjectClashWarnings", () => {
   });
 
   it("prints one line for a missing file", async () => {
-    const lines = await customSubjectClashWarnings({
-      path: join(import.meta.dir, "missing-custom-subjects.json"),
-      wanikaniWords: [word(9001, "どうぞ")],
-    });
+    const path = join(import.meta.dir, "missing-custom-subjects.json");
+    const lines = await customSubjectClashWarnings({ path, wanikaniWords: [word(9001, "どうぞ")] });
 
-    expect(lines).toEqual(["No custom_subjects.json, skipped the custom subject check"]);
+    expect(lines).toEqual([`No ${path}, skipped the custom subject check`]);
   });
 
   it("prints one line for a file that is not JSON", async () => {
@@ -61,7 +58,7 @@ describe("customSubjectClashWarnings", () => {
     const lines = await customSubjectClashWarnings({ path: CUSTOM_PATH, wanikaniWords: [] });
 
     expect(lines).toHaveLength(1);
-    expect(lines[0]).toStartWith("Could not read custom_subjects.json: ");
+    expect(lines[0]).toStartWith(`Could not read ${CUSTOM_PATH}: `);
   });
 
   it("prints one line for a file with a bad record", async () => {
@@ -70,7 +67,7 @@ describe("customSubjectClashWarnings", () => {
     const lines = await customSubjectClashWarnings({ path: CUSTOM_PATH, wanikaniWords: [] });
 
     expect(lines).toHaveLength(1);
-    expect(lines[0]).toStartWith("Could not read custom_subjects.json: record 5: ");
+    expect(lines[0]).toStartWith(`Could not read ${CUSTOM_PATH}: record 5: `);
   });
 
   it("prints one line for a read error", async () => {
@@ -79,13 +76,6 @@ describe("customSubjectClashWarnings", () => {
 
     const lines = await customSubjectClashWarnings({ path: CUSTOM_PATH, wanikaniWords: [] });
 
-    expect(lines).toEqual(["Could not read custom_subjects.json: disk gone"]);
-  });
-});
-
-describe("CUSTOM_SUBJECTS_FILE", () => {
-  // The scripts must not import a repository module, so the path is written twice
-  it("is the file the server writes", () => {
-    expect(normalize(CUSTOM_SUBJECTS_FILE)).toBe(normalize(CUSTOM_SUBJECTS_PATH));
+    expect(lines).toEqual([`Could not read ${CUSTOM_PATH}: disk gone`]);
   });
 });

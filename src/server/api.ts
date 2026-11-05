@@ -27,7 +27,7 @@ import {
 import {
   radicals as radicalData,
   kanji as kanjiData,
-  findSubjectTypeById,
+  findSubjectTypeWithCustom,
   getCustomSubjects,
   getWords,
 } from "./repository/data-loader.ts";
@@ -124,12 +124,6 @@ function parseCustomSubjectId(param: string): number | null {
 
 function customSubjectErrorStatus(error: unknown): 400 | 404 | 409 | 500 {
   return error instanceof CustomSubjectWriteError ? error.status : 500;
-}
-
-async function findStudyMaterialSubjectType(id: number): Promise<SubjectType | null> {
-  if (!isCustomSubjectId(id)) return findSubjectTypeById(id);
-  const record = findCustomSubject(await getCustomSubjects(), id);
-  return record && isVisibleSubject(record) ? record.object : null;
 }
 
 function resolveWkSubject(params: {
@@ -314,7 +308,12 @@ const app = new Hono()
     }
 
     try {
-      const type = await findStudyMaterialSubjectType(id);
+      const type = findSubjectTypeWithCustom({
+        id,
+        // A WaniKani id must still save when the custom subjects file is broken
+        customSubjects: isCustomSubjectId(id) ? await getCustomSubjects() : [],
+        includeHiddenCustom: false,
+      });
       if (!type) {
         console.log(`[API] Study material id=${id} — subject not found`);
         return c.json({ ok: false as const, error: "Subject not found" }, 404);
@@ -370,7 +369,7 @@ const app = new Hono()
       const data = findCustomSubject(await getCustomSubjects(), id);
       if (!data) {
         console.log(`[API] Get custom subject id=${id} — not found`);
-        return c.json({ ok: false as const, error: `custom subject ${id} not found` }, 404);
+        return c.json({ ok: false as const, error: `Custom subject ${id} not found` }, 404);
       }
       return c.json({ ok: true as const, data });
     } catch (err) {

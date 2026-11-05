@@ -1,6 +1,7 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, spyOn, test } from "bun:test";
 import { readFileSync } from "fs";
 import { unlink } from "fs/promises";
+import { CUSTOM_SUBJECT_ID_FLOOR } from "@/model/wanikani.ts";
 import type { LocalStudyMaterial, RadicalData } from "@/model/wanikani.ts";
 import { holdFsOp, resetFsMock, setFileContent, setFsError, writeCalls } from "@/test/preload.ts";
 import { setStudyMaterialFile, studyMaterialFixture } from "@/test/study-material-fixture.ts";
@@ -30,6 +31,8 @@ import {
   MNEMONIC_IMAGES_PATH,
 } from "../data-paths.ts";
 import { ensureRepositoryInitialized } from "./setup.ts";
+
+const UNKNOWN_CUSTOM_ID = CUSTOM_SUBJECT_ID_FLOOR + 99;
 
 function setFile(content: unknown): void {
   setFileContent(
@@ -245,10 +248,12 @@ describe("checkLocalStudyMaterialSubjects", () => {
   });
 
   test("an unknown custom id is refused, and passes with skip", () => {
-    expect(subjectError({ "1000099": { meaning_note: "Typo" } })).toContain(
-      "subject 1000099 is not a custom subject"
+    expect(subjectError({ [UNKNOWN_CUSTOM_ID]: { meaning_note: "Typo" } })).toContain(
+      `subject ${UNKNOWN_CUSTOM_ID} is not a custom subject`
     );
-    expect(subjectError({ "1000099": { meaning_note: "Newer" } }, "skip")).toBe("no error");
+    expect(subjectError({ [UNKNOWN_CUSTOM_ID]: { meaning_note: "Newer" } }, "skip")).toBe(
+      "no error"
+    );
   });
 
   test("a reading note on a custom kana word is refused in both modes", () => {
@@ -489,18 +494,24 @@ describe("initRepository", () => {
 
     await initRepository();
 
-    setStudyMaterialFile({ ...studyMaterialFixture, "1000099": { meaning_note: "Typo" } });
+    setStudyMaterialFile({
+      ...studyMaterialFixture,
+      [UNKNOWN_CUSTOM_ID]: { meaning_note: "Typo" },
+    });
 
-    await expect(initRepository()).rejects.toThrow("subject 1000099 is not a custom subject");
+    await expect(initRepository()).rejects.toThrow(
+      `subject ${UNKNOWN_CUSTOM_ID} is not a custom subject`
+    );
   });
 
   test("a WaniKani id at the custom floor fails the start", async () => {
     const radicalsPath = "./data/userdata/radicals.json";
     const radicals = JSON.parse(readFileSync(radicalsPath, "utf-8")) as RadicalData[];
-    setFileContent(radicalsPath, JSON.stringify([...radicals, { ...radicals[0], id: 1_000_000 }]));
+    const id = CUSTOM_SUBJECT_ID_FLOOR;
+    setFileContent(radicalsPath, JSON.stringify([...radicals, { ...radicals[0], id }]));
     try {
       await expect(initRepository()).rejects.toThrow(
-        "WaniKani id 1000000 reached CUSTOM_SUBJECT_ID_FLOOR"
+        `WaniKani id ${id} reached CUSTOM_SUBJECT_ID_FLOOR`
       );
     } finally {
       resetFsMock();

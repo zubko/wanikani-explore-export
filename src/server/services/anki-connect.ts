@@ -35,12 +35,11 @@ import {
   VOCABULARY_EXPECTED_FIELDS,
 } from "@/model/anki-models.ts";
 import {
-  buildSentenceSsml,
-  generateSentenceAudio,
+  buildSpeechSsml,
+  generateSpeechAudio,
   pickSentenceVoice,
-  pickVoiceForGender,
   readAzureTtsConfig,
-  sentenceAudioHash,
+  speechAudioHash,
   type AzureTtsConfig,
 } from "@/server/services/azure-tts.ts";
 import {
@@ -646,7 +645,7 @@ async function storeWaniKaniReadingAudios(params: {
     const ankiFilename = await storeReadingAudio({ deckId, slug: vocabulary.slug, gender, audio });
     soundTags.push(`[sound:${ankiFilename}]`);
   }
-  return { female: "", male: "", [gender]: soundTags.join(" ") };
+  return readingAudioTagsFor(gender, soundTags);
 }
 
 /** WaniKani has no clips for a custom word, so Azure reads every reading in the voice of the gender. */
@@ -658,19 +657,23 @@ async function storeCustomReadingAudios(params: {
   const { deckId, vocabulary, azureTtsConfig } = params;
   const slug = vocabulary.slug;
   const gender = preferredReadingGender(vocabulary);
-  const voice = pickVoiceForGender(azureTtsConfig.voices, gender);
+  const voice = azureTtsConfig.voicesByGender[gender];
   console.log(`[Anki] Reading audio ${slug}: TTS (custom word)`);
   const soundTags: string[] = [];
   for (const reading of acceptedReadingsPrimaryFirst(vocabulary)) {
-    const ssml = buildSentenceSsml({ text: reading, voice });
+    const ssml = buildSpeechSsml({ text: reading, voice });
     const ankiFilename = await storeCachedMedia({
       deckId,
       folder: "readings",
-      nameWithoutExtension: `${slug}_${gender}_${sentenceAudioHash(ssml)}`,
-      fetch: () => generateSentenceAudio({ ssml, config: azureTtsConfig }),
+      nameWithoutExtension: `${slug}_${gender}_${speechAudioHash(ssml)}`,
+      fetch: () => generateSpeechAudio({ ssml, config: azureTtsConfig }),
     });
     soundTags.push(`[sound:${ankiFilename}]`);
   }
+  return readingAudioTagsFor(gender, soundTags);
+}
+
+function readingAudioTagsFor(gender: VoiceGender, soundTags: string[]): ReadingAudioTags {
   return { female: "", male: "", [gender]: soundTags.join(" ") };
 }
 
@@ -712,12 +715,12 @@ async function storeSentenceAudio(params: {
   // The Dragon HD voice is on trial to read the kanji itself. The generated
   // kana reading only fills the furigana field.
   const voice = pickSentenceVoice(azureTtsConfig.voices, slug);
-  const ssml = buildSentenceSsml({ text: sentence.ja, voice });
+  const ssml = buildSpeechSsml({ text: sentence.ja, voice });
   return storeCachedMedia({
     deckId,
     folder: "sentences",
-    nameWithoutExtension: `${slug}_${sentenceAudioHash(ssml)}`,
-    fetch: () => generateSentenceAudio({ ssml, config: azureTtsConfig }),
+    nameWithoutExtension: `${slug}_${speechAudioHash(ssml)}`,
+    fetch: () => generateSpeechAudio({ ssml, config: azureTtsConfig }),
   });
 }
 

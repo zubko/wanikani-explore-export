@@ -126,6 +126,9 @@ export type VerbConjugations = {
 
 export type Conjugations = VerbConjugations;
 
+/** The forms of a verb as the data files store them, with no `type`. */
+export type VerbConjugationForms = Omit<VerbConjugations, "type">;
+
 export type SubjectReference = {
   id: number;
   characters: string;
@@ -174,7 +177,7 @@ type VocabularyDataFields = BaseSubjectDataFields & {
   pronunciation_audios: PronunciationAudio[];
   reading_mnemonic: string;
   // A WaniKani record never has it, a custom verb record does
-  conjugations?: Omit<VerbConjugations, "type">;
+  conjugations?: VerbConjugationForms;
 };
 
 type KanaVocabularyDataFields = BaseSubjectDataFields & {
@@ -182,7 +185,7 @@ type KanaVocabularyDataFields = BaseSubjectDataFields & {
   parts_of_speech: string[];
   context_sentences: ContextSentence[];
   pronunciation_audios: PronunciationAudio[];
-  conjugations?: Omit<VerbConjugations, "type">;
+  conjugations?: VerbConjugationForms;
 };
 
 type BaseSubjectWrapper<T extends SubjectType, D> = {
@@ -203,28 +206,34 @@ export type SubjectData = RadicalData | KanjiData | VocabularyData | KanaVocabul
 /** A record of the custom subjects file. */
 export type CustomSubject = VocabularyData | KanaVocabularyData;
 
+/** The fields of a custom word body that both types have. */
+export const CUSTOM_SUBJECT_COMMON_INPUT_FIELDS = [
+  "characters",
+  "meanings",
+  "auxiliary_meanings",
+  "parts_of_speech",
+  "meaning_mnemonic",
+  "context_sentences",
+  "conjugations",
+] as const;
+/** The fields of a custom word body that only a `vocabulary` word has. */
+export const CUSTOM_VOCABULARY_ONLY_INPUT_FIELDS = [
+  "readings",
+  "reading_mnemonic",
+  "component_subject_ids",
+] as const;
+
 // A custom word always has characters, only a WaniKani radical can have none
+type CommonInputField = Exclude<(typeof CUSTOM_SUBJECT_COMMON_INPUT_FIELDS)[number], "characters">;
+
 type CustomVocabularyInputData = { characters: string } & Pick<
   VocabularyDataFields,
-  | "meanings"
-  | "auxiliary_meanings"
-  | "parts_of_speech"
-  | "meaning_mnemonic"
-  | "context_sentences"
-  | "conjugations"
-  | "readings"
-  | "reading_mnemonic"
-  | "component_subject_ids"
+  CommonInputField | (typeof CUSTOM_VOCABULARY_ONLY_INPUT_FIELDS)[number]
 >;
 
 type CustomKanaVocabularyInputData = { characters: string } & Pick<
   KanaVocabularyDataFields,
-  | "meanings"
-  | "auxiliary_meanings"
-  | "parts_of_speech"
-  | "meaning_mnemonic"
-  | "context_sentences"
-  | "conjugations"
+  CommonInputField
 >;
 
 /** The body an agent sends to create or update a custom subject. The server fills the fixed fields. */

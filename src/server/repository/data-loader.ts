@@ -6,7 +6,7 @@ import type {
   StudyMaterial,
   LocalStudyMaterial,
   SubjectType,
-  VerbConjugations,
+  VerbConjugationForms,
   CustomSubject,
 } from "@/model/wanikani.ts";
 import { LOCAL_STUDY_MATERIAL_FIELDS } from "@/model/wanikani.ts";
@@ -30,8 +30,6 @@ import { isMissingFile } from "@server/utils/file-utils.ts";
 import { readJson, saveJsonIfMissing } from "@server/utils/json-utils.ts";
 import { createReloadingFile } from "@server/utils/reloading-file.ts";
 
-type RawVerbConjugations = Omit<VerbConjugations, "type">;
-
 export type SentenceReadingEntry = { ja: string; reading: string };
 
 type CustomSubjects = { records: CustomSubject[]; wordsByKanji: Map<number, number[]> };
@@ -41,7 +39,7 @@ export let kanji: KanjiData[];
 let vocabulary: VocabularyData[];
 let kanaVocabulary: KanaVocabularyData[];
 export let studyMaterials: StudyMaterial[];
-export let verbConjugations: Record<string, RawVerbConjugations>;
+export let verbConjugations: Record<string, VerbConjugationForms>;
 export let sentenceReadings: Record<string, SentenceReadingEntry>;
 
 // The other server writes these two files too, and a git pull brings its changes while this
@@ -86,7 +84,7 @@ export async function initRepository(): Promise<void> {
     readJson<VocabularyData[]>("./data/userdata/vocabulary.json"),
     readJson<KanaVocabularyData[]>("./data/userdata/kana_vocabulary.json"),
     readJson<StudyMaterial[]>("./data/userdata/study_materials.json"),
-    readJson<Record<string, RawVerbConjugations>>("./data/verb_conjugations.json"),
+    readJson<Record<string, VerbConjugationForms>>("./data/verb_conjugations.json"),
     readJson<Record<string, SentenceReadingEntry>>("./data/sentence_readings.json"),
   ]);
   checkWaniKaniIdsBelowCustomFloor();
@@ -146,12 +144,32 @@ export function getWaniKaniWords(): (VocabularyData | KanaVocabularyData)[] {
   return [...vocabulary, ...kanaVocabulary];
 }
 
+export function getVisibleKanjiIds(): number[] {
+  return kanji.filter(isVisibleSubject).map((item) => item.id);
+}
+
 export function findSubjectTypeById(id: number): SubjectType | null {
   if (radicals.some((item) => item.id === id)) return "radical";
   if (kanji.some((item) => item.id === id)) return "kanji";
   if (vocabulary.some((item) => item.id === id)) return "vocabulary";
   if (kanaVocabulary.some((item) => item.id === id)) return "kana_vocabulary";
   return null;
+}
+
+/**
+ * `findSubjectTypeById` for a WaniKani id, a lookup in `customSubjects` for a custom id. A hidden
+ * WaniKani id always has a type, `includeHiddenCustom` decides only for a hidden custom record.
+ */
+export function findSubjectTypeWithCustom(params: {
+  id: number;
+  customSubjects: CustomSubject[];
+  includeHiddenCustom: boolean;
+}): SubjectType | null {
+  const { id, customSubjects, includeHiddenCustom } = params;
+  if (!isCustomSubjectId(id)) return findSubjectTypeById(id);
+  const record = findCustomSubject(customSubjects, id);
+  if (!record || (!includeHiddenCustom && !isVisibleSubject(record))) return null;
+  return record.object;
 }
 
 /**
@@ -171,11 +189,9 @@ export function checkLocalStudyMaterialSubjects(params: {
     const id = subjectIdOfKey(subjectId);
     if (id === null) throw invalidStudyMaterials(`key ${subjectId} is not a subject id`);
 
-    const isCustom = isCustomSubjectId(id);
-    const type = isCustom
-      ? (findCustomSubject(customSubjects, id)?.object ?? null)
-      : findSubjectTypeById(id);
+    const type = findSubjectTypeWithCustom({ id, customSubjects, includeHiddenCustom: true });
     if (!type) {
+      const isCustom = isCustomSubjectId(id);
       const source = isCustom ? "custom" : "WaniKani";
       if (unknownSubject === "fail") {
         throw invalidStudyMaterials(`subject ${subjectId} is not a ${source} subject`);
@@ -243,7 +259,7 @@ function parseCustomSubjectsFile(content: string | null): CustomSubject[] {
 // A broken kanji id or a clash must not stop the server, the enrich step drops a hidden or unknown
 // kanji id
 function warnAboutCustomSubjects(records: CustomSubject[]): void {
-  const visibleKanjiIds = new Set(kanji.filter(isVisibleSubject).map((item) => item.id));
+  const visibleKanjiIds = new Set(getVisibleKanjiIds());
   for (const record of records) {
     if (record.object !== "vocabulary" || !isVisibleSubject(record)) continue;
     const unknownIds = record.data.component_subject_ids.filter((id) => !visibleKanjiIds.has(id));
@@ -296,8 +312,9 @@ function parseLocalStudyMaterials(value: unknown): Record<string, LocalStudyMate
 
   const knownFields: readonly string[] = LOCAL_STUDY_MATERIAL_FIELDS;
   for (const [subjectId, record] of Object.entries(value)) {
-    if (!isRecord(record))
+    if (!isRecord(record)) {
       throw invalidStudyMaterials(`subject ${subjectId} must be a JSON object`);
+    }
 
     const fields = Object.entries(record);
     // the app deletes an entry that has no field left, so an empty one would sit there unused

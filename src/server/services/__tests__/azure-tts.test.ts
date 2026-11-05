@@ -1,13 +1,12 @@
 import { describe, test, expect, beforeEach, afterEach, afterAll } from "bun:test";
 import { createFetchMock, resolveUrl } from "@/test/fetch-utils.ts";
 import {
-  buildSentenceSsml,
-  generateSentenceAudio,
+  buildSpeechSsml,
+  generateSpeechAudio,
   pickSentenceVoice,
-  pickVoiceForGender,
   readAzureTtsConfig,
-  sentenceAudioHash,
-  SENTENCE_AUDIO_OUTPUT_FORMAT,
+  speechAudioHash,
+  SPEECH_AUDIO_OUTPUT_FORMAT,
   type AzureTtsConfig,
 } from "@server/services/azure-tts.ts";
 
@@ -15,7 +14,12 @@ type RecordedRequest = { url: string; method?: string; headers: Headers; body?: 
 
 const ENV_NAMES = ["AZURE_TTS_KEY", "AZURE_TTS_REGION", "AZURE_TTS_VOICES"];
 const VOICES = ["ja-JP-Nanami:DragonHDLatestNeural", "ja-JP-Masaru:DragonHDLatestNeural"];
-const CONFIG: AzureTtsConfig = { key: "secret-key", region: "westeurope", voices: VOICES };
+const CONFIG: AzureTtsConfig = {
+  key: "secret-key",
+  region: "westeurope",
+  voices: VOICES,
+  voicesByGender: { female: VOICES[0]!, male: VOICES[1]! },
+};
 
 // Other test files install their own fetch mock, so this is not the real fetch
 const previousFetch = globalThis.fetch;
@@ -63,6 +67,10 @@ describe("readAzureTtsConfig", () => {
     expect(readAzureTtsConfig()).toEqual(CONFIG);
   });
 
+  test("the first voice is the female one and the second the male one", () => {
+    expect(readAzureTtsConfig().voicesByGender).toEqual({ female: VOICES[0]!, male: VOICES[1]! });
+  });
+
   test("throws with the name of the first missing variable", () => {
     delete process.env.AZURE_TTS_REGION;
     delete process.env.AZURE_TTS_VOICES;
@@ -93,13 +101,6 @@ describe("readAzureTtsConfig", () => {
   });
 });
 
-describe("pickVoiceForGender", () => {
-  test("answers the first voice for female and the second for male", () => {
-    expect(pickVoiceForGender(VOICES, "female")).toBe(VOICES[0]!);
-    expect(pickVoiceForGender(VOICES, "male")).toBe(VOICES[1]!);
-  });
-});
-
 describe("pickSentenceVoice", () => {
   test("gives one slug the same voice every time", () => {
     const voice = pickSentenceVoice(VOICES, "毎晩");
@@ -114,9 +115,9 @@ describe("pickSentenceVoice", () => {
   });
 });
 
-describe("buildSentenceSsml", () => {
+describe("buildSpeechSsml", () => {
   test("escapes the text and holds the voice name and its language", () => {
-    const ssml = buildSentenceSsml({ text: "A < B & C", voice: VOICES[0]! });
+    const ssml = buildSpeechSsml({ text: "A < B & C", voice: VOICES[0]! });
     expect(ssml).toMatchInlineSnapshot(`
       "<speak version='1.0' xml:lang='ja-JP'>
           <voice name='ja-JP-Nanami:DragonHDLatestNeural'>A &lt; B &amp; C</voice>
@@ -125,22 +126,22 @@ describe("buildSentenceSsml", () => {
   });
 });
 
-describe("sentenceAudioHash", () => {
+describe("speechAudioHash", () => {
   test("gives one SSML the same hash and another voice a new one", () => {
-    const ssml = buildSentenceSsml({ text: "毎晩", voice: VOICES[0]! });
-    const otherVoiceSsml = buildSentenceSsml({ text: "毎晩", voice: VOICES[1]! });
+    const ssml = buildSpeechSsml({ text: "毎晩", voice: VOICES[0]! });
+    const otherVoiceSsml = buildSpeechSsml({ text: "毎晩", voice: VOICES[1]! });
 
-    expect(sentenceAudioHash(ssml)).toMatch(/^[0-9a-f]{8}$/);
-    expect(sentenceAudioHash(ssml)).toBe(sentenceAudioHash(ssml));
-    expect(sentenceAudioHash(otherVoiceSsml)).not.toBe(sentenceAudioHash(ssml));
+    expect(speechAudioHash(ssml)).toMatch(/^[0-9a-f]{8}$/);
+    expect(speechAudioHash(ssml)).toBe(speechAudioHash(ssml));
+    expect(speechAudioHash(otherVoiceSsml)).not.toBe(speechAudioHash(ssml));
   });
 });
 
-describe("generateSentenceAudio", () => {
+describe("generateSpeechAudio", () => {
   test("posts the SSML with the three headers and answers an mp3", async () => {
-    const ssml = buildSentenceSsml({ text: "毎晩", voice: VOICES[0]! });
+    const ssml = buildSpeechSsml({ text: "毎晩", voice: VOICES[0]! });
 
-    const media = await generateSentenceAudio({ ssml, config: CONFIG });
+    const media = await generateSpeechAudio({ ssml, config: CONFIG });
 
     expect(media.extension).toBe("mp3");
     expect(media.data.length).toBe(100);
@@ -152,15 +153,15 @@ describe("generateSentenceAudio", () => {
     expect(Object.fromEntries(request?.headers ?? [])).toEqual({
       "ocp-apim-subscription-key": CONFIG.key,
       "content-type": "application/ssml+xml",
-      "x-microsoft-outputformat": SENTENCE_AUDIO_OUTPUT_FORMAT,
+      "x-microsoft-outputformat": SPEECH_AUDIO_OUTPUT_FORMAT,
     });
   });
 
   test("a bad status throws with the status and the answer text", async () => {
     answer = () => new Response("Quota exceeded", { status: 429 });
-    const ssml = buildSentenceSsml({ text: "毎晩", voice: VOICES[0]! });
+    const ssml = buildSpeechSsml({ text: "毎晩", voice: VOICES[0]! });
 
-    await expect(generateSentenceAudio({ ssml, config: CONFIG })).rejects.toThrow(
+    await expect(generateSpeechAudio({ ssml, config: CONFIG })).rejects.toThrow(
       "Azure TTS error: 429 - Quota exceeded"
     );
   });
