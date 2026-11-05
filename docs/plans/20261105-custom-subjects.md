@@ -389,11 +389,14 @@ Every error answer is `{ ok: false, error }` with `as const`. The id of GET by i
 **Files:**
 
 - Modify: `scripts/download-subjects.ts`
+- ➕ Create: `scripts/lib/custom-subject-clash.ts` (`customSubjectClashWarnings({ path, wanikaniWords })`: read, check, the lines to print)
+- ➕ Create: `scripts/lib/__tests__/custom-subject-clash.test.ts`
+- ➕ Modify: `src/model/custom-subject-utils.ts` (export `WordForClash`)
 
-- [ ] after `saveToFiles`, read `custom_subjects.json` with `readFile` (skip with one line when missing), run `findWaniKaniClash` with the visible downloaded words, print one warning line per hit, exit 0
-- [ ] a broken custom file prints `Could not read custom_subjects.json: <error>` and exits 0
-- [ ] the pure part is `findWaniKaniClash`, tested in task 1; check the script by hand with a temporary custom record that copies a WaniKani word, then remove the record
-- [ ] run `bun run tsc`, `bun run lint:fix` - must pass before task 9
+- [x] after `saveToFiles`, read `custom_subjects.json` with `readFile` (skip with one line when missing), run `findWaniKaniClash` with the visible downloaded words, print one warning line per hit, exit 0
+- [x] a broken custom file prints `Could not read custom_subjects.json: <error>` and exits 0
+- [x] the pure part is `findWaniKaniClash`, tested in task 1; check the script by hand with a temporary custom record that copies a WaniKani word, then remove the record (checked through `customSubjectClashWarnings` with a temp file in `/tmp` and the real WaniKani words, read only: ちょっと gave the warning for WaniKani 9176. The download itself was not run, and `data/userdata/` was not touched)
+- [x] run `bun run tsc`, `bun run lint:fix` - must pass before task 9
 
 ### Task 9: The add-custom-word skill
 

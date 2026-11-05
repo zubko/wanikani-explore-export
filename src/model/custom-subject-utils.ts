@@ -5,7 +5,10 @@ import { ValidationError } from "./validation-error.ts";
 
 export type WaniKaniClash = { customId: number; wanikaniId: number; characters: string };
 
-type WordForClash = { id: number; data: { characters: string | null; hidden_at: string | null } };
+export type WordForClash = {
+  id: number;
+  data: { characters: string | null; hidden_at: string | null };
+};
 
 const VERB_PARTS_OF_SPEECH = ["ichidan verb", "godan verb"];
 const COMMON_INPUT_FIELDS = [

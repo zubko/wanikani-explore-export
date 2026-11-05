@@ -1,9 +1,12 @@
+import type { WordForClash } from "../src/model/custom-subject-utils.ts";
+import { customSubjectClashWarnings } from "./lib/custom-subject-clash.ts";
 import { saveJsonAtomic } from "./lib/llm-utils.ts";
 
 const BASE_URL = "https://api.wanikani.com/v2";
 const API_REVISION = "20170710";
 const RATE_LIMIT_MS = 1000;
 const DATA_DIR = "./data/userdata";
+const CUSTOM_SUBJECTS_FILE = `${DATA_DIR}/custom_subjects.json`;
 
 type SubjectType = "radical" | "kanji" | "vocabulary" | "kana_vocabulary";
 
@@ -89,6 +92,10 @@ function groupByType(subjects: WanikaniSubject[]): Record<SubjectType, WanikaniS
   return grouped;
 }
 
+function toWordForClash(subject: WanikaniSubject): WordForClash {
+  return { id: subject.id, data: subject.data as WordForClash["data"] };
+}
+
 async function saveToFiles(grouped: Record<SubjectType, WanikaniSubject[]>): Promise<void> {
   await Bun.write(`${DATA_DIR}/.gitkeep`, "");
 
@@ -123,6 +130,13 @@ async function main(): Promise<void> {
 
   const grouped = groupByType(subjects);
   await saveToFiles(grouped);
+
+  const warnings = await customSubjectClashWarnings({
+    path: CUSTOM_SUBJECTS_FILE,
+    wanikaniWords: [...grouped.vocabulary, ...grouped.kana_vocabulary].map(toWordForClash),
+  });
+  console.log("");
+  for (const line of warnings) console.log(line);
 
   console.log("\nDone!");
   console.log(
