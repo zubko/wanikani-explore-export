@@ -378,11 +378,11 @@ Every error answer is `{ ok: false, error }` with `as const`. The id of GET by i
 - Modify: `src/client/components/VocabularyCard.tsx`
 - Modify: `src/client/components/__tests__/VocabularyCard.test.tsx`
 
-- [ ] `CardHeader`: `documentUrl?: string | null`, a `badge?: string` rendered inside the title element with `text-gray-500` and a gray border
-- [ ] `VocabularyCard`: `badge="custom"` when `isCustom`
-- [ ] write tests: a custom word renders the badge and no WaniKani link; a WaniKani word renders the link and no badge
-- [ ] check the phone layout at 321×695 and the desktop at 1440px in the browser with a long custom word, no element wider than the screen
-- [ ] run `bun test src/client`, `bun run tsc`, `bun run lint:fix` - must pass before task 8
+- [x] `CardHeader`: `documentUrl?: string | null`, a `badge?: string` rendered inside the title element with `text-gray-500` and a gray border
+- [x] `VocabularyCard`: `badge="custom"` when `isCustom`
+- [x] write tests: a custom word renders the badge and no WaniKani link; a WaniKani word renders the link and no badge
+- [x] check the phone layout at 321×695 and the desktop at 1440px in the browser with a long custom word, no element wider than the screen (skipped - a dev server started from a temp copy of the project ran inside the shell sandbox, and the browser could not reach it: ERR_CONNECTION_REFUSED on localhost and [::1])
+- [x] run `bun test src/client`, `bun run tsc`, `bun run lint:fix` - must pass before task 8
 
 ### Task 8: The download warning
 

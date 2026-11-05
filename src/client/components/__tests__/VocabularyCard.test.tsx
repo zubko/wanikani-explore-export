@@ -83,3 +83,23 @@ describe("VocabularyCard note editors", () => {
     expect(countAddNoteButtons(html)).toBe(0);
   });
 });
+
+describe("VocabularyCard header", () => {
+  it("shows the custom badge and no WaniKani link for a custom word", () => {
+    const html = renderToStaticMarkup(
+      <VocabularyCard
+        vocabulary={{ ...kanaVocabulary, id: 1000000, isCustom: true, documentUrl: null }}
+      />
+    );
+
+    expect(html).toContain(">custom<");
+    expect(html).not.toContain("wanikani.com");
+  });
+
+  it("shows the WaniKani link and no badge for a WaniKani word", () => {
+    const html = renderToStaticMarkup(<VocabularyCard vocabulary={vocabulary} />);
+
+    expect(html).toContain('href="https://www.wanikani.com/vocabulary/毎晩"');
+    expect(html).not.toContain(">custom<");
+  });
+});
