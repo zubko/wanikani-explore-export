@@ -253,7 +253,7 @@ function validatePrimaryList(params: { value: unknown; field: "meaning" | "readi
     requireBoolean(entry.primary, `${path}.primary`);
     requireBoolean(entry.accepted_answer, `${path}.accepted_answer`);
   });
-  requireOnePrimary(items as { primary: boolean }[], listPath);
+  requireOneAcceptedPrimary(items as { primary: boolean; accepted_answer: boolean }[], listPath);
 }
 
 function validateAuxiliaryMeanings(value: unknown): void {
@@ -328,10 +328,19 @@ function requireBoolean(value: unknown, path: string): void {
   if (typeof value !== "boolean") throw new ValidationError(`${path} must be a boolean`);
 }
 
-function requireOnePrimary(items: { primary: boolean }[], path: string): void {
+function requireOneAcceptedPrimary(
+  items: { primary: boolean; accepted_answer: boolean }[],
+  path: string
+): void {
   const primaryCount = items.filter((item) => item.primary).length;
   if (primaryCount !== 1) {
     throw new ValidationError(`${path} must have exactly one primary, it has ${primaryCount}`);
+  }
+  const primaryIndex = items.findIndex((item) => item.primary);
+  if (!items[primaryIndex]?.accepted_answer) {
+    throw new ValidationError(
+      `${path}[${primaryIndex}].accepted_answer must be true on the primary`
+    );
   }
 }
 

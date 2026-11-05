@@ -125,8 +125,8 @@ After every change, show the new text again. Save nothing the user has not seen.
   files in `data/userdata/iknow/` hold sentences for the iKnow words.
 - A word with `godan verb` or `ichidan verb` needs `conjugations` with `dictionary`, `masu`, `te`
   and `nai`. Any other word may have them too, like an irregular verb.
-- A `vocabulary` word also needs `readings` (exactly one `primary: true`), `reading_mnemonic` and
-  `component_subject_ids`. A `kana_vocabulary` word must not have them.
+- A `vocabulary` word also needs `readings` (exactly one `primary: true`, with
+  `accepted_answer: true`), `reading_mnemonic` and `component_subject_ids`. A `kana_vocabulary` word must not have them.
 - A reading holds only hiragana, katakana and ー. Azure TTS makes one reading clip for every reading
   with `accepted_answer: true`, so a reading the word does not use gets `accepted_answer: false`.
 - `component_subject_ids` lists each kanji id once. A repeated id is refused, also when the kanji

@@ -357,6 +357,25 @@ describe("custom-subjects API refusals", () => {
     expect(writeCalls).toHaveLength(0);
   });
 
+  test("POST with a primary reading that is not an accepted answer is a 400", async () => {
+    const readings = [
+      { reading: "くだす", primary: false, accepted_answer: true },
+      { reading: "げす", primary: true, accepted_answer: false },
+    ];
+
+    const { status, json } = await createCustomSubject({
+      ...customVerbInput,
+      data: { ...customVerbInput.data, readings },
+    });
+
+    expect(status).toBe(400);
+    expect(json).toEqual({
+      ok: false,
+      error: "data.readings[1].accepted_answer must be true on the primary",
+    });
+    expect(writeCalls).toHaveLength(0);
+  });
+
   test("PUT with two primary meanings is a 400", async () => {
     setCustomSubjectsFile(customSubjectFixture);
     const meanings = [

@@ -151,6 +151,20 @@ describe("validateCustomSubjectInput", () => {
     );
   });
 
+  it("refuses a primary reading or a primary meaning that is not an accepted answer", () => {
+    const rejectedReading = vocabularyInput.data.readings.map((r) => ({
+      ...r,
+      accepted_answer: false,
+    }));
+    expect(check(withData(vocabularyInput, { readings: rejectedReading }))).toThrow(
+      new ValidationError("data.readings[1].accepted_answer must be true on the primary")
+    );
+    const rejectedMeaning = [{ meaning: "Please", primary: true, accepted_answer: false }];
+    expect(check(withData(kanaInput, { meanings: rejectedMeaning }))).toThrow(
+      new ValidationError("data.meanings[0].accepted_answer must be true on the primary")
+    );
+  });
+
   it("refuses a vocabulary word with no kanji id or with no kanji in the characters", () => {
     expect(check(withData(vocabularyInput, { component_subject_ids: [] }))).toThrow(
       new ValidationError("data.component_subject_ids must not be empty")
