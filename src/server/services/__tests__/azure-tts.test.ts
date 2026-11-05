@@ -4,6 +4,7 @@ import {
   buildSentenceSsml,
   generateSentenceAudio,
   pickSentenceVoice,
+  pickVoiceForGender,
   readAzureTtsConfig,
   sentenceAudioHash,
   SENTENCE_AUDIO_OUTPUT_FORMAT,
@@ -80,6 +81,22 @@ describe("readAzureTtsConfig", () => {
         "Empty voice in AZURE_TTS_VOICES in the root env file"
       );
     }
+  });
+
+  test("a list of one or three voices is refused", () => {
+    for (const voices of [VOICES[0]!, [...VOICES, "ja-JP-Keita:DragonHDLatestNeural"].join(",")]) {
+      process.env.AZURE_TTS_VOICES = voices;
+      expect(() => readAzureTtsConfig()).toThrow(
+        "AZURE_TTS_VOICES needs exactly two voices, female first"
+      );
+    }
+  });
+});
+
+describe("pickVoiceForGender", () => {
+  test("answers the first voice for female and the second for male", () => {
+    expect(pickVoiceForGender(VOICES, "female")).toBe(VOICES[0]!);
+    expect(pickVoiceForGender(VOICES, "male")).toBe(VOICES[1]!);
   });
 });
 

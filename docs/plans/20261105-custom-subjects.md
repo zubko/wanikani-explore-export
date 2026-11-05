@@ -361,14 +361,14 @@ Every error answer is `{ ok: false, error }` with `as const`. The id of GET by i
 - Modify: `src/server/services/__tests__/azure-tts.test.ts`
 - Modify: `src/server/__tests__/api.add-to-anki.test.ts`
 
-- [ ] `azure-tts.ts`: `pickVoiceForGender(voices, gender)`, and the exactly-two-voices rule in `readAzureTtsConfig`, checked after the empty-entry rule so the existing `${VOICES[0]},,${VOICES[1]}` test keeps its "Empty voice" error
-- [ ] `src/test/preload.ts`: two test voices, female first; `src/test/fetch-interceptor.ts`: `ttsRequests` with the SSML body of every TTS call, cleared by `resetFetchInterceptor()`
-- [ ] update the snapshots that the second voice changed, scoped: `bun test src/server/__tests__/api.add-to-anki.test.ts --update-snapshots`; read the diff and expect only new sentence clip names, no changed WaniKani reading clip name
-- [ ] `anki-connect.ts`: the `isCustom` branch that makes one clip per reading through `storeCachedMedia` in `readings/` with the SSML hash name, primary first, into the field of the picked gender; the Azure config is read before the first write like today, so the two-voice rule fails the add with no note written
-- [ ] write tests in `azure-tts.test.ts`: `pickVoiceForGender` both genders; `readAzureTtsConfig` fails on one voice and on three
-- [ ] write tests in `api.add-to-anki.test.ts`: add the fixture verb with two readings (the primary listed second), snapshot the note fields (a `[sound:]` tag per reading in one gender field, primary first, the other field empty, `meaning_explanation` from the record) and the cached `readings/` paths in `writeCalls`; assert `ttsRequests` holds the primary reading first, then the other, then the sentence, with the voice of the hashed gender; a second add writes no `readings/` file and makes no TTS call (cache hit); add the fixture kana word with the characters as the one reading; a one-voice config fails the add with `ok: false` and no `addNote` call
-- [ ] update the new snapshots scoped with the same command; read the diff and expect only the new cases
-- [ ] run `bun test`, `bun run tsc`, `bun run lint:fix` - must pass before task 7
+- [x] `azure-tts.ts`: `pickVoiceForGender(voices, gender)`, and the exactly-two-voices rule in `readAzureTtsConfig`, checked after the empty-entry rule so the existing `${VOICES[0]},,${VOICES[1]}` test keeps its "Empty voice" error
+- [x] `src/test/preload.ts`: two test voices, female first; `src/test/fetch-interceptor.ts`: `ttsRequests` with the SSML body of every TTS call, cleared by `resetFetchInterceptor()`
+- [x] update the snapshots that the second voice changed, scoped: `bun test src/server/__tests__/api.add-to-anki.test.ts --update-snapshots`; read the diff and expect only new sentence clip names, no changed WaniKani reading clip name
+- [x] `anki-connect.ts`: the `isCustom` branch that makes one clip per reading through `storeCachedMedia` in `readings/` with the SSML hash name, primary first, into the field of the picked gender; the Azure config is read before the first write like today, so the two-voice rule fails the add with no note written
+- [x] write tests in `azure-tts.test.ts`: `pickVoiceForGender` both genders; `readAzureTtsConfig` fails on one voice and on three
+- [x] write tests in `api.add-to-anki.test.ts`: add the fixture verb with two readings (the primary listed second), snapshot the note fields (a `[sound:]` tag per reading in one gender field, primary first, the other field empty, `meaning_explanation` from the record) and the cached `readings/` paths in `writeCalls`; assert `ttsRequests` holds the primary reading first, then the other, then the sentence, with the voice of the hashed gender; a second add writes no `readings/` file and makes no TTS call (cache hit); add the fixture kana word with the characters as the one reading; a one-voice config fails the add with `ok: false` and no `addNote` call
+- [x] update the new snapshots scoped with the same command; read the diff and expect only the new cases
+- [x] run `bun test`, `bun run tsc`, `bun run lint:fix` - must pass before task 7
 
 ### Task 7: The custom badge in the web UI
 

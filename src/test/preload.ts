@@ -202,7 +202,7 @@ mock.module("fs/promises", () => ({
 // sentence clip names in the snapshots from machine to machine
 process.env.AZURE_TTS_KEY = "test-key";
 process.env.AZURE_TTS_REGION = "eastus";
-process.env.AZURE_TTS_VOICES = "ja-JP-TestNeural";
+process.env.AZURE_TTS_VOICES = "ja-JP-TestFemaleNeural,ja-JP-TestMaleNeural";
 
 let initialized = false;
 

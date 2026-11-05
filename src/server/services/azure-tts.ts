@@ -1,4 +1,5 @@
 import type { FetchedMedia } from "@server/repository/media-cache.ts";
+import type { VoiceGender } from "@/model/wanikani.ts";
 import { hashNumber, shortHash } from "@server/utils/hash.ts";
 
 export type AzureTtsConfig = { key: string; region: string; voices: string[] };
@@ -13,12 +14,20 @@ export function readAzureTtsConfig(): AzureTtsConfig {
     .map((voice) => voice.trim());
   // The list length picks the voice of each word, so a stray comma would rename most clips
   if (voices.includes("")) throw new Error("Empty voice in AZURE_TTS_VOICES in the root env file");
+  // pickVoiceForGender reads the gender from the position, so a third voice would have none
+  if (voices.length !== 2) {
+    throw new Error("AZURE_TTS_VOICES needs exactly two voices, female first");
+  }
   return { key, region, voices };
 }
 
 /** The voice is part of the clip name, so one word must always get the same voice. */
 export function pickSentenceVoice(voices: string[], slug: string): string {
   return voices[hashNumber(slug) % voices.length]!;
+}
+
+export function pickVoiceForGender(voices: string[], gender: VoiceGender): string {
+  return gender === "female" ? voices[0]! : voices[1]!;
 }
 
 export function buildSentenceSsml(params: { text: string; voice: string }): string {

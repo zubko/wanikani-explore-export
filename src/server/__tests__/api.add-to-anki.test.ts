@@ -13,10 +13,13 @@ import {
   setMediaContentType,
   setMediaStatus,
   setModelFields,
+  ttsRequests,
 } from "@/test/fetch-interceptor.ts";
 import { ensureRepositoryInitialized, resetFsMock, writeCalls } from "@/test/preload.ts";
 import {
+  customKanaWord,
   customSubjectFixture,
+  customVerb,
   hiddenCustomWord,
   setCustomSubjectsFile,
 } from "@/test/custom-subject-fixture.ts";
@@ -26,6 +29,7 @@ import { getVocabularyData } from "@server/repository/data-loader.ts";
 import { MEDIA_ROOT_PATH, MNEMONIC_IMAGES_PATH } from "@server/repository/data-paths.ts";
 import { getRadical } from "@server/repository/radical.ts";
 import { getVocabulary } from "@server/repository/vocabulary.ts";
+import { hashNumber } from "@server/utils/hash.ts";
 import { api } from "../api.ts";
 
 installFetchInterceptor();
@@ -86,6 +90,15 @@ function storedMedia(): { filename: unknown; data: unknown }[] {
 
 function storedAudioFilenames(): string[] {
   return storedMediaFilenames().filter((name) => name.endsWith(".mp3"));
+}
+
+/** The voice and the text of every TTS call, in call order. */
+function spokenTexts(): { voice: string; text: string }[] {
+  return ttsRequests.map((ssml) => {
+    const match = /<voice name='([^']+)'>([^<]*)<\/voice>/.exec(ssml);
+    if (!match) throw new Error(`No voice in the SSML: ${ssml}`);
+    return { voice: match[1]!, text: match[2]! };
+  });
 }
 
 function cachedMediaPaths(): string[] {
@@ -213,7 +226,7 @@ describe("add-to-anki API", () => {
       [
         "1003_平壌_male_3af1ead2.mp3",
         "1003_平壌_male_d10a9de1.mp3",
-        "1003_平壌_b85cd9d7.mp3",
+        "1003_平壌_3eaaa74e.mp3",
       ]
     `);
   });
@@ -479,13 +492,13 @@ describe("media cache for a word", () => {
     expect(cachedMediaPaths()).toMatchInlineSnapshot(`
       [
         "./data/userdata/media/readings/毎晩_female_a03eecb8.mp3",
-        "./data/userdata/media/sentences/毎晩_982a186a.mp3",
+        "./data/userdata/media/sentences/毎晩_c7c777a2.mp3",
       ]
     `);
     expect(storedAudioFilenames()).toMatchInlineSnapshot(`
       [
         "1003_毎晩_female_a03eecb8.mp3",
-        "1003_毎晩_982a186a.mp3",
+        "1003_毎晩_c7c777a2.mp3",
       ]
     `);
     const fields = findVocabularyFields("addNote", "毎晩");
@@ -537,6 +550,101 @@ describe("media cache for a word", () => {
       expect(cachedMediaPaths().some((path) => path.includes("/sentences/"))).toBe(false);
     } finally {
       data.context_sentences = sentences;
+    }
+  });
+});
+
+describe("reading audio of a custom word", () => {
+  beforeEach(() => setCustomSubjectsFile(customSubjectFixture));
+
+  test("each reading gets one TTS clip in the voice of the hashed gender, primary first (下す)", async () => {
+    const result = await addToAnkiJson({ id: customVerb.id, type: "vocabulary" });
+    expect(result.ok).toBe(true);
+
+    expect(findVocabularyFields("addNote", "下す")).toMatchInlineSnapshot(`
+      {
+        "alternative_meanings": "",
+        "characters": "下す",
+        "conjugations": "下す, 下します, 下して, 下さない",
+        "extra_meanings": "",
+        "kanji_composition": "<span class="kanji-item"><span class="kanji-badge">下</span> Below</span>",
+        "masu_form": "下します",
+        "meaning_explanation": "A judge hands <span style="background-color: #aa00ff; color: white; padding: 0 4px; border-radius: 3px;">down</span> a decision.",
+        "meaning_note": "",
+        "primary_meaning": "To Hand Down",
+        "reading": "くだす",
+        "reading_audio_female": "",
+        "reading_audio_male": "[sound:1003_下す_male_21044251.mp3] [sound:1003_下す_male_0f691a03.mp3]",
+        "reading_explanation": "The judge <span style="background-color: #555; color: white; padding: 0 4px; border-radius: 3px;">くだす</span> the decision.",
+        "reading_note": "",
+        "sentence_eng": "The judge handed down a decision.",
+        "sentence_eng_audio": "",
+        "sentence_jap": "判事が判決を下した。",
+        "sentence_jap_audio": "[sound:1003_下す_ca1de205.mp3]",
+        "sentence_jap_furigana": "はんじがはんけつをくだした。",
+        "user_synonyms": "",
+        "word_type": "godan verb, transitive verb",
+      }
+    `);
+    expect(cachedMediaPaths().filter((path) => path.includes("/readings/"))).toMatchInlineSnapshot(`
+      [
+        "./data/userdata/media/readings/下す_male_21044251.mp3",
+        "./data/userdata/media/readings/下す_male_0f691a03.mp3",
+      ]
+    `);
+
+    const gender = hashNumber("reading-gender:くだす") % 2 === 0 ? "female" : "male";
+    const readingVoice = gender === "female" ? "ja-JP-TestFemaleNeural" : "ja-JP-TestMaleNeural";
+    expect(spokenTexts()).toEqual([
+      { voice: readingVoice, text: "くだす" },
+      { voice: readingVoice, text: "おろす" },
+      { voice: expect.any(String), text: "判事が判決を下した。" },
+    ]);
+  });
+
+  test("a second add reads every clip from disk (下す)", async () => {
+    await addToAnkiJson({ id: customVerb.id, type: "vocabulary" });
+    const firstFields = findVocabularyFields("addNote", "下す");
+    const firstCachedPaths = cachedMediaPaths();
+    resetFetchInterceptor();
+
+    const result = await addToAnkiJson({ id: customVerb.id, type: "vocabulary" });
+    expect(result.ok).toBe(true);
+    expect(ttsRequests).toEqual([]);
+    expect(cachedMediaPaths()).toEqual(firstCachedPaths);
+    const fields = findVocabularyFields("addNote", "下す");
+    expect(fields.reading_audio_female).toBe(firstFields.reading_audio_female);
+    expect(fields.reading_audio_male).toBe(firstFields.reading_audio_male);
+  });
+
+  test("a kana word speaks its characters as the one reading (どうぞ)", async () => {
+    const result = await addToAnkiJson({ id: customKanaWord.id, type: "kana_vocabulary" });
+    expect(result.ok).toBe(true);
+
+    const fields = findVocabularyFields("addNote", "どうぞ");
+    expect([fields.reading_audio_female, fields.reading_audio_male]).toMatchInlineSnapshot(`
+      [
+        "[sound:1003_どうぞ_female_7cb55089.mp3]",
+        "",
+      ]
+    `);
+    expect(spokenTexts().map((spoken) => spoken.text)).toEqual(["どうぞ", "どうぞ入って。"]);
+    expect(spokenTexts()[0]?.voice).toBe("ja-JP-TestFemaleNeural");
+  });
+
+  test("a list of one voice fails the add before any note is written", async () => {
+    const voices = process.env.AZURE_TTS_VOICES;
+    process.env.AZURE_TTS_VOICES = "ja-JP-TestFemaleNeural";
+    try {
+      const result = await addToAnkiJson({ id: customVerb.id, type: "vocabulary" });
+      expect(result).toEqual({
+        ok: false,
+        error: "AZURE_TTS_VOICES needs exactly two voices, female first",
+      });
+      expect(ankiCalls.some((call) => call.action === "addNote")).toBe(false);
+      expect(ttsRequests).toEqual([]);
+    } finally {
+      process.env.AZURE_TTS_VOICES = voices;
     }
   });
 });
