@@ -7,7 +7,13 @@ import {
   getPrimaryMeaning,
   isVisibleSubject,
 } from "@/model/subject-utils.ts";
-import { kanji, vocabulary, studyMaterials, getLocalStudyMaterials } from "./data-loader.ts";
+import {
+  kanji,
+  studyMaterials,
+  getLocalStudyMaterials,
+  getVocabularyData,
+  getCustomWordsByKanji,
+} from "./data-loader.ts";
 import { getRadicals } from "./radical.ts";
 
 async function mapKanjiDataToKanji(data: KanjiData): Promise<Kanji> {
@@ -18,7 +24,11 @@ async function mapKanjiDataToKanji(data: KanjiData): Promise<Kanji> {
     kanji,
     data.data.visually_similar_subject_ids
   );
-  const foundInVocabulary = buildSubjectReferences(vocabulary, data.data.amalgamation_subject_ids);
+  const customWordIds = (await getCustomWordsByKanji()).get(data.id) ?? [];
+  const foundInVocabulary = buildSubjectReferences(await getVocabularyData(), [
+    ...data.data.amalgamation_subject_ids,
+    ...customWordIds,
+  ]);
 
   return {
     object: "kanji" as const,

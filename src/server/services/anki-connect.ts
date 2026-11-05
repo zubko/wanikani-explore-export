@@ -678,7 +678,7 @@ function buildVocabularyNoteFields(params: {
     vocabulary.localStudyMaterial
   );
 
-  const conjugations = vocabData?.conjugations;
+  const conjugations = vocabulary.conjugations;
   const conjugationsStr = conjugations
     ? `${conjugations.dictionary}, ${conjugations.masu}, ${conjugations.te}, ${conjugations.nai}`
     : "";

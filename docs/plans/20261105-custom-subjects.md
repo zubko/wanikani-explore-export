@@ -312,15 +312,15 @@ Every error answer is `{ ok: false, error }` with `as const`. The id of GET by i
 - Modify: `src/server/__tests__/api.study-materials.test.ts`
 - Modify: `src/server/__tests__/api.add-to-anki.test.ts`
 
-- [ ] `vocabulary.ts`: the three `find` calls use `getVocabularyData()` and `getKanaVocabularyData()`; set `isCustom`; read `conjugations` from the record for both types and keep the inline sentence `reading` for a custom id; pass `documentUrl` through as `null`
-- [ ] `anki-connect.ts` and `VocabularyCard.tsx`: read `conjugations` from either vocabulary type
-- [ ] `kanji.ts`: build `foundInVocabulary` from the merged vocabulary with the ids of `getCustomWordsByKanji()` appended
-- [ ] `api.ts`: `/anki-notes` reads the two getters once and passes the arrays to `resolveWkSubject`; the PATCH route moves the type lookup, its 404 and the `reading_note` 400 inside its `try`, falls back to `findCustomSubject(await getCustomSubjects(), id)` and treats a hidden record as not found; drop the `vocabulary` and `kanaVocabulary` imports from `data-loader.ts` everywhere (`bun run tsc` finds the rest)
-- [ ] add `resetFsMock` in `beforeEach` and `afterEach` to `vocabulary.test.ts`, `kanji.test.ts` and `api.anki-notes.test.ts`, because they will change a seeded file
-- [ ] write tests: `vocabulary.test.ts` finds the fixture kana word by characters and by id with `isCustom: true`, `conjugations` from the record, `documentUrl: null`, does not find the hidden fixture word, and a WaniKani word still has `isCustom: false`; `kanji.test.ts` lists the fixture verb under its kanji's `foundInVocabulary` and `amalgamationSubjectIds`
-- [ ] write tests: `api.search.test.ts` finds the custom word (file snapshot), does not find the hidden one, and the kanji card lists the verb; `api.anki-notes.test.ts` resolves a note with the custom characters to the custom id and leaves a note of the hidden word unresolved; `api.study-materials.test.ts` saves a note on the custom word, answers 404 for the hidden one, 400 for a `reading_note` on the custom kana word, and a JSON 500 with no write when the custom file is broken (`setFileContent` before the request); `api.add-to-anki.test.ts` answers 404 for the hidden word
-- [ ] update the new file snapshots one file at a time with the scoped command; read each diff and expect only the new cases
-- [ ] run `bun test`, `bun run tsc`, `bun run lint:fix` - must pass before task 4
+- [x] `vocabulary.ts`: the three `find` calls use `getVocabularyData()` and `getKanaVocabularyData()`; set `isCustom`; read `conjugations` from the record for both types and keep the inline sentence `reading` for a custom id; pass `documentUrl` through as `null`
+- [x] `anki-connect.ts` and `VocabularyCard.tsx`: read `conjugations` from either vocabulary type
+- [x] `kanji.ts`: build `foundInVocabulary` from the merged vocabulary with the ids of `getCustomWordsByKanji()` appended
+- [x] `api.ts`: `/anki-notes` reads the two getters once and passes the arrays to `resolveWkSubject`; the PATCH route moves the type lookup, its 404 and the `reading_note` 400 inside its `try`, falls back to `findCustomSubject(await getCustomSubjects(), id)` and treats a hidden record as not found; drop the `vocabulary` and `kanaVocabulary` imports from `data-loader.ts` everywhere (`bun run tsc` finds the rest)
+- [x] add `resetFsMock` in `beforeEach` and `afterEach` to `vocabulary.test.ts`, `kanji.test.ts` and `api.anki-notes.test.ts`, because they will change a seeded file
+- [x] write tests: `vocabulary.test.ts` finds the fixture kana word by characters and by id with `isCustom: true`, `conjugations` from the record, `documentUrl: null`, does not find the hidden fixture word, and a WaniKani word still has `isCustom: false`; `kanji.test.ts` lists the fixture verb under its kanji's `foundInVocabulary` and `amalgamationSubjectIds`
+- [x] write tests: `api.search.test.ts` finds the custom word (file snapshot), does not find the hidden one, and the kanji card lists the verb; `api.anki-notes.test.ts` resolves a note with the custom characters to the custom id and leaves a note of the hidden word unresolved; `api.study-materials.test.ts` saves a note on the custom word, answers 404 for the hidden one, 400 for a `reading_note` on the custom kana word, and a JSON 500 with no write when the custom file is broken (`setFileContent` before the request); `api.add-to-anki.test.ts` answers 404 for the hidden word
+- [x] update the new file snapshots one file at a time with the scoped command; read each diff and expect only the new cases
+- [x] run `bun test`, `bun run tsc`, `bun run lint:fix` - must pass before task 4
 
 ### Task 4: The write module with the queue
 

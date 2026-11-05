@@ -6,11 +6,13 @@ import type {
   AnkiNoteItem,
   Kanji,
   KanaVocabulary,
+  KanaVocabularyData,
   LocalStudyMaterialPatch,
   Radical,
   Subject,
   SubjectType,
   Vocabulary,
+  VocabularyData,
 } from "@/model/wanikani.ts";
 
 import { getRadical, findRadicalByCharacters, findRadicalByName } from "./repository/radical.ts";
@@ -24,10 +26,11 @@ import {
 import {
   radicals as radicalData,
   kanji as kanjiData,
-  vocabulary as vocabularyData,
-  kanaVocabulary as kanaVocabularyData,
+  findSubjectTypeById,
+  getCustomSubjects,
+  getKanaVocabularyData,
+  getVocabularyData,
 } from "./repository/data-loader.ts";
-import { findSubjectTypeById } from "./repository/data-loader.ts";
 import { upsertLocalStudyMaterial } from "./repository/study-material.ts";
 import {
   getPrimaryMeaning,
@@ -35,6 +38,7 @@ import {
   validateLocalStudyMaterialValue,
   validateReadingNote,
 } from "@/model/subject-utils.ts";
+import { findCustomSubject, isCustomSubjectId } from "@/model/custom-subject-utils.ts";
 import { ValidationError } from "@/model/validation-error.ts";
 import type { AnkiDeckType } from "./services/anki-connect.ts";
 import {
@@ -46,6 +50,11 @@ import {
   syncAnkiWeb,
 } from "./services/anki-connect.ts";
 import { getErrorMessage } from "./utils/error-utils.ts";
+
+type VocabularyPools = {
+  vocabularyWords: VocabularyData[];
+  kanaVocabularyWords: KanaVocabularyData[];
+};
 
 const ANKI_DECK_TYPES: AnkiDeckType[] = ["radical", "kanji", "vocabulary"];
 
@@ -90,10 +99,18 @@ async function readJsonObjectBody(c: Context): Promise<Record<string, unknown> |
   return body as Record<string, unknown>;
 }
 
-function resolveWkSubject(
-  deckType: AnkiDeckType,
-  characters: string
-): { id: number; type: SubjectType } | null {
+async function findStudyMaterialSubjectType(id: number): Promise<SubjectType | null> {
+  if (!isCustomSubjectId(id)) return findSubjectTypeById(id);
+  const record = findCustomSubject(await getCustomSubjects(), id);
+  return record && isVisibleSubject(record) ? record.object : null;
+}
+
+function resolveWkSubject(params: {
+  deckType: AnkiDeckType;
+  characters: string;
+  vocabularyPools: VocabularyPools;
+}): { id: number; type: SubjectType } | null {
+  const { deckType, characters, vocabularyPools } = params;
   if (deckType === "radical") {
     const matches = radicalData.filter(
       (r) =>
@@ -116,10 +133,12 @@ function resolveWkSubject(
   }
 
   // vocabulary deck can contain both vocabulary and kana_vocabulary
-  const vocab = vocabularyData.find((v) => isVisibleSubject(v) && v.data.characters === characters);
+  const vocab = vocabularyPools.vocabularyWords.find(
+    (v) => isVisibleSubject(v) && v.data.characters === characters
+  );
   if (vocab) return { id: vocab.id, type: "vocabulary" };
 
-  const kanaVocab = kanaVocabularyData.find(
+  const kanaVocab = vocabularyPools.kanaVocabularyWords.find(
     (v) => isVisibleSubject(v) && v.data.characters === characters
   );
   if (kanaVocab) return { id: kanaVocab.id, type: "kana_vocabulary" };
@@ -188,9 +207,18 @@ const app = new Hono()
 
     try {
       const deckNotes = await getDeckNotes(deckType);
+      // One read of the custom file per request, not one per note
+      const vocabularyPools: VocabularyPools = {
+        vocabularyWords: await getVocabularyData(),
+        kanaVocabularyWords: await getKanaVocabularyData(),
+      };
 
       const data: AnkiNoteItem[] = deckNotes.map((note) => {
-        const resolved = resolveWkSubject(deckType, note.characters);
+        const resolved = resolveWkSubject({
+          deckType,
+          characters: note.characters,
+          vocabularyPools,
+        });
         return {
           characters: note.characters,
           meaning: note.meaning,
@@ -270,30 +298,33 @@ const app = new Hono()
       return c.json({ ok: false as const, error: error.message }, 400);
     }
 
-    const type = findSubjectTypeById(id);
-    if (!type) {
-      console.log(`[API] Study material id=${id} — subject not found`);
-      return c.json({ ok: false as const, error: "Subject not found" }, 404);
-    }
-
-    if ("reading_note" in patch) {
-      try {
-        validateReadingNote(type);
-      } catch (error) {
-        if (!(error instanceof ValidationError)) throw error;
-        return c.json({ ok: false as const, error: `Invalid reading_note: ${error.message}` }, 400);
-      }
-    }
-
-    console.log(`[API] Study material ${type} id=${id}: ${Object.keys(patch).join(", ")}`);
-
     try {
+      const type = await findStudyMaterialSubjectType(id);
+      if (!type) {
+        console.log(`[API] Study material id=${id} — subject not found`);
+        return c.json({ ok: false as const, error: "Subject not found" }, 404);
+      }
+
+      if ("reading_note" in patch) {
+        try {
+          validateReadingNote(type);
+        } catch (error) {
+          if (!(error instanceof ValidationError)) throw error;
+          return c.json(
+            { ok: false as const, error: `Invalid reading_note: ${error.message}` },
+            400
+          );
+        }
+      }
+
+      console.log(`[API] Study material ${type} id=${id}: ${Object.keys(patch).join(", ")}`);
+
       const data = await upsertLocalStudyMaterial(id, patch as LocalStudyMaterialPatch);
       console.log(`[API] Study material ${type} id=${id} — ${data ? "saved" : "removed"}`);
       return c.json({ ok: true as const, data });
     } catch (err) {
       const message = getErrorMessage(err);
-      console.error(`[API] Study material ${type} id=${id} — error: ${message}`);
+      console.error(`[API] Study material id=${id} — error: ${message}`);
       return c.json({ ok: false as const, error: message }, 500);
     }
   })

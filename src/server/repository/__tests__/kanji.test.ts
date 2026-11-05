@@ -1,9 +1,20 @@
-import { describe, test, expect, beforeAll, beforeEach } from "bun:test";
+import { describe, test, expect, beforeAll, beforeEach, afterEach } from "bun:test";
 import { resetMockState, installFetchMock, ensureRepositoryInitialized } from "./setup.ts";
+import { resetFsMock } from "@/test/preload.ts";
+import {
+  CUSTOM_VERB_KANJI_ID,
+  customSubjectFixture,
+  customVerb,
+  hiddenCustomWord,
+  setCustomSubjectsFile,
+} from "@/test/custom-subject-fixture.ts";
 import { getKanji, getKanjis, findKanjiByCharacters, findKanjiByMeaning } from "../kanji.ts";
 
 installFetchMock();
 beforeAll(() => ensureRepositoryInitialized());
+// The custom word tests change the seeded custom subjects file
+beforeEach(resetFsMock);
+afterEach(resetFsMock);
 
 describe("getKanji", () => {
   beforeEach(resetMockState);
@@ -106,5 +117,23 @@ describe("findKanjiByMeaning", () => {
   test("never finds a hidden kanji (Prosperous, id=2285)", async () => {
     const k = await findKanjiByMeaning("prosperous");
     expect(k).toBeNull();
+  });
+});
+
+describe("custom words under a kanji", () => {
+  test("the kanji lists the custom verb after its WaniKani words, and not the hidden one", async () => {
+    const before = await getKanji(CUSTOM_VERB_KANJI_ID);
+    setCustomSubjectsFile(customSubjectFixture);
+    const after = await getKanji(CUSTOM_VERB_KANJI_ID);
+
+    expect(after!.amalgamationSubjectIds).toEqual([
+      ...before!.amalgamationSubjectIds,
+      customVerb.id,
+    ]);
+    expect(after!.foundInVocabulary.at(-1)).toMatchObject({
+      id: customVerb.id,
+      characters: "下す",
+    });
+    expect(after!.amalgamationSubjectIds).not.toContain(hiddenCustomWord.id);
   });
 });

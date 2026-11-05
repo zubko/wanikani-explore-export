@@ -14,6 +14,12 @@ import {
   setStudyMaterialFile,
   studyMaterialFixture as fixture,
 } from "@/test/study-material-fixture.ts";
+import {
+  customSubjectFixture,
+  customVerb,
+  hiddenCustomWord,
+  setCustomSubjectsFile,
+} from "@/test/custom-subject-fixture.ts";
 import { getLocalStudyMaterials } from "../repository/data-loader.ts";
 import { LOCAL_STUDY_MATERIALS_PATH, MNEMONIC_IMAGES_PATH } from "../repository/data-paths.ts";
 import { api } from "../api.ts";
@@ -162,5 +168,30 @@ describe("search API with the local study materials changed outside the app", ()
     const response = await searchApi("type=kanji&q=川");
     expect(response.status).toBe(200);
     expect((await response.json()).data.localStudyMaterial).toEqual(fixture["456"]!);
+  });
+});
+
+describe("search API with custom words", () => {
+  beforeEach(() => setCustomSubjectsFile(customSubjectFixture));
+
+  test("finds a custom verb (下す)", async () => {
+    const result = await searchJson("type=vocabulary&q=下す");
+    expect(result.found).toBe(true);
+    expect(result.data.id).toBe(customVerb.id);
+    expect(result.data.isCustom).toBe(true);
+    expect(result.data).toMatchSnapshot();
+  });
+
+  test("never finds the hidden custom word (下記)", async () => {
+    const response = await searchApi("type=vocabulary&q=下記");
+    expect(response.status).toBe(404);
+  });
+
+  test("the kanji card lists the custom verb and not the hidden word (下)", async () => {
+    const result = await searchJson("type=kanji&q=下");
+    const ids = result.data.foundInVocabulary.map((reference: { id: number }) => reference.id);
+    expect(ids).toContain(customVerb.id);
+    expect(ids).not.toContain(hiddenCustomWord.id);
+    expect(result.data.amalgamationSubjectIds).toContain(customVerb.id);
   });
 });

@@ -62,7 +62,7 @@ export function VocabularyCard({ vocabulary }: VocabularyCardProps) {
           meanings={vocabulary.meanings}
           synonyms={synonymProps(vocabulary)}
           partsOfSpeech={vocabulary.partsOfSpeech}
-          conjugations={vocabData?.conjugations ?? null}
+          conjugations={vocabulary.conjugations}
           mnemonic={vocabulary.meaningMnemonic}
           note={noteProps(vocabulary, "meaning_note")}
         />

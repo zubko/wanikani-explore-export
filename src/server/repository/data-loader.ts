@@ -38,8 +38,8 @@ type CustomSubjects = { records: CustomSubject[]; wordsByKanji: Map<number, numb
 
 export let radicals: RadicalData[];
 export let kanji: KanjiData[];
-export let vocabulary: VocabularyData[];
-export let kanaVocabulary: KanaVocabularyData[];
+let vocabulary: VocabularyData[];
+let kanaVocabulary: KanaVocabularyData[];
 export let studyMaterials: StudyMaterial[];
 export let verbConjugations: Record<string, RawVerbConjugations>;
 export let sentenceReadings: Record<string, SentenceReadingEntry>;

@@ -1,10 +1,16 @@
-import { describe, test, expect, beforeAll, beforeEach } from "bun:test";
+import { describe, test, expect, beforeAll, beforeEach, afterEach } from "bun:test";
 import {
   installFetchInterceptor,
   resetFetchInterceptor,
   setAnkiResponse,
 } from "@/test/fetch-interceptor.ts";
-import { ensureRepositoryInitialized } from "@/test/preload.ts";
+import { ensureRepositoryInitialized, resetFsMock } from "@/test/preload.ts";
+import {
+  customKanaWord,
+  customSubjectFixture,
+  customVerb,
+  setCustomSubjectsFile,
+} from "@/test/custom-subject-fixture.ts";
 import { getPrimaryMeaning } from "@/model/subject-utils.ts";
 import { api } from "../api.ts";
 import { radicals as radicalData } from "../repository/data-loader.ts";
@@ -12,6 +18,9 @@ import { radicals as radicalData } from "../repository/data-loader.ts";
 installFetchInterceptor();
 beforeAll(() => ensureRepositoryInitialized());
 beforeEach(resetFetchInterceptor);
+// The custom word tests change the seeded custom subjects file
+beforeEach(resetFsMock);
+afterEach(resetFsMock);
 
 async function getAnkiNotes(type: string) {
   return api.request(`/anki-notes?type=${type}`);
@@ -208,6 +217,50 @@ describe("anki-notes API", () => {
     const result = await getAnkiNotesJson("vocabulary");
     expect(result.data).toEqual([
       { characters: "悪女", meaning: "Evil Woman", wkId: null, wkType: null },
+    ]);
+  });
+});
+
+describe("anki-notes API with custom words", () => {
+  beforeEach(() => setCustomSubjectsFile(customSubjectFixture));
+
+  test("resolves a note of a custom word to the custom id", async () => {
+    setAnkiResponse("findNotes", [700, 701]);
+    setAnkiResponse("notesInfo", [
+      {
+        noteId: 700,
+        fields: { characters: { value: "下す" }, primary_meaning: { value: "To Hand Down" } },
+      },
+      {
+        noteId: 701,
+        fields: { characters: { value: "どうぞ" }, primary_meaning: { value: "Please" } },
+      },
+    ]);
+
+    const result = await getAnkiNotesJson("vocabulary");
+    expect(result.data).toEqual([
+      { characters: "下す", meaning: "To Hand Down", wkId: customVerb.id, wkType: "vocabulary" },
+      {
+        characters: "どうぞ",
+        meaning: "Please",
+        wkId: customKanaWord.id,
+        wkType: "kana_vocabulary",
+      },
+    ]);
+  });
+
+  test("a note of the hidden custom word is not resolved (下記)", async () => {
+    setAnkiResponse("findNotes", [702]);
+    setAnkiResponse("notesInfo", [
+      {
+        noteId: 702,
+        fields: { characters: { value: "下記" }, primary_meaning: { value: "The Following" } },
+      },
+    ]);
+
+    const result = await getAnkiNotesJson("vocabulary");
+    expect(result.data).toEqual([
+      { characters: "下記", meaning: "The Following", wkId: null, wkType: null },
     ]);
   });
 });
