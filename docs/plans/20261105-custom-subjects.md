@@ -423,10 +423,10 @@ Every error answer is `{ ok: false, error }` with `as const`. The id of GET by i
 
 ### Task 11: [Final] Update documentation
 
-- [ ] `CLAUDE.md`: the "Custom Subjects" section, the API table rows, the structure tree, the fixture in Test Architecture, the skill, the voice rule, the custom reading clip name, the no-merge-driver line, the two renamed helpers in "Local Study Materials"
-- [ ] `docs/backlog.md`: the two items
-- [ ] `data/userdata/README.md`: the file
-- [ ] move this plan to `docs/plans/completed/`
+- [x] `CLAUDE.md`: the "Custom Subjects" section, the API table rows, the structure tree, the fixture in Test Architecture, the skill, the voice rule, the custom reading clip name, the no-merge-driver line, the two renamed helpers in "Local Study Materials"
+- [x] `docs/backlog.md`: the two items
+- [x] `data/userdata/README.md`: the file (left as an uncommitted change in the data repo)
+- [x] move this plan to `docs/plans/completed/` (skipped - the run harness moves the plan after all phases finish)
 
 ## Post-Completion
 
