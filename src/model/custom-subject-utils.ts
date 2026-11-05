@@ -69,7 +69,7 @@ export function validateCustomSubjectInput(params: {
   if (!CHARACTERS_PATTERN.test(characters)) {
     throw new ValidationError("data.characters must hold only kana, kanji, ー and 々");
   }
-  validateMeanings(data.meanings);
+  validatePrimaryList({ value: data.meanings, field: "meaning" });
   validateAuxiliaryMeanings(data.auxiliary_meanings);
   const partsOfSpeech = requireArray({
     value: data.parts_of_speech,
@@ -81,7 +81,7 @@ export function validateCustomSubjectInput(params: {
   validateContextSentences(data.context_sentences);
 
   if (object === "vocabulary") {
-    validateReadings(data.readings);
+    validatePrimaryList({ value: data.readings, field: "reading" });
     requireString(data.reading_mnemonic, "data.reading_mnemonic");
     validateKanjiIds({ value: data.component_subject_ids, kanjiIds });
     if (!KANJI_PATTERN.test(characters)) {
@@ -247,17 +247,19 @@ export function buildCustomWordsByKanji(records: CustomSubject[]): Map<number, n
   return wordsByKanji;
 }
 
-function validateMeanings(value: unknown): void {
-  const meanings = requireArray({ value, path: "data.meanings", nonEmpty: true });
-  meanings.forEach((item, index) => {
-    const path = `data.meanings[${index}]`;
-    const meaning = requireObject(item, path);
-    requireKnownKeys({ value: meaning, path, allowed: ["meaning", "primary", "accepted_answer"] });
-    requireString(meaning.meaning, `${path}.meaning`);
-    requireBoolean(meaning.primary, `${path}.primary`);
-    requireBoolean(meaning.accepted_answer, `${path}.accepted_answer`);
+function validatePrimaryList(params: { value: unknown; field: "meaning" | "reading" }): void {
+  const { value, field } = params;
+  const listPath = `data.${field}s`;
+  const items = requireArray({ value, path: listPath, nonEmpty: true });
+  items.forEach((item, index) => {
+    const path = `${listPath}[${index}]`;
+    const entry = requireObject(item, path);
+    requireKnownKeys({ value: entry, path, allowed: [field, "primary", "accepted_answer"] });
+    requireString(entry[field], `${path}.${field}`);
+    requireBoolean(entry.primary, `${path}.primary`);
+    requireBoolean(entry.accepted_answer, `${path}.accepted_answer`);
   });
-  requireOnePrimary(meanings as { primary: boolean }[], "data.meanings");
+  requireOnePrimary(items as { primary: boolean }[], listPath);
 }
 
 function validateAuxiliaryMeanings(value: unknown): void {
@@ -283,19 +285,6 @@ function validateContextSentences(value: unknown): void {
     requireString(sentence.ja, `${path}.ja`);
     requireString(sentence.reading, `${path}.reading`);
   });
-}
-
-function validateReadings(value: unknown): void {
-  const readings = requireArray({ value, path: "data.readings", nonEmpty: true });
-  readings.forEach((item, index) => {
-    const path = `data.readings[${index}]`;
-    const reading = requireObject(item, path);
-    requireKnownKeys({ value: reading, path, allowed: ["reading", "primary", "accepted_answer"] });
-    requireString(reading.reading, `${path}.reading`);
-    requireBoolean(reading.primary, `${path}.primary`);
-    requireBoolean(reading.accepted_answer, `${path}.accepted_answer`);
-  });
-  requireOnePrimary(readings as { primary: boolean }[], "data.readings");
 }
 
 function validateKanjiIds(params: { value: unknown; kanjiIds: ReadonlySet<number> | null }): void {

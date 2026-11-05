@@ -414,12 +414,12 @@ Every error answer is `{ ok: false, error }` with `as const`. The id of GET by i
 
 ### Task 10: Verify acceptance criteria
 
-- [ ] verify all requirements from Overview are implemented
-- [ ] verify edge cases are handled: a missing file at start, a deleted file while running, a pulled change, a WaniKani clash, a deleted word with an Anki note and a local note, a create after a delete, an id at the floor on the WaniKani side
-- [ ] run full test suite: `bun test`
-- [ ] run `bun run tsc`, `bun run lint:fix`, `bun run format`
-- [ ] run `bun run sync-anki-notes --dry-run` against the dev server and check that the custom word is listed
-- [ ] run the refactor-simplifier agent on the changed files, as CLAUDE.md asks after a change
+- [x] verify all requirements from Overview are implemented
+- [x] verify edge cases are handled: a missing file at start, a deleted file while running, a pulled change, a WaniKani clash, a deleted word with an Anki note and a local note, a create after a delete, an id at the floor on the WaniKani side (each one has a test in `data-loader.test.ts`, `custom-subject.test.ts`, `api.custom-subjects.test.ts` or `api.anki-notes.test.ts`)
+- [x] run full test suite: `bun test`
+- [x] run `bun run tsc`, `bun run lint:fix`, `bun run format`
+- [x] run `bun run sync-anki-notes --dry-run` against the dev server and check that the custom word is listed (どうぞ listed as word 419 of 1042)
+- [x] run the refactor-simplifier agent on the changed files, as CLAUDE.md asks after a change (done by hand: `validateMeanings` and `validateReadings` merged into `validatePrimaryList`)
 
 ### Task 11: [Final] Update documentation
 
