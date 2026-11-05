@@ -83,4 +83,26 @@ describe("createReloadingFile", () => {
 
     expect(await file.get()).toBe("FIXED");
   });
+
+  test("an async parse error is thrown on every get and never answers the old value", async () => {
+    setFileContent(PATH, "one");
+    const file = createReloadingFile({
+      path: PATH,
+      parse: async (content) => {
+        await Promise.resolve();
+        if (content === "broken") throw new Error("broken file");
+        return content;
+      },
+    });
+    expect(await file.get()).toBe("one");
+
+    setFileContent(PATH, "broken");
+
+    await expect(file.get()).rejects.toThrow("broken file");
+    await expect(file.get()).rejects.toThrow("broken file");
+
+    setFileContent(PATH, "fixed");
+
+    expect(await file.get()).toBe("fixed");
+  });
 });

@@ -9,7 +9,7 @@ type ReloadingFile<T> = { get: () => Promise<T> };
  */
 export function createReloadingFile<T>(params: {
   path: string;
-  parse: (content: string | null) => T;
+  parse: (content: string | null) => T | Promise<T>;
 }): ReloadingFile<T> {
   const { path, parse } = params;
   let held: { fileVersion: string; value: T } | null = null;
@@ -20,7 +20,7 @@ export function createReloadingFile<T>(params: {
 
     const content = fileVersion === MISSING_FILE_VERSION ? null : await readFile(path, "utf-8");
     // Held only after a successful parse, so a bad file throws on every call until it is fixed
-    const value = parse(content);
+    const value = await parse(content);
     held = { fileVersion, value };
     return value;
   }

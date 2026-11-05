@@ -3,6 +3,7 @@ import { readFileSync } from "fs";
 import { readFile } from "fs/promises";
 import { basename, dirname, normalize } from "path";
 import {
+  CUSTOM_SUBJECTS_PATH,
   LOCAL_STUDY_MATERIALS_PATH,
   MEDIA_ROOT_PATH,
   MNEMONIC_IMAGES_PATH,
@@ -34,6 +35,7 @@ export const STUDY_MATERIALS_FIXTURE_PATH = "src/test/fixtures/study_materials_e
 const SEEDED_FILES = [
   { path: MNEMONIC_IMAGES_PATH, fixturePath: "src/test/fixtures/mnemonic-images.jsonl" },
   { path: LOCAL_STUDY_MATERIALS_PATH, fixturePath: STUDY_MATERIALS_FIXTURE_PATH },
+  { path: CUSTOM_SUBJECTS_PATH, fixturePath: "src/test/fixtures/custom_subjects.json" },
 ];
 
 // A seeded or media file that is not in the mock must read as missing, never as the user's real
