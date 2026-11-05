@@ -144,8 +144,16 @@ export function getWaniKaniWords(): (VocabularyData | KanaVocabularyData)[] {
   return [...vocabulary, ...kanaVocabulary];
 }
 
-export function getVisibleKanjiIds(): number[] {
-  return kanji.filter(isVisibleSubject).map((item) => item.id);
+/** The characters of every visible kanji by id, and of the hidden kanji in `keptIds`. */
+export function getKanjiCharactersById(keptIds: readonly number[] = []): Map<number, string> {
+  const charactersById = new Map<number, string>();
+  for (const item of kanji) {
+    if (item.data.characters === null) continue;
+    if (isVisibleSubject(item) || keptIds.includes(item.id)) {
+      charactersById.set(item.id, item.data.characters);
+    }
+  }
+  return charactersById;
 }
 
 export function findSubjectTypeById(id: number): SubjectType | null {
@@ -259,10 +267,10 @@ function parseCustomSubjectsFile(content: string | null): CustomSubject[] {
 // A broken kanji id or a clash must not stop the server, the enrich step drops a hidden or unknown
 // kanji id
 function warnAboutCustomSubjects(records: CustomSubject[]): void {
-  const visibleKanjiIds = new Set(getVisibleKanjiIds());
+  const visibleKanji = getKanjiCharactersById();
   for (const record of records) {
     if (record.object !== "vocabulary" || !isVisibleSubject(record)) continue;
-    const unknownIds = record.data.component_subject_ids.filter((id) => !visibleKanjiIds.has(id));
+    const unknownIds = record.data.component_subject_ids.filter((id) => !visibleKanji.has(id));
     if (unknownIds.length > 0) {
       console.warn(
         `[Repository] ${CUSTOM_SUBJECTS_PATH}: custom subject ${record.id} uses ${unknownIds.join(", ")}, which is no visible WaniKani kanji`

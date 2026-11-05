@@ -65,7 +65,9 @@ Note its `id`, its `meanings`, its `readingMnemonic`, and every entry of `readin
 `reading`, `primary`, `accepted_answer` and `type`. A taught reading has `accepted_answer: true`.
 WaniKani lists untaught readings too, like なま for 生.
 
-The `id` of every kanji goes into `component_subject_ids`, in the order of the word.
+The `id` of every kanji goes into `component_subject_ids`, in the order of the word. 々 is a
+WaniKani kanji too (id 856), so search it and list it like the others. The server checks that the
+ids name exactly the kanji of `characters`, in this order.
 
 **Stop** when a kanji is not found. The word cannot be a custom word yet, because a custom word
 can only use WaniKani kanji. Tell the user which kanji is missing.
@@ -129,8 +131,9 @@ After every change, show the new text again. Save nothing the user has not seen.
   `accepted_answer: true`), `reading_mnemonic` and `component_subject_ids`. A `kana_vocabulary` word must not have them.
 - A reading holds only hiragana, katakana and ー. Azure TTS makes one reading clip for every reading
   with `accepted_answer: true`, so a reading the word does not use gets `accepted_answer: false`.
-- `component_subject_ids` lists each kanji id once. A repeated id is refused, also when the kanji
-  comes twice in the word.
+- `component_subject_ids` lists the kanji of `characters` in order, 々 included, and each kanji
+  once. A kanji that comes twice in the word is listed at its first place only: 日曜日 is 日, 曜.
+  A wrong, missing, extra or repeated id, or a wrong order, is refused with a 400.
 - No other field. The server refuses an unknown key with a 400 that names it.
 
 ### Template: a kana word

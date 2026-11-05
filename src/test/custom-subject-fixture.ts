@@ -10,8 +10,9 @@ import { CUSTOM_SUBJECTS_PATH } from "@server/repository/data-paths.ts";
 import { setFileContent } from "./preload.ts";
 
 const CREATED_AT = "2026-11-05T10:00:00.000Z";
-// 下 in the real WaniKani data
+// 下 and 記 in the real WaniKani data
 export const CUSTOM_VERB_KANJI_ID = 451;
+const RECORD_KANJI_ID = 664;
 
 export const customKanaWordInput: CustomSubjectInput = {
   object: "kana_vocabulary",
@@ -83,7 +84,7 @@ export const hiddenCustomWordInput: CustomSubjectInput = {
     meaning_mnemonic: "What is written <vocabulary>below</vocabulary>.",
     readings: [{ reading: "かき", primary: true, accepted_answer: true }],
     reading_mnemonic: "Written <reading>かき</reading> below.",
-    component_subject_ids: [CUSTOM_VERB_KANJI_ID],
+    component_subject_ids: [CUSTOM_VERB_KANJI_ID, RECORD_KANJI_ID],
     context_sentences: [],
   },
 };

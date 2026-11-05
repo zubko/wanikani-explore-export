@@ -15,9 +15,20 @@ import { ValidationError } from "../validation-error.ts";
 import { CUSTOM_SUBJECT_ID_FLOOR } from "../wanikani.ts";
 import type { CustomSubject, CustomSubjectInput } from "../wanikani.ts";
 
-const KANJI_ID = 440;
-const OTHER_KANJI_ID = 441;
-const KANJI_IDS = new Set([KANJI_ID, OTHER_KANJI_ID]);
+const KANJI_ID = 450;
+const OTHER_KANJI_ID = 451;
+const PERSON_KANJI_ID = 444;
+const REPEATER_KANJI_ID = 856;
+const SUN_KANJI_ID = 476;
+const WEEKDAY_KANJI_ID = 961;
+const KANJI_CHARACTERS_BY_ID = new Map([
+  [KANJI_ID, "上"],
+  [OTHER_KANJI_ID, "下"],
+  [PERSON_KANJI_ID, "人"],
+  [REPEATER_KANJI_ID, "々"],
+  [SUN_KANJI_ID, "日"],
+  [WEEKDAY_KANJI_ID, "曜"],
+]);
 const NOW = "2026-11-05T10:00:00.000Z";
 
 const kanaInput = {
@@ -99,8 +110,11 @@ describe("needsConjugations", () => {
 });
 
 describe("validateCustomSubjectInput", () => {
-  function check(input: unknown, kanjiIds: ReadonlySet<number> | null = KANJI_IDS) {
-    return () => validateCustomSubjectInput({ input, kanjiIds });
+  function check(
+    input: unknown,
+    kanjiCharactersById: ReadonlyMap<number, string> | null = KANJI_CHARACTERS_BY_ID
+  ) {
+    return () => validateCustomSubjectInput({ input, kanjiCharactersById });
   }
 
   function withData(base: { object: string; data: object }, data: Record<string, unknown>) {
@@ -220,7 +234,14 @@ describe("validateCustomSubjectInput", () => {
 
   it("accepts ー, a kanji with 々, and 々 on a kana word", () => {
     expect(check(withData(kanaInput, { characters: "コーヒー" }))).not.toThrow();
-    expect(check(withData(vocabularyInput, { characters: "人々" }))).not.toThrow();
+    expect(
+      check(
+        withData(vocabularyInput, {
+          characters: "人々",
+          component_subject_ids: [PERSON_KANJI_ID, REPEATER_KANJI_ID],
+        })
+      )
+    ).not.toThrow();
   });
 
   it("does not count 々 alone as a kanji", () => {
@@ -237,6 +258,56 @@ describe("validateCustomSubjectInput", () => {
         new ValidationError("data.readings[0].reading must hold only kana")
       );
     }
+  });
+
+  describe("the kanji ids of the characters", () => {
+    function checkIds(characters: string, ids: number[]) {
+      return check(withData(vocabularyInput, { characters, component_subject_ids: ids }));
+    }
+
+    it("refuses a wrong, a missing and an extra id, and a wrong order", () => {
+      expect(checkIds("上がる", [OTHER_KANJI_ID])).toThrow(
+        new ValidationError(
+          "data.component_subject_ids must be the ids of 上 in this order, but they are the ids of 下"
+        )
+      );
+      expect(checkIds("上下", [KANJI_ID])).toThrow(
+        new ValidationError(
+          "data.component_subject_ids must be the ids of 上, 下 in this order, but they are the ids of 上"
+        )
+      );
+      expect(checkIds("上がる", [KANJI_ID, OTHER_KANJI_ID])).toThrow(
+        new ValidationError(
+          "data.component_subject_ids must be the ids of 上 in this order, but they are the ids of 上, 下"
+        )
+      );
+      expect(checkIds("上下", [OTHER_KANJI_ID, KANJI_ID])).toThrow(
+        new ValidationError(
+          "data.component_subject_ids must be the ids of 上, 下 in this order, but they are the ids of 下, 上"
+        )
+      );
+    });
+
+    it("counts 々 as a kanji, like WaniKani does", () => {
+      expect(checkIds("人々", [PERSON_KANJI_ID])).toThrow(
+        new ValidationError(
+          "data.component_subject_ids must be the ids of 人, 々 in this order, but they are the ids of 人"
+        )
+      );
+    });
+
+    it("lists a repeated kanji once, at its first place", () => {
+      expect(checkIds("日曜日", [SUN_KANJI_ID, WEEKDAY_KANJI_ID])).not.toThrow();
+      expect(checkIds("日曜日", [SUN_KANJI_ID, WEEKDAY_KANJI_ID, SUN_KANJI_ID])).toThrow(
+        new ValidationError(`data.component_subject_ids[2] ${SUN_KANJI_ID} is listed twice`)
+      );
+    });
+
+    it("skips the characters rule with no kanji list", () => {
+      expect(
+        check(withData(vocabularyInput, { component_subject_ids: [999] }), null)
+      ).not.toThrow();
+    });
   });
 
   it("refuses a kanji id listed twice and a kanji id that is not an integer", () => {

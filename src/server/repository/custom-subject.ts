@@ -9,7 +9,7 @@ import {
 import { ValidationError } from "@/model/validation-error.ts";
 import { createSaveQueue, saveJsonWithRetry } from "@server/utils/json-utils.ts";
 import { CUSTOM_SUBJECTS_PATH } from "./data-paths.ts";
-import { getVisibleKanjiIds, getWaniKaniWords, readCustomSubjects } from "./data-loader.ts";
+import { getKanjiCharactersById, getWaniKaniWords, readCustomSubjects } from "./data-loader.ts";
 
 type SaveStep = (records: CustomSubject[]) => { records: CustomSubject[]; saved: CustomSubject };
 
@@ -91,9 +91,11 @@ function saveWithRetry(label: string, step: SaveStep): Promise<CustomSubject> {
 
 function validateInput(params: { input: unknown; keptKanjiIds: number[] }): CustomSubjectInput {
   const { input, keptKanjiIds } = params;
-  const kanjiIds = new Set([...getVisibleKanjiIds(), ...keptKanjiIds]);
   try {
-    validateCustomSubjectInput({ input, kanjiIds });
+    validateCustomSubjectInput({
+      input,
+      kanjiCharactersById: getKanjiCharactersById(keptKanjiIds),
+    });
   } catch (error) {
     if (!(error instanceof ValidationError)) throw error;
     throw new CustomSubjectWriteError(400, error.message);

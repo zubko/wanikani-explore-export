@@ -1,6 +1,7 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { CUSTOM_SUBJECT_ID_FLOOR } from "@/model/wanikani.ts";
-import type { CustomSubject } from "@/model/wanikani.ts";
+import { buildCustomRecord } from "@/model/custom-subject-utils.ts";
+import type { CustomSubject, CustomSubjectInput } from "@/model/wanikani.ts";
 import { installFetchInterceptor, resetFetchInterceptor } from "@/test/fetch-interceptor.ts";
 import {
   ensureRepositoryInitialized,
@@ -29,7 +30,11 @@ const WANIKANI_KANJI_ID = 440;
 const UNKNOWN_CUSTOM_ID = 1_000_999;
 // ちょっと, a WaniKani kana word
 const WANIKANI_KANA_WORD_ID = 9176;
-// 昌, a kanji that WaniKani hides
+// 下 and 記 in the real WaniKani data
+const DOWN_KANJI_ID = 451;
+const RECORD_KANJI_ID = 664;
+// 繁 and 昌, a kanji that WaniKani hides
+const VISIBLE_KANJI_ID = 1764;
 const HIDDEN_KANJI_ID = 2285;
 
 async function request(params: { method: string; path: string; body?: unknown; rawBody?: string }) {
@@ -68,6 +73,13 @@ function searchVocabulary(characters: string) {
     method: "GET",
     path: `/search?type=vocabulary&q=${encodeURIComponent(characters)}`,
   });
+}
+
+function wordWithKanji(characters: string, kanjiIds: number[]): CustomSubjectInput {
+  return {
+    ...hiddenCustomWordInput,
+    data: { ...hiddenCustomWordInput.data, characters, component_subject_ids: kanjiIds },
+  } as CustomSubjectInput;
 }
 
 function lastWrittenRecords(): CustomSubject[] {
@@ -298,32 +310,21 @@ describe("custom-subjects API refusals", () => {
   });
 
   test("PUT keeps a kanji id that WaniKani hid after the save, a new hidden id is a 400", async () => {
-    const withHiddenKanji = {
-      ...customVerb,
-      data: {
-        ...customVerb.data,
-        component_subject_ids: [...customVerb.data.component_subject_ids, HIDDEN_KANJI_ID],
-      },
-    };
-    setCustomSubjectsFile([withHiddenKanji]);
-
-    const kept = await updateCustomSubject(customVerb.id, {
-      ...customVerbInput,
-      data: {
-        ...customVerbInput.data,
-        component_subject_ids: withHiddenKanji.data.component_subject_ids,
-      },
+    const prosperityInput = wordWithKanji("繁昌", [VISIBLE_KANJI_ID, HIDDEN_KANJI_ID]);
+    const prosperity = buildCustomRecord({
+      id: CUSTOM_SUBJECT_ID_FLOOR,
+      input: prosperityInput,
+      now: customVerb.data.created_at,
     });
+    setCustomSubjectsFile([prosperity]);
+
+    const kept = await updateCustomSubject(prosperity.id, prosperityInput);
     expect(kept.status).toBe(200);
 
-    setCustomSubjectsFile([customVerb]);
-    const added = await updateCustomSubject(customVerb.id, {
-      ...customVerbInput,
-      data: {
-        ...customVerbInput.data,
-        component_subject_ids: withHiddenKanji.data.component_subject_ids,
-      },
-    });
+    setCustomSubjectsFile([
+      { ...prosperity, data: { ...prosperity.data, component_subject_ids: [VISIBLE_KANJI_ID] } },
+    ]);
+    const added = await updateCustomSubject(prosperity.id, prosperityInput);
     expect(added).toEqual({
       status: 400,
       json: {
@@ -331,6 +332,27 @@ describe("custom-subjects API refusals", () => {
         error: `data.component_subject_ids[1] ${HIDDEN_KANJI_ID} is not a visible WaniKani kanji`,
       },
     });
+  });
+
+  test("POST with kanji ids that do not match the characters is a 400", async () => {
+    const cases = [
+      { characters: "下す", ids: [WANIKANI_KANJI_ID], got: "一" },
+      { characters: "下記", ids: [DOWN_KANJI_ID], got: "下" },
+      { characters: "下す", ids: [DOWN_KANJI_ID, RECORD_KANJI_ID], got: "下, 記" },
+      { characters: "下記", ids: [RECORD_KANJI_ID, DOWN_KANJI_ID], got: "記, 下" },
+    ];
+    for (const { characters, ids, got } of cases) {
+      const expected = characters === "下記" ? "下, 記" : "下";
+      const response = await createCustomSubject(wordWithKanji(characters, ids));
+      expect(response).toEqual({
+        status: 400,
+        json: {
+          ok: false,
+          error: `data.component_subject_ids must be the ids of ${expected} in this order, but they are the ids of ${got}`,
+        },
+      });
+    }
+    expect(writeCalls).toHaveLength(0);
   });
 
   test("POST that fails the content check is a 400", async () => {

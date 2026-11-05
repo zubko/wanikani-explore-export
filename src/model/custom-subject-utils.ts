@@ -32,6 +32,8 @@ const CONJUGATION_FIELDS = ["dictionary", "masu", "te", "nai"];
 const CHARACTERS_PATTERN = /^[\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Han}ー々]+$/u;
 // 々 is in the Han script too, but it only repeats the kanji before it
 const KANJI_PATTERN = /(?!々)\p{Script=Han}/u;
+// WaniKani has 々 as a kanji of its own, and every WaniKani word with 々 lists its id
+const COMPONENT_KANJI_PATTERN = /\p{Script=Han}/gu;
 // Azure TTS reads the reading of a custom word, so a kanji or romaji reading gives a wrong clip
 const KANA_PATTERN = /^[\p{Script=Hiragana}\p{Script=Katakana}ー]+$/u;
 
@@ -45,14 +47,15 @@ export function needsConjugations(partsOfSpeech: string[]): boolean {
 }
 
 /**
- * Throws a `ValidationError` on the first bad value of the body an agent sends. `kanjiIds` holds
- * the visible WaniKani kanji ids, `null` skips that rule.
+ * Throws a `ValidationError` on the first bad value of the body an agent sends.
+ * `kanjiCharactersById` holds the characters of the WaniKani kanji an id may name. `null` skips the
+ * two rules that need it.
  */
 export function validateCustomSubjectInput(params: {
   input: unknown;
-  kanjiIds: ReadonlySet<number> | null;
+  kanjiCharactersById: ReadonlyMap<number, string> | null;
 }): void {
-  const { input, kanjiIds } = params;
+  const { input, kanjiCharactersById } = params;
   if (!isRecord(input)) throw new ValidationError("Invalid body: must be a JSON object");
   const root = input;
   requireKnownKeys({ value: root, path: "", allowed: ["object", "data"] });
@@ -91,10 +94,10 @@ export function validateCustomSubjectInput(params: {
   if (object === "vocabulary") {
     validatePrimaryList({ value: data.readings, field: "reading" });
     requireString(data.reading_mnemonic, "data.reading_mnemonic");
-    validateKanjiIds({ value: data.component_subject_ids, kanjiIds });
     if (!KANJI_PATTERN.test(characters)) {
       throw new ValidationError("data.characters must hold at least one kanji");
     }
+    validateKanjiIds({ value: data.component_subject_ids, characters, kanjiCharactersById });
   } else if (KANJI_PATTERN.test(characters)) {
     throw new ValidationError("data.characters must hold no kanji on a kana_vocabulary");
   }
@@ -132,7 +135,10 @@ export function validateCustomSubjectRecord(record: unknown): void {
   }
 
   // The kanji ids are not checked: a kanji that WaniKani hides later must not fail the start
-  validateCustomSubjectInput({ input: { object: root.object, data: rest }, kanjiIds: null });
+  validateCustomSubjectInput({
+    input: { object: root.object, data: rest },
+    kanjiCharactersById: null,
+  });
 }
 
 /** Throws a `ValidationError` when the whole custom subjects file has a wrong shape. */
@@ -281,7 +287,13 @@ function validateContextSentences(value: unknown): void {
   });
 }
 
-function validateKanjiIds(params: { value: unknown; kanjiIds: ReadonlySet<number> | null }): void {
+/** The ids must name the kanji of `characters` in order, each kanji once, like in WaniKani. */
+function validateKanjiIds(params: {
+  value: unknown;
+  characters: string;
+  kanjiCharactersById: ReadonlyMap<number, string> | null;
+}): void {
+  const { characters, kanjiCharactersById } = params;
   const path = "data.component_subject_ids";
   const ids = requireArray({ value: params.value, path, nonEmpty: true });
   ids.forEach((id, index) => {
@@ -291,10 +303,19 @@ function validateKanjiIds(params: { value: unknown; kanjiIds: ReadonlySet<number
     if (ids.indexOf(id) !== index) {
       throw new ValidationError(`${path}[${index}] ${id} is listed twice`);
     }
-    if (params.kanjiIds && !params.kanjiIds.has(id)) {
+    if (kanjiCharactersById && !kanjiCharactersById.has(id)) {
       throw new ValidationError(`${path}[${index}] ${id} is not a visible WaniKani kanji`);
     }
   });
+  if (!kanjiCharactersById) return;
+
+  const expected = [...new Set(characters.match(COMPONENT_KANJI_PATTERN))];
+  const actual = ids.map((id) => kanjiCharactersById.get(id as number));
+  if (actual.join(", ") !== expected.join(", ")) {
+    throw new ValidationError(
+      `${path} must be the ids of ${expected.join(", ")} in this order, but they are the ids of ${actual.join(", ")}`
+    );
+  }
 }
 
 function validateConjugations(value: unknown): void {

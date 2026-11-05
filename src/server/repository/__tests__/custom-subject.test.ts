@@ -200,17 +200,27 @@ describe("updateCustomSubject", () => {
     expect(records.find((record) => record.id === customVerb.id)).toEqual(saved);
   });
 
-  test("new kanji ids move the word to the other kanji", async () => {
-    setCustomSubjectsFile(customSubjectFixture);
+  test("the right kanji id moves a word away from a wrong one in the file", async () => {
+    const wrongKanji = {
+      ...customVerb,
+      data: { ...customVerb.data, component_subject_ids: [OTHER_KANJI_ID] },
+    };
+    setCustomSubjectsFile([wrongKanji]);
 
-    await updateCustomSubject(customVerb.id, {
-      ...customVerbInput,
-      data: { ...customVerbInput.data, component_subject_ids: [OTHER_KANJI_ID] },
-    });
+    const kept = await writeError(
+      updateCustomSubject(customVerb.id, {
+        ...customVerbInput,
+        data: { ...customVerbInput.data, component_subject_ids: [OTHER_KANJI_ID] },
+      })
+    );
+    expect(kept.status).toBe(400);
+    expect(writeCalls).toHaveLength(0);
+
+    await updateCustomSubject(customVerb.id, customVerbInput);
 
     const wordsByKanji = await getCustomWordsByKanji();
-    expect(wordsByKanji.get(CUSTOM_VERB_KANJI_ID)).toBeUndefined();
-    expect(wordsByKanji.get(OTHER_KANJI_ID)).toEqual([customVerb.id]);
+    expect(wordsByKanji.get(OTHER_KANJI_ID)).toBeUndefined();
+    expect(wordsByKanji.get(CUSTOM_VERB_KANJI_ID)).toEqual([customVerb.id]);
   });
 
   test("an unknown id and a hidden id are a 404", async () => {
