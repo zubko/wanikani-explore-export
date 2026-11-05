@@ -131,6 +131,11 @@ export async function getKanaVocabularyData(): Promise<KanaVocabularyData[]> {
   return [...kanaVocabulary, ...customWords];
 }
 
+/** The WaniKani `vocabulary` and `kana_vocabulary` records, hidden ones included. */
+export function getWaniKaniWords(): (VocabularyData | KanaVocabularyData)[] {
+  return [...vocabulary, ...kanaVocabulary];
+}
+
 export function findSubjectTypeById(id: number): SubjectType | null {
   if (radicals.some((item) => item.id === id)) return "radical";
   if (kanji.some((item) => item.id === id)) return "kanji";
@@ -241,7 +246,7 @@ function warnAboutCustomSubjects(records: CustomSubject[]): void {
 
   const clashes = findWaniKaniClash({
     customSubjects: records,
-    wanikaniWords: [...vocabulary, ...kanaVocabulary],
+    wanikaniWords: getWaniKaniWords(),
   });
   for (const { customId, wanikaniId, characters } of clashes) {
     console.warn(
