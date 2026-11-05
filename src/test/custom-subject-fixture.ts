@@ -4,30 +4,17 @@ import type {
   KanaVocabularyData,
   VocabularyData,
 } from "@/model/wanikani.ts";
+import { buildCustomRecord } from "@/model/custom-subject-utils.ts";
 import { CUSTOM_SUBJECTS_PATH } from "@server/repository/data-paths.ts";
 import { setFileContent } from "./preload.ts";
 
 const CREATED_AT = "2026-11-05T10:00:00.000Z";
-const FIXED_DATA_FIELDS = [
-  "slug",
-  "level",
-  "hidden_at",
-  "document_url",
-  "created_at",
-  "pronunciation_audios",
-  "lesson_position",
-  "spaced_repetition_system_id",
-];
 // 下 in the real WaniKani data
 export const CUSTOM_VERB_KANJI_ID = 451;
 
-export const customKanaWord: KanaVocabularyData = {
-  id: 1_000_000,
+export const customKanaWordInput: CustomSubjectInput = {
   object: "kana_vocabulary",
-  url: null,
-  data_updated_at: CREATED_AT,
   data: {
-    ...fixedFields("どうぞ"),
     characters: "どうぞ",
     meanings: [{ meaning: "Please", primary: true, accepted_answer: true }],
     auxiliary_meanings: [{ meaning: "Go ahead", type: "whitelist" }],
@@ -39,13 +26,9 @@ export const customKanaWord: KanaVocabularyData = {
   },
 };
 
-export const customKanaVerb: KanaVocabularyData = {
-  id: 1_000_001,
+export const customKanaVerbInput: CustomSubjectInput = {
   object: "kana_vocabulary",
-  url: null,
-  data_updated_at: CREATED_AT,
   data: {
-    ...fixedFields("くれる"),
     characters: "くれる",
     meanings: [{ meaning: "To Give Me", primary: true, accepted_answer: true }],
     auxiliary_meanings: [],
@@ -62,13 +45,9 @@ export const customKanaVerb: KanaVocabularyData = {
   },
 };
 
-export const customVerb: VocabularyData = {
-  id: 1_000_002,
+export const customVerbInput: CustomSubjectInput = {
   object: "vocabulary",
-  url: null,
-  data_updated_at: CREATED_AT,
   data: {
-    ...fixedFields("下す"),
     characters: "下す",
     meanings: [{ meaning: "To Hand Down", primary: true, accepted_answer: true }],
     auxiliary_meanings: [],
@@ -76,8 +55,9 @@ export const customVerb: VocabularyData = {
     meaning_mnemonic: "A judge hands <vocabulary>down</vocabulary> a decision.",
     // the primary reading is listed second on purpose
     readings: [
-      { reading: "おろす", primary: false, accepted_answer: false },
+      { reading: "おろす", primary: false, accepted_answer: true },
       { reading: "くだす", primary: true, accepted_answer: true },
+      { reading: "げす", primary: false, accepted_answer: false },
     ],
     reading_mnemonic: "The judge <reading>くだす</reading> the decision.",
     component_subject_ids: [CUSTOM_VERB_KANJI_ID],
@@ -92,14 +72,9 @@ export const customVerb: VocabularyData = {
   },
 };
 
-export const hiddenCustomWord: VocabularyData = {
-  id: 1_000_003,
+export const hiddenCustomWordInput: CustomSubjectInput = {
   object: "vocabulary",
-  url: null,
-  data_updated_at: CREATED_AT,
   data: {
-    ...fixedFields("下記"),
-    hidden_at: "2026-11-05T12:00:00.000Z",
     characters: "下記",
     meanings: [{ meaning: "The Following", primary: true, accepted_answer: true }],
     auxiliary_meanings: [],
@@ -111,6 +86,13 @@ export const hiddenCustomWord: VocabularyData = {
     context_sentences: [],
   },
 };
+
+export const customKanaWord = buildFixture(1_000_000, customKanaWordInput) as KanaVocabularyData;
+export const customKanaVerb = buildFixture(1_000_001, customKanaVerbInput) as KanaVocabularyData;
+export const customVerb = buildFixture(1_000_002, customVerbInput) as VocabularyData;
+export const hiddenCustomWord = hide(
+  buildFixture(1_000_003, hiddenCustomWordInput) as VocabularyData
+);
 
 export const customSubjectFixture: CustomSubject[] = [
   customKanaWord,
@@ -124,22 +106,10 @@ export function setCustomSubjectsFile(records: unknown[]): void {
   setFileContent(CUSTOM_SUBJECTS_PATH, JSON.stringify(records, null, 2) + "\n");
 }
 
-/** The body an agent would send for this record: the record without the fixed fields. */
-export function customSubjectInputOf(record: CustomSubject): CustomSubjectInput {
-  const data: Record<string, unknown> = { ...record.data };
-  for (const field of FIXED_DATA_FIELDS) delete data[field];
-  return { object: record.object, data } as unknown as CustomSubjectInput;
+function buildFixture(id: number, input: CustomSubjectInput): CustomSubject {
+  return buildCustomRecord({ id, input, now: CREATED_AT });
 }
 
-function fixedFields(characters: string) {
-  return {
-    created_at: CREATED_AT,
-    level: 0,
-    slug: characters,
-    hidden_at: null,
-    document_url: null,
-    pronunciation_audios: [],
-    lesson_position: 0,
-    spaced_repetition_system_id: 0,
-  };
+function hide(record: VocabularyData): VocabularyData {
+  return { ...record, data: { ...record.data, hidden_at: "2026-11-05T12:00:00.000Z" } };
 }

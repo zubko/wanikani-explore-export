@@ -661,7 +661,7 @@ async function storeCustomReadingAudios(params: {
   const voice = pickVoiceForGender(azureTtsConfig.voices, gender);
   console.log(`[Anki] Reading audio ${slug}: TTS (custom word)`);
   const soundTags: string[] = [];
-  for (const reading of readingsPrimaryFirst(vocabulary)) {
+  for (const reading of acceptedReadingsPrimaryFirst(vocabulary)) {
     const ssml = buildSentenceSsml({ text: reading, voice });
     const ankiFilename = await storeCachedMedia({
       deckId,
@@ -674,10 +674,11 @@ async function storeCustomReadingAudios(params: {
   return { female: "", male: "", [gender]: soundTags.join(" ") };
 }
 
-function readingsPrimaryFirst(vocabulary: Vocabulary | KanaVocabulary): string[] {
+function acceptedReadingsPrimaryFirst(vocabulary: Vocabulary | KanaVocabulary): string[] {
   if (vocabulary.object !== "vocabulary") return [vocabulary.characters];
   const primaryReading = getPrimaryReading(vocabulary.readings);
   const otherReadings = vocabulary.readings
+    .filter((r) => r.accepted_answer)
     .map((r) => r.reading)
     .filter((reading) => reading !== primaryReading);
   return [primaryReading, ...otherReadings];

@@ -28,8 +28,12 @@ Read the answer, do not trust the HTTP status:
 
 - No answer or a connection error: the dev server is down. Start `bun run dev` in the background,
   wait a few seconds, check again.
-- `{"ok":false, "error": ...}`: the dev server is up but Anki is not reachable. Do **not** start
-  another dev server. Ask the user to open Anki, then check again.
+- `{"ok":false, "error": ...}`: the dev server is up, but something failed. Do **not** start
+  another dev server. Read the error text:
+  - An AnkiConnect error, like a refused connection to `127.0.0.1:8765`: Anki is not reachable.
+    Ask the user to open Anki, then check again.
+  - An error that names a data file, like `custom_subjects.json`, `study_materials_extra.json` or
+    `mnemonic-images.jsonl`: that file is broken. **Stop** and show the error to the user.
 - `{"ok":true, ...}`: both are up. Go on.
 
 ## 2. Search the word first
@@ -107,8 +111,12 @@ After every change, show the new text again. Save nothing the user has not seen.
 
 - Mnemonic tags as in the WaniKani data: `<vocabulary>`, `<kanji>`, `<radical>`, `<reading>`.
 - `meanings`: exactly one `primary: true`, every one with `accepted_answer: true`. Title case, like
-  WaniKani (`To Give Me`, `Please`).
-- `auxiliary_meanings`: more accepted answers as `{ "meaning": "...", "type": "whitelist" }`, or `[]`.
+  WaniKani (`To Give Me`, `Please`). Every other meaning the card should show goes here too, with
+  `primary: false`. The card and the Anki note show these as the alternative meanings.
+- `auxiliary_meanings`: usually `[]`. Nothing shows them, not the card and not Anki. The synonym
+  editor treats them as known meanings, so the user cannot add them as synonyms either. Use them
+  only for an answer that should count but never show, as
+  `{ "meaning": "...", "type": "whitelist" }`.
 - `parts_of_speech`: the WaniKani values, like `noun`, `adverb`, `expression`, `interjection`,
   `な adjective`, `い adjective`, `godan verb`, `ichidan verb`, `transitive verb`,
   `intransitive verb`.
@@ -119,6 +127,10 @@ After every change, show the new text again. Save nothing the user has not seen.
   and `nai`. Any other word may have them too, like an irregular verb.
 - A `vocabulary` word also needs `readings` (exactly one `primary: true`), `reading_mnemonic` and
   `component_subject_ids`. A `kana_vocabulary` word must not have them.
+- A reading holds only hiragana, katakana and ー. Azure TTS makes one reading clip for every reading
+  with `accepted_answer: true`, so a reading the word does not use gets `accepted_answer: false`.
+- `component_subject_ids` lists each kanji id once. A repeated id is refused, also when the kanji
+  comes twice in the word.
 - No other field. The server refuses an unknown key with a 400 that names it.
 
 ### Template: a kana word
@@ -128,8 +140,13 @@ After every change, show the new text again. Save nothing the user has not seen.
   "object": "kana_vocabulary",
   "data": {
     "characters": "どうぞ",
-    "meanings": [{ "meaning": "Please", "primary": true, "accepted_answer": true }],
-    "auxiliary_meanings": [{ "meaning": "Go Ahead", "type": "whitelist" }],
+    "meanings": [
+      { "meaning": "Please", "primary": true, "accepted_answer": true },
+      { "meaning": "Go Ahead", "primary": false, "accepted_answer": true },
+      { "meaning": "Here You Are", "primary": false, "accepted_answer": true },
+      { "meaning": "Help Yourself", "primary": false, "accepted_answer": true }
+    ],
+    "auxiliary_meanings": [],
     "parts_of_speech": ["adverb"],
     "meaning_mnemonic": "...",
     "context_sentences": [
@@ -146,7 +163,10 @@ After every change, show the new text again. Save nothing the user has not seen.
   "object": "vocabulary",
   "data": {
     "characters": "下す",
-    "meanings": [{ "meaning": "To Hand Down", "primary": true, "accepted_answer": true }],
+    "meanings": [
+      { "meaning": "To Hand Down", "primary": true, "accepted_answer": true },
+      { "meaning": "To Lower", "primary": false, "accepted_answer": true }
+    ],
     "auxiliary_meanings": [],
     "parts_of_speech": ["godan verb", "transitive verb"],
     "meaning_mnemonic": "...",
@@ -184,8 +204,13 @@ curl -s -X POST http://localhost:5173/api/custom-subjects -H 'Content-Type: appl
 - `409`: another word already has these characters. The error names the id. **Stop** and tell the
   user. A WaniKani id means step 2 missed the word.
 
-To change a saved word, PUT the whole body to `/api/custom-subjects/<id>`. `object` and
-`characters` cannot change: a new spelling is a DELETE and a new POST.
+To change a saved word, PUT the whole body to `/api/custom-subjects/<id>`, with the same
+`Content-Type` header and temp file. `object` and `characters` cannot change: a new spelling is a
+DELETE and a new POST. After an update, POST the add to Anki again (step 6), so the note shows the
+new content.
+
+A DELETE hides the word, but its Anki note stays. Tell the user to delete that note in Anki by hand.
+Otherwise every `sync-anki-notes` run lists it as a note that matches no subject.
 
 ## 6. Add it to Anki
 
@@ -212,17 +237,21 @@ and a later run skips the word as already in Anki.
 
 Follow the `add-references` skill: the new note can name other items.
 
-Then commit and push the data repo, the standing rule for every add. Pull first:
+Then commit and push the data repo, the standing rule for every add. Commit first, then pull. The
+other server commits to this repo too, and a pull stops when it changes a file that has a local
+change:
 
 ```bash
-git -C data/userdata pull --no-rebase
 git -C data/userdata add custom_subjects.json media mnemonic-images.jsonl iknow-vocabulary-status.json
 git -C data/userdata commit -m "data: add the custom word <word> to Anki"
+git -C data/userdata pull --no-rebase
 git -C data/userdata push
 ```
 
-The commit holds the custom file, the new media, the registry lines and the status file. The main
-repo needs its own request.
+The commit holds the custom file, the new media, the registry lines and the status file. A conflict
+in `custom_subjects.json` has no merge driver: resolve it by hand, like one in
+`study_materials_extra.json`. When both sides gave the same id to two words, give one record a new
+id. Then commit the merge and push. Never force push. The main repo needs its own request.
 
 ## Report
 

@@ -141,7 +141,7 @@ Types in `src/model/wanikani.ts`:
 - `url: string | null` on `BaseSubjectWrapper`. Nothing reads it.
 - `document_url` moves out of `BaseSubjectDataFields` into the four data-fields types: `string` for radical and kanji, `string | null` for the two vocabulary types. `documentUrl: string | null` on the enriched `Vocabulary` and `KanaVocabulary`.
 - `conjugations?: Omit<VerbConjugations, "type">` on `VocabularyDataFields` and on `KanaVocabularyDataFields`. A WaniKani record never has it, a custom verb record does. So a custom record is a plain `VocabularyData` or `KanaVocabularyData`, and the getters answer `VocabularyData[]` with no new union. `CustomSubject = VocabularyData | KanaVocabularyData` is only a name for the records of the custom file.
-- `conjugations: Conjugations | null` on the enriched `KanaVocabulary` too, so `buildVocabularyNoteFields` in `anki-connect.ts` and the conjugation rows of `VocabularyCard` read it from either type. A WaniKani kana word answers `null` there, as today's `vocabulary` words with no entry do.
+- `conjugations: Conjugations | null` on the enriched `KanaVocabulary` too, so `buildVocabularyNoteFields` in `anki-connect.ts` and the conjugation rows of `VocabularyCard` read it from either type. A WaniKani kana word reads its entry in `data/verb_conjugations.json` like a WaniKani `vocabulary` word, and answers `null` when there is none. する (9180) has an entry, so it shows its conjugations.
 - `CustomSubjectInput`, the body above, built from `Pick` of the data-fields types.
 - `isCustom: boolean` on `Vocabulary` and `KanaVocabulary`.
 - `CUSTOM_SUBJECT_ID_FLOOR = 1_000_000` in `src/model/wanikani.ts` next to `SUBJECT_TYPES`.
@@ -205,7 +205,7 @@ Every error answer is `{ ok: false, error }` with `as const`. The id of GET by i
 
 - `vocabulary.ts`: the three `find` calls use the getters. `mapVocabularyDataToVocabulary` sets `isCustom`, and for a custom id takes `conjugations` from `data.conjugations` and leaves the context sentences as they are (the `reading` is inline). `documentUrl` passes `null` through.
 - `kanji.ts`: `foundInVocabulary` is built from `await getVocabularyData()` with `[...amalgamation_subject_ids, ...(customWordsByKanji.get(id) ?? [])]`, so `amalgamationSubjectIds` lists the custom word too.
-- `api.ts`: `/anki-notes` reads the two getters once before `deckNotes.map` and passes the arrays into `resolveWkSubject`, which stays sync. One `stat` per request, not one per note. The PATCH route falls back to the custom lookup when `findSubjectTypeById` answers `null`.
+- `api.ts`: `/anki-notes` reads `getWords()` once before `deckNotes.map`, and only for the vocabulary deck. `getWords()` answers the WaniKani vocabulary, the WaniKani kana vocabulary, then the custom records, so a WaniKani word wins a clash. It passes the list into `resolveWkSubject`, which stays sync. One `stat` per request, not one per note, and none for the radical and kanji decks. The PATCH route picks the lookup by the id range: a custom id (at or above `CUSTOM_SUBJECT_ID_FLOOR`) is looked up in the custom list, a WaniKani id in the four arrays with `findSubjectTypeById`.
 
 ### Anki
 
@@ -381,7 +381,7 @@ Every error answer is `{ ok: false, error }` with `as const`. The id of GET by i
 - [x] `CardHeader`: `documentUrl?: string | null`, a `badge?: string` rendered inside the title element with `text-gray-500` and a gray border
 - [x] `VocabularyCard`: `badge="custom"` when `isCustom`
 - [x] write tests: a custom word renders the badge and no WaniKani link; a WaniKani word renders the link and no badge
-- [x] check the phone layout at 321×695 and the desktop at 1440px in the browser with a long custom word, no element wider than the screen (skipped - a dev server started from a temp copy of the project ran inside the shell sandbox, and the browser could not reach it: ERR_CONNECTION_REFUSED on localhost and [::1])
+- [x] check the phone layout at 321×695 and the desktop at 1440px in the browser with a long custom word, no element wider than the screen (NOT DONE. Left for a manual look by the user: open a long custom word at 321×695 and at 1440px and check the badge. The automated run could not reach a dev server from the browser: ERR_CONNECTION_REFUSED on localhost and [::1])
 - [x] run `bun test src/client`, `bun run tsc`, `bun run lint:fix` - must pass before task 8
 
 ### Task 8: The download warning

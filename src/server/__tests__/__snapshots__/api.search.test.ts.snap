@@ -6126,7 +6126,7 @@ exports[`search API with custom words finds a custom verb (下す) 1`] = `
   "readingMnemonic": "The judge <reading>くだす</reading> the decision.",
   "readings": [
     {
-      "accepted_answer": false,
+      "accepted_answer": true,
       "primary": false,
       "reading": "おろす",
     },
@@ -6134,6 +6134,11 @@ exports[`search API with custom words finds a custom verb (下す) 1`] = `
       "accepted_answer": true,
       "primary": true,
       "reading": "くだす",
+    },
+    {
+      "accepted_answer": false,
+      "primary": false,
+      "reading": "げす",
     },
   ],
   "slug": "下す",

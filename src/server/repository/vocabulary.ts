@@ -18,6 +18,7 @@ import {
   getLocalStudyMaterials,
   getVocabularyData,
   getKanaVocabularyData,
+  getWords,
   verbConjugations,
   sentenceReadings,
 } from "./data-loader.ts";
@@ -79,19 +80,11 @@ async function mapKanaVocabularyDataToKanaVocabulary(
 async function findAndBuildVocabulary(
   predicate: (v: VocabularyData | KanaVocabularyData) => boolean
 ): Promise<Vocabulary | KanaVocabulary | null> {
-  const isMatch = (v: VocabularyData | KanaVocabularyData) => isVisibleSubject(v) && predicate(v);
-
-  const vocabData = (await getVocabularyData()).find(isMatch);
-  if (vocabData) {
-    return mapVocabularyDataToVocabulary(vocabData);
-  }
-
-  const kanaVocabData = (await getKanaVocabularyData()).find(isMatch);
-  if (kanaVocabData) {
-    return mapKanaVocabularyDataToKanaVocabulary(kanaVocabData);
-  }
-
-  return null;
+  const word = (await getWords()).find((v) => isVisibleSubject(v) && predicate(v));
+  if (!word) return null;
+  return word.object === "vocabulary"
+    ? mapVocabularyDataToVocabulary(word)
+    : mapKanaVocabularyDataToKanaVocabulary(word);
 }
 
 export async function getVocabulary(id: number): Promise<Vocabulary | null> {

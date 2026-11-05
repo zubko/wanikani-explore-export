@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import type { Context } from "hono";
+import { createMiddleware } from "hono/factory";
 import { isSubjectType, LOCAL_STUDY_MATERIAL_PATCH_FIELDS } from "@/model/wanikani.ts";
 import type {
   AnkiAddResult,
@@ -28,8 +29,7 @@ import {
   kanji as kanjiData,
   findSubjectTypeById,
   getCustomSubjects,
-  getKanaVocabularyData,
-  getVocabularyData,
+  getWords,
 } from "./repository/data-loader.ts";
 import { upsertLocalStudyMaterial } from "./repository/study-material.ts";
 import {
@@ -57,12 +57,18 @@ import {
 } from "./services/anki-connect.ts";
 import { getErrorMessage } from "./utils/error-utils.ts";
 
-type VocabularyPools = {
-  vocabularyWords: VocabularyData[];
-  kanaVocabularyWords: KanaVocabularyData[];
-};
-
 const ANKI_DECK_TYPES: AnkiDeckType[] = ["radical", "kanji", "vocabulary"];
+
+// A page of another origin can POST text/plain or a form with no CORS preflight, and CORS only
+// hides the answer, so the route would still run. A JSON content type needs a preflight, and the
+// CORS rule in app.ts refuses it for another origin.
+const requireJsonContentType = createMiddleware(async (c, next) => {
+  const mediaType = c.req.header("Content-Type")?.split(";")[0]?.trim().toLowerCase();
+  if (mediaType !== "application/json") {
+    return c.json({ ok: false as const, error: "Content-Type must be application/json" }, 415);
+  }
+  await next();
+});
 
 async function findSubjectForAnki(id: number, type: SubjectType): Promise<Subject | null> {
   if (type === "radical") return getRadical(id);
@@ -99,8 +105,12 @@ function validateStudyMaterialPatch(patch: Record<string, unknown>): void {
   }
 }
 
+function readJsonBody(c: Context): Promise<unknown> {
+  return c.req.json().catch(() => null);
+}
+
 async function readJsonObjectBody(c: Context): Promise<Record<string, unknown> | null> {
-  const body = await c.req.json().catch(() => null);
+  const body = await readJsonBody(c);
   if (typeof body !== "object" || body === null || Array.isArray(body)) return null;
   return body as Record<string, unknown>;
 }
@@ -110,19 +120,6 @@ function parseCustomSubjectId(param: string): number | null {
   if (!/^\d+$/.test(param)) return null;
   const id = Number(param);
   return isCustomSubjectId(id) ? id : null;
-}
-
-/** The shape every write body needs. The write module checks the content. */
-function checkCustomSubjectBody(body: Record<string, unknown> | null): string | null {
-  if (!body) return "Invalid body: must be a JSON object";
-  if (!("object" in body) || !("data" in body)) {
-    return "Missing required parameters: object and data";
-  }
-  const data = body.data;
-  if (typeof data !== "object" || data === null || Array.isArray(data)) {
-    return "Invalid data: must be an object";
-  }
-  return null;
 }
 
 function customSubjectErrorStatus(error: unknown): 400 | 404 | 409 | 500 {
@@ -138,9 +135,9 @@ async function findStudyMaterialSubjectType(id: number): Promise<SubjectType | n
 function resolveWkSubject(params: {
   deckType: AnkiDeckType;
   characters: string;
-  vocabularyPools: VocabularyPools;
+  words: (VocabularyData | KanaVocabularyData)[];
 }): { id: number; type: SubjectType } | null {
-  const { deckType, characters, vocabularyPools } = params;
+  const { deckType, characters, words } = params;
   if (deckType === "radical") {
     const matches = radicalData.filter(
       (r) =>
@@ -163,17 +160,8 @@ function resolveWkSubject(params: {
   }
 
   // vocabulary deck can contain both vocabulary and kana_vocabulary
-  const vocab = vocabularyPools.vocabularyWords.find(
-    (v) => isVisibleSubject(v) && v.data.characters === characters
-  );
-  if (vocab) return { id: vocab.id, type: "vocabulary" };
-
-  const kanaVocab = vocabularyPools.kanaVocabularyWords.find(
-    (v) => isVisibleSubject(v) && v.data.characters === characters
-  );
-  if (kanaVocab) return { id: kanaVocab.id, type: "kana_vocabulary" };
-
-  return null;
+  const word = words.find((w) => isVisibleSubject(w) && w.data.characters === characters);
+  return word ? { id: word.id, type: word.object } : null;
 }
 
 const app = new Hono()
@@ -238,16 +226,13 @@ const app = new Hono()
     try {
       const deckNotes = await getDeckNotes(deckType);
       // One read of the custom file per request, not one per note
-      const vocabularyPools: VocabularyPools = {
-        vocabularyWords: await getVocabularyData(),
-        kanaVocabularyWords: await getKanaVocabularyData(),
-      };
+      const words = deckType === "vocabulary" ? await getWords() : [];
 
       const data: AnkiNoteItem[] = deckNotes.map((note) => {
         const resolved = resolveWkSubject({
           deckType,
           characters: note.characters,
-          vocabularyPools,
+          words,
         });
         return {
           characters: note.characters,
@@ -268,7 +253,7 @@ const app = new Hono()
       return c.json({ ok: false as const, error: message });
     }
   })
-  .post("/add-to-anki", async (c) => {
+  .post("/add-to-anki", requireJsonContentType, async (c) => {
     const body = await c.req.json<{ id: number; type: string; sync?: boolean }>();
     const { id, type, sync = true } = body;
 
@@ -309,7 +294,7 @@ const app = new Hono()
       return c.json({ ok: false as const, error: message });
     }
   })
-  .patch("/study-materials", async (c) => {
+  .patch("/study-materials", requireJsonContentType, async (c) => {
     const body = await readJsonObjectBody(c);
     if (!body) {
       return c.json({ ok: false as const, error: "Invalid body: must be a JSON object" }, 400);
@@ -394,11 +379,8 @@ const app = new Hono()
       return c.json({ ok: false as const, error: message }, 500);
     }
   })
-  .post("/custom-subjects", async (c) => {
-    const body = await readJsonObjectBody(c);
-    const bodyProblem = checkCustomSubjectBody(body);
-    if (bodyProblem) return c.json({ ok: false as const, error: bodyProblem }, 400);
-
+  .post("/custom-subjects", requireJsonContentType, async (c) => {
+    const body = await readJsonBody(c);
     console.log("[API] Create custom subject");
     try {
       const data = await createCustomSubject(body);
@@ -412,7 +394,7 @@ const app = new Hono()
       return c.json({ ok: false as const, error: message }, customSubjectErrorStatus(err));
     }
   })
-  .put("/custom-subjects/:id", async (c) => {
+  .put("/custom-subjects/:id", requireJsonContentType, async (c) => {
     const param = c.req.param("id");
     const id = parseCustomSubjectId(param);
     if (id === null) {
@@ -422,10 +404,7 @@ const app = new Hono()
       );
     }
 
-    const body = await readJsonObjectBody(c);
-    const bodyProblem = checkCustomSubjectBody(body);
-    if (bodyProblem) return c.json({ ok: false as const, error: bodyProblem }, 400);
-
+    const body = await readJsonBody(c);
     console.log(`[API] Update custom subject id=${id}`);
     try {
       const data = await updateCustomSubject(id, body);

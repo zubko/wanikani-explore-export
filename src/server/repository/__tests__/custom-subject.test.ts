@@ -5,8 +5,11 @@ import { holdFsOp, resetFsMock, setFileContent, setFsError, writeCalls } from "@
 import {
   CUSTOM_VERB_KANJI_ID,
   customKanaWord,
+  customKanaVerb,
   customSubjectFixture,
-  customSubjectInputOf,
+  customKanaWordInput,
+  customVerbInput,
+  hiddenCustomWordInput,
   customVerb,
   hiddenCustomWord,
   setCustomSubjectsFile,
@@ -25,6 +28,8 @@ import { ensureRepositoryInitialized } from "./setup.ts";
 // 口 and 毎晩 in the real WaniKani data
 const OTHER_KANJI_ID = 452;
 const WANIKANI_WORD_ID = 3766;
+// ちょっと in the real WaniKani data
+const WANIKANI_KANA_WORD_ID = 9176;
 
 function lastWrittenRecords(): CustomSubject[] {
   const call = writeCalls.at(-1);
@@ -43,9 +48,6 @@ async function writeError(promise: Promise<unknown>): Promise<CustomSubjectWrite
   return error;
 }
 
-const kanaWordInput = customSubjectInputOf(customKanaWord);
-const verbInput = customSubjectInputOf(customVerb);
-
 beforeAll(ensureRepositoryInitialized);
 
 // The fs mock is process-global, so a saved record must not reach the next test or file
@@ -54,8 +56,8 @@ afterEach(resetFsMock);
 
 describe("createCustomSubject", () => {
   test("the first record gets the floor id and the next one floor + 1", async () => {
-    const first = await createCustomSubject(kanaWordInput);
-    const second = await createCustomSubject(verbInput);
+    const first = await createCustomSubject(customKanaWordInput);
+    const second = await createCustomSubject(customVerbInput);
 
     expect(first.id).toBe(CUSTOM_SUBJECT_ID_FLOOR);
     expect(second.id).toBe(CUSTOM_SUBJECT_ID_FLOOR + 1);
@@ -65,7 +67,7 @@ describe("createCustomSubject", () => {
   });
 
   test("the save lands as JSON under the real path only", async () => {
-    const saved = await createCustomSubject(kanaWordInput);
+    const saved = await createCustomSubject(customKanaWordInput);
 
     expect(writeCalls.map((call) => call.path)).toEqual([CUSTOM_SUBJECTS_PATH]);
     expect(String(writeCalls[0]!.data).endsWith("\n")).toBe(true);
@@ -76,7 +78,7 @@ describe("createCustomSubject", () => {
     setCustomSubjectsFile([customKanaWord, customVerb]);
     await deleteCustomSubject(customVerb.id);
 
-    const saved = await createCustomSubject(verbInput);
+    const saved = await createCustomSubject(customVerbInput);
 
     expect(saved.id).toBe(customVerb.id + 1);
   });
@@ -84,7 +86,7 @@ describe("createCustomSubject", () => {
   test("the characters of a hidden word are free again", async () => {
     setCustomSubjectsFile(customSubjectFixture);
 
-    const saved = await createCustomSubject(customSubjectInputOf(hiddenCustomWord));
+    const saved = await createCustomSubject(hiddenCustomWordInput);
 
     expect(saved.id).toBe(hiddenCustomWord.id + 1);
     expect(saved.data.hidden_at).toBeNull();
@@ -95,8 +97,8 @@ describe("createCustomSubject", () => {
 
   test("two creates at the same time both land with two ids", async () => {
     const [first, second] = await Promise.all([
-      createCustomSubject(kanaWordInput),
-      createCustomSubject(verbInput),
+      createCustomSubject(customKanaWordInput),
+      createCustomSubject(customVerbInput),
     ]);
 
     expect([first.id, second.id]).toEqual([CUSTOM_SUBJECT_ID_FLOOR, CUSTOM_SUBJECT_ID_FLOOR + 1]);
@@ -108,7 +110,7 @@ describe("createCustomSubject", () => {
 
   test("a create after a refused create still works", async () => {
     const refused = createCustomSubject({ object: "radical", data: {} });
-    const next = createCustomSubject(kanaWordInput);
+    const next = createCustomSubject(customKanaWordInput);
 
     expect((await writeError(refused)).status).toBe(400);
     expect((await next).id).toBe(CUSTOM_SUBJECT_ID_FLOOR);
@@ -116,11 +118,26 @@ describe("createCustomSubject", () => {
 });
 
 describe("createCustomSubject refusals", () => {
+  test("the spelling of a WaniKani kana word is a 409 (ちょっと)", async () => {
+    const error = await writeError(
+      createCustomSubject({
+        ...customKanaWordInput,
+        data: { ...customKanaWordInput.data, characters: "ちょっと" },
+      })
+    );
+
+    expect(error.status).toBe(409);
+    expect(error.message).toBe(
+      `characters ちょっと are used by WaniKani subject ${WANIKANI_KANA_WORD_ID}`
+    );
+    expect(writeCalls).toHaveLength(0);
+  });
+
   test("a WaniKani spelling is a 409 that names the WaniKani id", async () => {
     const error = await writeError(
       createCustomSubject({
-        ...verbInput,
-        data: { ...verbInput.data, characters: "毎晩", component_subject_ids: [572, 958] },
+        ...customVerbInput,
+        data: { ...customVerbInput.data, characters: "毎晩", component_subject_ids: [572, 958] },
       })
     );
 
@@ -132,7 +149,7 @@ describe("createCustomSubject refusals", () => {
   test("the spelling of a visible custom word is a 409 that names it", async () => {
     setCustomSubjectsFile(customSubjectFixture);
 
-    const error = await writeError(createCustomSubject(kanaWordInput));
+    const error = await writeError(createCustomSubject(customKanaWordInput));
 
     expect(error.status).toBe(409);
     expect(error.message).toBe(`characters どうぞ are used by custom subject ${customKanaWord.id}`);
@@ -140,10 +157,10 @@ describe("createCustomSubject refusals", () => {
   });
 
   test("a godan verb without conjugations is a 400", async () => {
-    const data = { ...verbInput.data };
+    const data = { ...customVerbInput.data };
     delete data.conjugations;
 
-    const error = await writeError(createCustomSubject({ ...verbInput, data }));
+    const error = await writeError(createCustomSubject({ ...customVerbInput, data }));
 
     expect(error.status).toBe(400);
     expect(error.message).toBe("data.conjugations is required for an ichidan or godan verb");
@@ -152,7 +169,10 @@ describe("createCustomSubject refusals", () => {
 
   test("an unknown kanji id is a 400", async () => {
     const error = await writeError(
-      createCustomSubject({ ...verbInput, data: { ...verbInput.data, component_subject_ids: [1] } })
+      createCustomSubject({
+        ...customVerbInput,
+        data: { ...customVerbInput.data, component_subject_ids: [1] },
+      })
     );
 
     expect(error.status).toBe(400);
@@ -166,8 +186,8 @@ describe("updateCustomSubject", () => {
     const meanings = [{ meaning: "To Lower", primary: true, accepted_answer: true }];
 
     const saved = await updateCustomSubject(customVerb.id, {
-      ...verbInput,
-      data: { ...verbInput.data, meanings },
+      ...customVerbInput,
+      data: { ...customVerbInput.data, meanings },
     });
 
     expect(saved.data.meanings).toEqual(meanings);
@@ -184,8 +204,8 @@ describe("updateCustomSubject", () => {
     setCustomSubjectsFile(customSubjectFixture);
 
     await updateCustomSubject(customVerb.id, {
-      ...verbInput,
-      data: { ...verbInput.data, component_subject_ids: [OTHER_KANJI_ID] },
+      ...customVerbInput,
+      data: { ...customVerbInput.data, component_subject_ids: [OTHER_KANJI_ID] },
     });
 
     const wordsByKanji = await getCustomWordsByKanji();
@@ -196,9 +216,9 @@ describe("updateCustomSubject", () => {
   test("an unknown id and a hidden id are a 404", async () => {
     setCustomSubjectsFile(customSubjectFixture);
 
-    const unknown = await writeError(updateCustomSubject(hiddenCustomWord.id + 1, verbInput));
+    const unknown = await writeError(updateCustomSubject(hiddenCustomWord.id + 1, customVerbInput));
     const hidden = await writeError(
-      updateCustomSubject(hiddenCustomWord.id, customSubjectInputOf(hiddenCustomWord))
+      updateCustomSubject(hiddenCustomWord.id, hiddenCustomWordInput)
     );
 
     expect([unknown.status, hidden.status]).toEqual([404, 404]);
@@ -210,7 +230,7 @@ describe("updateCustomSubject", () => {
     setCustomSubjectsFile(customSubjectFixture);
 
     const error = await writeError(
-      updateCustomSubject(customKanaWord.id, { ...kanaWordInput, object: "vocabulary" })
+      updateCustomSubject(customKanaWord.id, { ...customKanaWordInput, object: "vocabulary" })
     );
 
     expect(error.status).toBe(400);
@@ -223,8 +243,8 @@ describe("updateCustomSubject", () => {
 
     const error = await writeError(
       updateCustomSubject(customKanaWord.id, {
-        ...kanaWordInput,
-        data: { ...kanaWordInput.data, characters: "どうも" },
+        ...customKanaWordInput,
+        data: { ...customKanaWordInput.data, characters: "どうも" },
       })
     );
 
@@ -274,7 +294,7 @@ describe("custom subject write failures", () => {
 
   test("a change between the read and the rename makes the save start again", async () => {
     const write = holdFsOp("writeFile");
-    const save = createCustomSubject(verbInput);
+    const save = createCustomSubject(customVerbInput);
     await write.reached;
     setCustomSubjectsFile([customKanaWord]);
     write.release();
@@ -286,9 +306,53 @@ describe("custom subject write failures", () => {
     expect(writeCalls.map((call) => call.path)).toEqual([CUSTOM_SUBJECTS_PATH]);
   });
 
+  test("an update and a delete start again when the file changed before the rename", async () => {
+    const meanings = [{ meaning: "To Pass Down", primary: true, accepted_answer: true }];
+    const pulled = [customKanaWord, customVerb, customKanaVerb];
+    setCustomSubjectsFile([customKanaWord, customVerb]);
+
+    let write = holdFsOp("writeFile");
+    const update = updateCustomSubject(customVerb.id, {
+      ...customVerbInput,
+      data: { ...customVerbInput.data, meanings },
+    });
+    await write.reached;
+    setCustomSubjectsFile(pulled);
+    write.release();
+    const updated = await update;
+    expect(lastWrittenRecords().map((record) => record.id)).toEqual(pulled.map((r) => r.id));
+    expect(lastWrittenRecords()[1]).toEqual(updated);
+
+    write = holdFsOp("writeFile");
+    const remove = deleteCustomSubject(customKanaWord.id);
+    await write.reached;
+    setCustomSubjectsFile([...pulled, hiddenCustomWord]);
+    write.release();
+    const deleted = await remove;
+    expect(lastWrittenRecords()).toEqual([deleted, customVerb, customKanaVerb, hiddenCustomWord]);
+  });
+
+  test("an update and a delete of one word at the same time both land", async () => {
+    setCustomSubjectsFile(customSubjectFixture);
+    const meanings = [{ meaning: "To Pass Down", primary: true, accepted_answer: true }];
+
+    const [updated, deleted] = await Promise.all([
+      updateCustomSubject(customVerb.id, {
+        ...customVerbInput,
+        data: { ...customVerbInput.data, meanings },
+      }),
+      deleteCustomSubject(customVerb.id),
+    ]);
+
+    expect(updated.data.meanings).toEqual(meanings);
+    expect(deleted.data.meanings).toEqual(meanings);
+    expect(deleted.data.hidden_at).not.toBeNull();
+    expect(lastWrittenRecords()[2]).toEqual(deleted);
+  });
+
   test("a file that changes during every attempt fails the save and writes nothing", async () => {
     let write = holdFsOp("writeFile");
-    const save = createCustomSubject(verbInput);
+    const save = createCustomSubject(customVerbInput);
     for (let attempt = 1; attempt <= CUSTOM_SUBJECT_SAVE_ATTEMPTS; attempt++) {
       await write.reached;
       setCustomSubjectsFile(attempt % 2 === 1 ? [customKanaWord] : []);
@@ -305,7 +369,7 @@ describe("custom subject write failures", () => {
   test("a file with a bad shape fails the write with the path and a plain Error", async () => {
     setFileContent(CUSTOM_SUBJECTS_PATH, JSON.stringify({ not: "an array" }));
 
-    const error = await createCustomSubject(kanaWordInput).then(
+    const error = await createCustomSubject(customKanaWordInput).then(
       () => null,
       (caught: unknown) => caught
     );

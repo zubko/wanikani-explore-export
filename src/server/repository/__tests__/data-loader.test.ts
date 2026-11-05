@@ -336,6 +336,45 @@ describe("getCustomSubjects", () => {
     }
   });
 
+  test("a clash with a WaniKani kana word logs a warning too (ちょっと, id=9176)", async () => {
+    const word = {
+      ...customKanaWord,
+      data: { ...customKanaWord.data, characters: "ちょっと", slug: "ちょっと" },
+    };
+    const warn = spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      setCustomSubjectsFile([word]);
+
+      expect(await getCustomSubjects()).toEqual([word]);
+      expect(warn.mock.calls.map(([line]) => String(line))).toEqual([
+        `[Repository] ${CUSTOM_SUBJECTS_PATH}: custom subject ${word.id} "ちょっと" has the same characters as WaniKani 9176`,
+      ]);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  test("a hidden record and a kana record log no warning", async () => {
+    const hiddenWithProblems = {
+      ...hiddenCustomWord,
+      data: {
+        ...hiddenCustomWord.data,
+        characters: "下手",
+        slug: "下手",
+        component_subject_ids: [999999],
+      },
+    };
+    const warn = spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      setCustomSubjectsFile([customKanaWord, hiddenWithProblems]);
+
+      expect(await getCustomSubjects()).toEqual([customKanaWord, hiddenWithProblems]);
+      expect(warn).not.toHaveBeenCalled();
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
   test("the words by kanji list the verb and not the hidden word", async () => {
     setCustomSubjectsFile(customSubjectFixture);
 
@@ -381,6 +420,19 @@ describe("getLocalStudyMaterials", () => {
     setStudyMaterialFile(fixed);
 
     expect(await getLocalStudyMaterials()).toEqual(fixed);
+  });
+
+  test("a change of only the custom file runs the subject rules again", async () => {
+    setCustomSubjectsFile(customSubjectFixture);
+    const file = { ...studyMaterialFixture, [customVerb.id]: { reading_note: "Kudasu" } };
+    setStudyMaterialFile(file);
+    expect(await getLocalStudyMaterials()).toEqual(file);
+
+    setCustomSubjectsFile([{ ...customKanaWord, id: customVerb.id }]);
+
+    await expect(getLocalStudyMaterials()).rejects.toThrow(
+      `subject ${customVerb.id} field reading_note a kana_vocabulary has no reading`
+    );
   });
 
   // The other machine may have downloaded newer subjects than the arrays loaded at start

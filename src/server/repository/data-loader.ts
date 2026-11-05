@@ -57,6 +57,8 @@ const customSubjectsFile = createReloadingFile<CustomSubjects>({
 
 const localStudyMaterialsFile = createReloadingFile({
   path: LOCAL_STUDY_MATERIALS_PATH,
+  // The subject check below reads the custom list
+  dependsOn: [CUSTOM_SUBJECTS_PATH],
   parse: async (content) => {
     const records = parseLocalStudyMaterialsFile(content);
     // The subject arrays are read once at start, and the other machine may hold a newer download
@@ -129,6 +131,14 @@ export async function getKanaVocabularyData(): Promise<KanaVocabularyData[]> {
     (record): record is KanaVocabularyData => record.object === "kana_vocabulary"
   );
   return [...kanaVocabulary, ...customWords];
+}
+
+/**
+ * Every word, hidden ones included. The WaniKani words come first, so a WaniKani word wins over a
+ * custom word with the same characters or meaning.
+ */
+export async function getWords(): Promise<(VocabularyData | KanaVocabularyData)[]> {
+  return [...getWaniKaniWords(), ...(await getCustomSubjects())];
 }
 
 /** The WaniKani `vocabulary` and `kana_vocabulary` records, hidden ones included. */

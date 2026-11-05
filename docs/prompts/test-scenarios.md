@@ -63,6 +63,21 @@ Edited in place on every card. The values are stored in `data/userdata/study_mat
 - Stop the dev server, then save a note: a red toast shows the fetch error and the editor opens again with the text. Cancel after that shows the last saved value, not the draft
 - Run "Add to Anki" for a word with a local note and a local synonym, then check the fields in Anki. The kanji note also gets its local synonyms in `user_synonyms`, and both the kanji and the word get them in `alternative_meanings`
 
+## Custom Words
+
+A custom word lives in `data/userdata/custom_subjects.json`. The real file holds どうぞ (id 1000000). Create a test word with the `add-custom-word` skill or with a POST to `/api/custom-subjects`.
+
+- Search `どうぞ` in Vocabulary: the card shows a small gray "custom" label in the title and no WaniKani link. The meaning section shows "Please" and the alternative meanings "Go Ahead, Here You Are, Help Yourself"
+- Check the custom label on the phone at 321×695 and on desktop at 1440px with a long custom word: the label wraps with the title, and no element is wider than the screen
+- Search a custom word by its meaning (`please`): a WaniKani word with the same primary meaning comes first, the custom word only shows when no WaniKani word matches
+- A custom verb with kanji: its kanji card lists the word under "Found In Vocabulary". A custom verb shows the "Conjugations" row like a WaniKani verb
+- Add the custom word to Anki: the note has the alternative meanings and a reading clip made by Azure TTS. The second add makes no TTS request, the server log shows a `[Media]` cache hit
+- Add a local note and a synonym on the custom word card: both save, and both show in Anki after the next add
+- `DELETE /api/custom-subjects/<id>`: the search no longer finds the word, and the PATCH of a note answers 404. The Anki note stays: `sync-anki-notes` lists it as unresolved until it is deleted in Anki by hand
+- POST a custom word with the characters of a WaniKani word (`ちょっと`): the answer is 409 and names the WaniKani id
+- POST a body with `Content-Type: text/plain`: the answer is 415 and the file does not change
+- Edit `custom_subjects.json` by hand while the server runs (change a meaning): the next search shows it with no restart. Break the JSON: the next vocabulary search answers 500 and names the file. Fix it: the search works again with no restart
+
 ## Empty/No Results
 
 - Verify "Enter a search term to find items" message appears before searching

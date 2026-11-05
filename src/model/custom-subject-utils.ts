@@ -27,6 +27,8 @@ const CONJUGATION_FIELDS = ["dictionary", "masu", "te", "nai"];
 const CHARACTERS_PATTERN = /^[\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Han}ー々]+$/u;
 // 々 is in the Han script too, but it only repeats the kanji before it
 const KANJI_PATTERN = /(?!々)\p{Script=Han}/u;
+// Azure TTS reads the reading of a custom word, so a kanji or romaji reading gives a wrong clip
+const KANA_PATTERN = /^[\p{Script=Hiragana}\p{Script=Katakana}ー]+$/u;
 
 export function isCustomSubjectId(id: number): boolean {
   return Number.isInteger(id) && id >= CUSTOM_SUBJECT_ID_FLOOR;
@@ -255,7 +257,10 @@ function validatePrimaryList(params: { value: unknown; field: "meaning" | "readi
     const path = `${listPath}[${index}]`;
     const entry = requireObject(item, path);
     requireKnownKeys({ value: entry, path, allowed: [field, "primary", "accepted_answer"] });
-    requireString(entry[field], `${path}.${field}`);
+    const text = requireString(entry[field], `${path}.${field}`);
+    if (field === "reading" && !KANA_PATTERN.test(text)) {
+      throw new ValidationError(`${path}.reading must hold only kana`);
+    }
     requireBoolean(entry.primary, `${path}.primary`);
     requireBoolean(entry.accepted_answer, `${path}.accepted_answer`);
   });
@@ -293,6 +298,9 @@ function validateKanjiIds(params: { value: unknown; kanjiIds: ReadonlySet<number
   ids.forEach((id, index) => {
     if (typeof id !== "number" || !Number.isInteger(id)) {
       throw new ValidationError(`${path}[${index}] must be an integer`);
+    }
+    if (ids.indexOf(id) !== index) {
+      throw new ValidationError(`${path}[${index}] ${id} is listed twice`);
     }
     if (params.kanjiIds && !params.kanjiIds.has(id)) {
       throw new ValidationError(`${path}[${index}] ${id} is not a visible WaniKani kanji`);

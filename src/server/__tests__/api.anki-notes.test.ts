@@ -264,3 +264,26 @@ describe("anki-notes API with custom words", () => {
     ]);
   });
 });
+
+describe("anki-notes API when a custom word clashes with a WaniKani word", () => {
+  test("a note resolves to the WaniKani word (ちょっと)", async () => {
+    setCustomSubjectsFile([
+      {
+        ...customKanaWord,
+        data: { ...customKanaWord.data, characters: "ちょっと", slug: "ちょっと" },
+      },
+    ]);
+    setAnkiResponse("findNotes", [704]);
+    setAnkiResponse("notesInfo", [
+      {
+        noteId: 704,
+        fields: { characters: { value: "ちょっと" }, primary_meaning: { value: "A Little" } },
+      },
+    ]);
+
+    const result = await getAnkiNotesJson("vocabulary");
+    expect(result.data).toEqual([
+      { characters: "ちょっと", meaning: "A Little", wkId: 9176, wkType: "kana_vocabulary" },
+    ]);
+  });
+});

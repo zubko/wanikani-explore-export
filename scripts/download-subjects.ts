@@ -1,12 +1,11 @@
 import type { WordForClash } from "../src/model/custom-subject-utils.ts";
-import { customSubjectClashWarnings } from "./lib/custom-subject-clash.ts";
+import { CUSTOM_SUBJECTS_FILE, customSubjectClashWarnings } from "./lib/custom-subject-clash.ts";
 import { saveJsonAtomic } from "./lib/llm-utils.ts";
 
 const BASE_URL = "https://api.wanikani.com/v2";
 const API_REVISION = "20170710";
 const RATE_LIMIT_MS = 1000;
 const DATA_DIR = "./data/userdata";
-const CUSTOM_SUBJECTS_FILE = `${DATA_DIR}/custom_subjects.json`;
 
 type SubjectType = "radical" | "kanji" | "vocabulary" | "kana_vocabulary";
 

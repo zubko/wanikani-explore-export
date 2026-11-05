@@ -105,4 +105,22 @@ describe("createReloadingFile", () => {
 
     expect(await file.get()).toBe("fixed");
   });
+
+  test("a change of a file in dependsOn parses the unchanged file again", async () => {
+    const otherPath = "./data/userdata/reloading-file-test-other.txt";
+    setFileContent(PATH, "one");
+    setFileContent(otherPath, "a");
+    let parseCount = 0;
+    const file = createReloadingFile({
+      path: PATH,
+      dependsOn: [otherPath],
+      parse: (content) => `${content} ${++parseCount}`,
+    });
+    expect(await file.get()).toBe("one 1");
+    expect(await file.get()).toBe("one 1");
+
+    setFileContent(otherPath, "b");
+
+    expect(await file.get()).toBe("one 2");
+  });
 });

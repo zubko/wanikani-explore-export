@@ -270,4 +270,22 @@ describe("study-materials API on custom words", () => {
     expect(json.error).toContain(`Cannot read ${CUSTOM_SUBJECTS_PATH}`);
     expect(writeCalls).toHaveLength(0);
   });
+
+  test("an unknown custom id returns 404", async () => {
+    const { status, json } = await patchJson({ id: 1_000_999, meaning_note: "Note" });
+
+    expect(status).toBe(404);
+    expect(json).toEqual({ ok: false, error: "Subject not found" });
+    expect(writeCalls).toHaveLength(0);
+  });
+
+  test("a WaniKani id still saves when the custom subjects file is broken (毎晩)", async () => {
+    setFileContent(CUSTOM_SUBJECTS_PATH, "{ broken");
+
+    const { status, json } = await patchJson({ id: 3766, meaning_note: "Note" });
+
+    expect(status).toBe(200);
+    expect(json.ok).toBe(true);
+    expect(lastWrite()["3766"]?.meaning_note).toBe("Note");
+  });
 });

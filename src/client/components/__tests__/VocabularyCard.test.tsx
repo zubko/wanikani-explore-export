@@ -103,3 +103,34 @@ describe("VocabularyCard header", () => {
     expect(html).not.toContain(">custom<");
   });
 });
+
+describe("VocabularyCard conjugations", () => {
+  it("shows the conjugation row of a kana verb", () => {
+    const html = renderToStaticMarkup(
+      <VocabularyCard
+        vocabulary={{
+          ...kanaVocabulary,
+          characters: "くれる",
+          slug: "くれる",
+          partsOfSpeech: ["ichidan verb"],
+          conjugations: {
+            type: "verb",
+            dictionary: "くれる",
+            masu: "くれます",
+            te: "くれて",
+            nai: "くれない",
+          },
+        }}
+      />
+    );
+
+    expect(html).toContain("Conjugations");
+    expect(html).toContain("くれる, くれます, くれて, くれない");
+  });
+
+  it("shows no conjugation row for a kana word with none", () => {
+    const html = renderToStaticMarkup(<VocabularyCard vocabulary={kanaVocabulary} />);
+
+    expect(html).not.toContain("Conjugations");
+  });
+});

@@ -4,6 +4,8 @@ import type { WordForClash } from "../../src/model/custom-subject-utils.ts";
 import type { CustomSubject } from "../../src/model/wanikani.ts";
 import { formatError } from "./format-error.ts";
 
+export const CUSTOM_SUBJECTS_FILE = "./data/userdata/custom_subjects.json";
+
 /**
  * The lines to print after a download. A missing or broken file gives one line and never throws,
  * because the download before it is the long step.

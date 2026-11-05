@@ -3,7 +3,6 @@ import { isVisibleSubject } from "@/model/subject-utils.ts";
 import {
   buildCustomRecord,
   findCustomSubject,
-  findWaniKaniClash,
   nextCustomSubjectId,
   validateCustomSubjectInput,
 } from "@/model/custom-subject-utils.ts";
@@ -32,7 +31,7 @@ let queue: Promise<unknown> = Promise.resolve();
 
 export function createCustomSubject(input: unknown): Promise<CustomSubject> {
   return runInQueue(async () => {
-    const checkedInput = validateInput(input);
+    const checkedInput = validateInput({ input, keptKanjiIds: [] });
     return saveWithRetry(`create of ${checkedInput.data.characters}`, (records) => {
       const record = buildCustomRecord({
         id: nextCustomSubjectId(records),
@@ -53,7 +52,8 @@ export function updateCustomSubject(id: number, input: unknown): Promise<CustomS
       refuseIdentityChange({ current, input });
       const record = buildCustomRecord({
         id,
-        input: validateInput(input),
+        // A kanji that WaniKani hid after the save must not block every later edit of the word
+        input: validateInput({ input, keptKanjiIds: keptKanjiIdsOf(current) }),
         now: new Date().toISOString(),
         createdAt: current.data.created_at,
       });
@@ -110,8 +110,10 @@ async function saveWithRetry(action: string, step: SaveStep): Promise<CustomSubj
   );
 }
 
-function validateInput(input: unknown): CustomSubjectInput {
-  const kanjiIds = new Set(kanji.filter(isVisibleSubject).map((item) => item.id));
+function validateInput(params: { input: unknown; keptKanjiIds: number[] }): CustomSubjectInput {
+  const { input, keptKanjiIds } = params;
+  const visibleKanjiIds = kanji.filter(isVisibleSubject).map((item) => item.id);
+  const kanjiIds = new Set([...visibleKanjiIds, ...keptKanjiIds]);
   try {
     validateCustomSubjectInput({ input, kanjiIds });
   } catch (error) {
@@ -133,14 +135,13 @@ function refuseClash(params: { records: CustomSubject[]; record: CustomSubject }
       `characters ${characters} are used by custom subject ${customTwin.id}`
     );
   }
-  const [clash] = findWaniKaniClash({
-    customSubjects: [record],
-    wanikaniWords: getWaniKaniWords(),
-  });
-  if (clash) {
+  const wanikaniTwin = getWaniKaniWords().find(
+    (word) => isVisibleSubject(word) && word.data.characters === characters
+  );
+  if (wanikaniTwin) {
     throw new CustomSubjectWriteError(
       409,
-      `characters ${characters} are used by WaniKani subject ${clash.wanikaniId}`
+      `characters ${characters} are used by WaniKani subject ${wanikaniTwin.id}`
     );
   }
 }
@@ -171,6 +172,10 @@ function refuseIdentityChange(params: { current: CustomSubject; input: unknown }
       `characters cannot change from ${current.data.characters}. Delete the word and create a new one.`
     );
   }
+}
+
+function keptKanjiIdsOf(record: CustomSubject): number[] {
+  return record.object === "vocabulary" ? record.data.component_subject_ids : [];
 }
 
 function replaceRecord(records: CustomSubject[], record: CustomSubject): CustomSubject[] {

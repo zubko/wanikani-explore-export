@@ -66,6 +66,15 @@ const vocabularyInput = {
   },
 } satisfies CustomSubjectInput;
 
+function thrownBy(run: () => void): unknown {
+  try {
+    run();
+  } catch (error) {
+    return error;
+  }
+  return null;
+}
+
 function hide(record: CustomSubject): CustomSubject {
   const copy = structuredClone(record);
   copy.data.hidden_at = NOW;
@@ -195,6 +204,65 @@ describe("validateCustomSubjectInput", () => {
     }
   });
 
+  it("accepts ー, a kanji with 々, and 々 on a kana word", () => {
+    expect(check(withData(kanaInput, { characters: "コーヒー" }))).not.toThrow();
+    expect(check(withData(vocabularyInput, { characters: "人々" }))).not.toThrow();
+  });
+
+  it("does not count 々 alone as a kanji", () => {
+    expect(check(withData(vocabularyInput, { characters: "々" }))).toThrow(
+      new ValidationError("data.characters must hold at least one kanji")
+    );
+    expect(check(withData(kanaInput, { characters: "どう々" }))).not.toThrow();
+  });
+
+  it("refuses a reading that is not kana", () => {
+    for (const reading of ["上がる", "agaru"]) {
+      const readings = [{ reading, primary: true, accepted_answer: true }];
+      expect(check(withData(vocabularyInput, { readings }))).toThrow(
+        new ValidationError("data.readings[0].reading must hold only kana")
+      );
+    }
+  });
+
+  it("refuses a kanji id listed twice and a kanji id that is not an integer", () => {
+    expect(
+      check(withData(vocabularyInput, { component_subject_ids: [KANJI_ID, KANJI_ID] }))
+    ).toThrow(new ValidationError(`data.component_subject_ids[1] ${KANJI_ID} is listed twice`));
+    expect(check(withData(vocabularyInput, { component_subject_ids: [1.5] }))).toThrow(
+      new ValidationError("data.component_subject_ids[0] must be an integer")
+    );
+  });
+
+  it("refuses a string of only spaces", () => {
+    expect(check(withData(kanaInput, { meaning_mnemonic: "   " }))).toThrow(
+      new ValidationError("data.meaning_mnemonic must be a non-empty string")
+    );
+  });
+
+  it("refuses an auxiliary meaning with an unknown type", () => {
+    const auxiliaryMeanings = [{ meaning: "Go Ahead", type: "graylist" }];
+    expect(check(withData(kanaInput, { auxiliary_meanings: auxiliaryMeanings }))).toThrow(
+      new ValidationError("data.auxiliary_meanings[0].type must be whitelist or blacklist")
+    );
+  });
+
+  it("refuses conjugations with a missing or an unknown key", () => {
+    const { dictionary, masu, te } = kanaVerbInput.data.conjugations;
+    const withoutNai = { dictionary, masu, te };
+    expect(check(withData(kanaVerbInput, { conjugations: withoutNai }))).toThrow(
+      new ValidationError("data.conjugations.nai must be a non-empty string")
+    );
+    const withPast = { ...kanaVerbInput.data.conjugations, past: "くれた" };
+    expect(check(withData(kanaVerbInput, { conjugations: withPast }))).toThrow(
+      new ValidationError("data.conjugations.past is not a known field")
+    );
+  });
+
+  it("throws the ValidationError class", () => {
+    expect(thrownBy(check({ ...kanaInput, object: "kanji" }))).toBeInstanceOf(ValidationError);
+  });
+
   it("names the path of a bad nested value", () => {
     const meanings = [
       { meaning: "Please", primary: true, accepted_answer: true },
@@ -237,6 +305,33 @@ describe("validateCustomSubjectRecord", () => {
     expect(() => validateCustomSubjectRecord(withRecordData({ hidden_at: NOW }))).not.toThrow();
   });
 
+  it("refuses a wrong fixed field", () => {
+    const cases: [Record<string, unknown>, string][] = [
+      [{ slug: "どうも" }, "data.slug must equal data.characters"],
+      [{ document_url: "https://www.wanikani.com" }, "data.document_url must be null"],
+      [{ pronunciation_audios: [{}] }, "data.pronunciation_audios must be an empty array"],
+      [{ pronunciation_audios: null }, "data.pronunciation_audios must be an empty array"],
+      [{ lesson_position: 1 }, "data.lesson_position must be 0"],
+      [{ spaced_repetition_system_id: 1 }, "data.spaced_repetition_system_id must be 0"],
+      [{ created_at: "" }, "data.created_at must be a non-empty string"],
+      [{ hidden_at: 5 }, "data.hidden_at must be null or a string"],
+    ];
+    for (const [data, message] of cases) {
+      expect(() => validateCustomSubjectRecord(withRecordData(data))).toThrow(
+        new ValidationError(message)
+      );
+    }
+    expect(() => validateCustomSubjectRecord({ ...record, data_updated_at: null })).toThrow(
+      new ValidationError("data_updated_at must be a non-empty string")
+    );
+  });
+
+  it("throws the ValidationError class", () => {
+    expect(
+      thrownBy(() => validateCustomSubjectRecord(withRecordData({ level: 3 })))
+    ).toBeInstanceOf(ValidationError);
+  });
+
   it("runs the input check on the rest of the data", () => {
     expect(() => validateCustomSubjectRecord(withRecordData({ extra: 1 }))).toThrow(
       new ValidationError("data.extra is not a known field")
@@ -266,6 +361,15 @@ describe("validateCustomSubjects", () => {
   it("puts the record id in front of a record problem", () => {
     expect(() => validateCustomSubjects([first, { ...second, url: "x" }])).toThrow(
       new ValidationError(`record ${CUSTOM_SUBJECT_ID_FLOOR + 1}: url must be null`)
+    );
+  });
+
+  it("refuses a record that is not an object, named by its index", () => {
+    expect(() => validateCustomSubjects([first, "どうぞ"])).toThrow(
+      new ValidationError("record [1]: the record must be an object")
+    );
+    expect(thrownBy(() => validateCustomSubjects([first, "どうぞ"]))).toBeInstanceOf(
+      ValidationError
     );
   });
 

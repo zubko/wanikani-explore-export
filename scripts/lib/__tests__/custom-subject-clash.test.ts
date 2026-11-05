@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { join } from "path";
+import { join, normalize } from "path";
 import {
   customKanaWord,
   customSubjectFixture,
@@ -7,7 +7,8 @@ import {
   hiddenCustomWord,
 } from "@/test/custom-subject-fixture.ts";
 import { resetFsMock, setFileContent, setFsError } from "@/test/preload.ts";
-import { customSubjectClashWarnings } from "../custom-subject-clash.ts";
+import { CUSTOM_SUBJECTS_PATH } from "@server/repository/data-paths.ts";
+import { CUSTOM_SUBJECTS_FILE, customSubjectClashWarnings } from "../custom-subject-clash.ts";
 
 const CUSTOM_PATH = "./data/custom-subject-clash-test.json";
 
@@ -79,5 +80,12 @@ describe("customSubjectClashWarnings", () => {
     const lines = await customSubjectClashWarnings({ path: CUSTOM_PATH, wanikaniWords: [] });
 
     expect(lines).toEqual(["Could not read custom_subjects.json: disk gone"]);
+  });
+});
+
+describe("CUSTOM_SUBJECTS_FILE", () => {
+  // The scripts must not import a repository module, so the path is written twice
+  it("is the file the server writes", () => {
+    expect(normalize(CUSTOM_SUBJECTS_FILE)).toBe(normalize(CUSTOM_SUBJECTS_PATH));
   });
 });

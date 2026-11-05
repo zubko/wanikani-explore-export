@@ -82,7 +82,7 @@ Steps marked **root** need sudo. An AI agent can do the rest.
    curl 127.0.0.1:8765 -d '{"action":"sync","version":6}'         # {"result": null, "error": null}
    ```
 
-9. The app. `bun install` in the repo, then `scp` `.env` and `scripts/.env` from the main machine. `.env` holds the three Azure TTS values and is required. Without one of them the dev server still starts, but the first API request fails, and the dev server log names the missing variable. Keep `AZURE_TTS_VOICES` the same on both machines: the voice is part of the sentence clip name, so a different list makes each machine create its own clip for most words.
+9. The app. `bun install` in the repo, then `scp` `.env` and `scripts/.env` from the main machine. `.env` holds the three Azure TTS values and is required. Without one of them the dev server still starts, but the first API request fails, and the dev server log names the missing variable. `AZURE_TTS_VOICES` must hold exactly two voices, female first, or the server fails the same way. Keep the list the same on both machines. The voice is part of the sentence clip name, and of the reading clip name of a custom word (`{slug}_{gender}_{ssmlHash}.mp3`, the hash covers the SSML with the voice). So a different list makes each machine create its own clips for most words.
 
 ## Unit files
 
@@ -198,6 +198,7 @@ Stop `anki` before you stop or restart `xvfb-anki`. Stopping the display kills A
 - **Upgrading Anki**: unpack the new tarball next to the old one, move the `~/opt/anki` symlink, `systemctl --user restart anki`, check the version with the curl call above.
 - **A data repo pull stops with a conflict under `media/`**: this clone lacks the `ours` merge driver. Run `git -C data/userdata config merge.ours.driver true`, then `git -C data/userdata merge --abort`, and pull again.
 - **Every search answers 500 after an auto-pull**: a data file is broken, by the merge or by a hand edit. The dev server log names the file and the line. Fix the file and commit it, the server needs no restart. For `page ... has two images, delete one line` in `mnemonic-images.jsonl`, delete one of the two lines.
+- **A data repo pull stops with a conflict in `custom_subjects.json`**: both machines changed the custom words. The file has no merge driver, so fix it by hand: keep the records of both sides in one JSON array, then commit the merge. When both sides gave the same id to two words, give one record a new id (the largest id plus one), and move its entry in `study_materials_extra.json` to that id. Until then the duplicate-id check fails every request that reads the file.
 - **A new subject from a fresh download does not show**: the server reads the subject files once at start. Restart the dev server after a pull that changes them.
 
 ## For AI agents

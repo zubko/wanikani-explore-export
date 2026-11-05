@@ -11,7 +11,9 @@ import {
 import {
   customKanaWord,
   customSubjectFixture,
-  customSubjectInputOf,
+  customKanaWordInput,
+  customVerbInput,
+  hiddenCustomWordInput,
   customVerb,
   hiddenCustomWord,
   setCustomSubjectsFile,
@@ -25,9 +27,10 @@ const WANIKANI_WORD_KANJI_IDS = [572, 958];
 // 一 in the real WaniKani data
 const WANIKANI_KANJI_ID = 440;
 const UNKNOWN_CUSTOM_ID = 1_000_999;
-
-const kanaWordInput = customSubjectInputOf(customKanaWord);
-const verbInput = customSubjectInputOf(customVerb);
+// ちょっと, a WaniKani kana word
+const WANIKANI_KANA_WORD_ID = 9176;
+// 昌, a kanji that WaniKani hides
+const HIDDEN_KANJI_ID = 2285;
 
 async function request(params: { method: string; path: string; body?: unknown; rawBody?: string }) {
   const { method, path, body, rawBody } = params;
@@ -117,25 +120,30 @@ describe("custom-subjects API reads", () => {
     expect(json).toEqual({ ok: false, error: `custom subject ${UNKNOWN_CUSTOM_ID} not found` });
   });
 
-  test("a read error of the file is a 500 for a read and a write", async () => {
+  test("a read error of the file is a 500 for every route", async () => {
+    setCustomSubjectsFile(customSubjectFixture);
     setFsError("readFile", new Error("disk gone"));
 
-    const list = await listCustomSubjects();
-    const create = await createCustomSubject(kanaWordInput);
+    const answers = [
+      await listCustomSubjects(),
+      await getCustomSubject(customKanaWord.id),
+      await createCustomSubject(customKanaWordInput),
+      await updateCustomSubject(customKanaWord.id, customKanaWordInput),
+      await deleteCustomSubject(customKanaWord.id),
+    ];
 
-    expect(list.status).toBe(500);
-    expect(list.json.ok).toBe(false);
-    expect(list.json.error).toContain("disk gone");
-    expect(create.status).toBe(500);
-    expect(create.json.ok).toBe(false);
-    expect(create.json.error).toContain("disk gone");
+    for (const { status, json } of answers) {
+      expect(status).toBe(500);
+      expect(json.ok).toBe(false);
+      expect(json.error).toContain("disk gone");
+    }
     expect(writeCalls).toHaveLength(0);
   });
 });
 
 describe("custom-subjects API writes", () => {
   test("POST answers 201 with the id and the timestamps, and the file holds the record", async () => {
-    const { status, json } = await createCustomSubject(kanaWordInput);
+    const { status, json } = await createCustomSubject(customKanaWordInput);
 
     expect(status).toBe(201);
     expect(json.ok).toBe(true);
@@ -153,8 +161,8 @@ describe("custom-subjects API writes", () => {
     const meanings = [{ meaning: "Here You Are", primary: true, accepted_answer: true }];
 
     const { status, json } = await updateCustomSubject(customKanaWord.id, {
-      ...kanaWordInput,
-      data: { ...kanaWordInput.data, meanings },
+      ...customKanaWordInput,
+      data: { ...customKanaWordInput.data, meanings },
     });
 
     expect(status).toBe(200);
@@ -179,7 +187,7 @@ describe("custom-subjects API writes", () => {
   });
 
   test("a word goes through create, search, add to Anki, update and delete", async () => {
-    const created = await createCustomSubject(kanaWordInput);
+    const created = await createCustomSubject(customKanaWordInput);
     expect(created.status).toBe(201);
     const id = (created.json.data as CustomSubject).id;
 
@@ -197,8 +205,8 @@ describe("custom-subjects API writes", () => {
 
     const meanings = [{ meaning: "Here You Are", primary: true, accepted_answer: true }];
     const updated = await updateCustomSubject(id, {
-      ...kanaWordInput,
-      data: { ...kanaWordInput.data, meanings },
+      ...customKanaWordInput,
+      data: { ...customKanaWordInput.data, meanings },
     });
     expect(updated.status).toBe(200);
     expect((await searchVocabulary("どうぞ")).json.data.meanings).toEqual(meanings);
@@ -224,9 +232,9 @@ describe("custom-subjects API writes", () => {
 describe("custom-subjects API refusals", () => {
   test("POST with a WaniKani spelling is a 409 that names the WaniKani id and the characters", async () => {
     const { status, json } = await createCustomSubject({
-      ...verbInput,
+      ...customVerbInput,
       data: {
-        ...verbInput.data,
+        ...customVerbInput.data,
         characters: "毎晩",
         component_subject_ids: WANIKANI_WORD_KANJI_IDS,
       },
@@ -241,8 +249,8 @@ describe("custom-subjects API refusals", () => {
   });
 
   test("POST of the same word twice is a 409", async () => {
-    const first = await createCustomSubject(kanaWordInput);
-    const second = await createCustomSubject(kanaWordInput);
+    const first = await createCustomSubject(customKanaWordInput);
+    const second = await createCustomSubject(customKanaWordInput);
 
     expect(first.status).toBe(201);
     expect(second.status).toBe(409);
@@ -253,34 +261,86 @@ describe("custom-subjects API refusals", () => {
     expect(writeCalls).toHaveLength(1);
   });
 
-  test("POST with a bad body shape is a 400", async () => {
+  test("POST and PUT with a bad body shape are a 400", async () => {
+    setCustomSubjectsFile(customSubjectFixture);
     const cases: { body?: unknown; rawBody?: string; error: string }[] = [
-      {
-        body: { object: "kana_vocabulary" },
-        error: "Missing required parameters: object and data",
-      },
-      { rawBody: "not json", error: "Invalid body: must be a JSON object" },
-      { body: [kanaWordInput], error: "Invalid body: must be a JSON object" },
-      {
-        body: { object: "kana_vocabulary", data: "どうぞ" },
-        error: "Invalid data: must be an object",
-      },
+      { body: { object: "kana_vocabulary" }, error: "data must be an object" },
+      { rawBody: "not json", error: "the body must be an object" },
+      { body: [customKanaWordInput], error: "the body must be an object" },
+      { body: { object: "kana_vocabulary", data: "どうぞ" }, error: "data must be an object" },
     ];
     for (const { body, rawBody, error } of cases) {
-      const answer = await request({ method: "POST", path: "/custom-subjects", body, rawBody });
-      expect(answer).toEqual({ status: 400, json: { ok: false, error } });
+      const created = await request({ method: "POST", path: "/custom-subjects", body, rawBody });
+      const updated = await request({
+        method: "PUT",
+        path: `/custom-subjects/${customKanaWord.id}`,
+        body,
+        rawBody,
+      });
+      expect(created).toEqual({ status: 400, json: { ok: false, error } });
+      expect(updated).toEqual({ status: 400, json: { ok: false, error } });
     }
     expect(writeCalls).toHaveLength(0);
   });
 
+  test("POST with the characters of a WaniKani kana word is a 409 (ちょっと)", async () => {
+    const { status, json } = await createCustomSubject({
+      ...customKanaWordInput,
+      data: { ...customKanaWordInput.data, characters: "ちょっと" },
+    });
+
+    expect(status).toBe(409);
+    expect(json).toEqual({
+      ok: false,
+      error: `characters ちょっと are used by WaniKani subject ${WANIKANI_KANA_WORD_ID}`,
+    });
+    expect(writeCalls).toHaveLength(0);
+  });
+
+  test("PUT keeps a kanji id that WaniKani hid after the save, a new hidden id is a 400", async () => {
+    const withHiddenKanji = {
+      ...customVerb,
+      data: {
+        ...customVerb.data,
+        component_subject_ids: [...customVerb.data.component_subject_ids, HIDDEN_KANJI_ID],
+      },
+    };
+    setCustomSubjectsFile([withHiddenKanji]);
+
+    const kept = await updateCustomSubject(customVerb.id, {
+      ...customVerbInput,
+      data: {
+        ...customVerbInput.data,
+        component_subject_ids: withHiddenKanji.data.component_subject_ids,
+      },
+    });
+    expect(kept.status).toBe(200);
+
+    setCustomSubjectsFile([customVerb]);
+    const added = await updateCustomSubject(customVerb.id, {
+      ...customVerbInput,
+      data: {
+        ...customVerbInput.data,
+        component_subject_ids: withHiddenKanji.data.component_subject_ids,
+      },
+    });
+    expect(added).toEqual({
+      status: 400,
+      json: {
+        ok: false,
+        error: `data.component_subject_ids[1] ${HIDDEN_KANJI_ID} is not a visible WaniKani kanji`,
+      },
+    });
+  });
+
   test("POST that fails the content check is a 400", async () => {
     const slash = await createCustomSubject({
-      ...kanaWordInput,
-      data: { ...kanaWordInput.data, characters: "どう/ぞ" },
+      ...customKanaWordInput,
+      data: { ...customKanaWordInput.data, characters: "どう/ぞ" },
     });
     const unknownKanji = await createCustomSubject({
-      ...verbInput,
-      data: { ...verbInput.data, component_subject_ids: [1] },
+      ...customVerbInput,
+      data: { ...customVerbInput.data, component_subject_ids: [1] },
     });
 
     expect(slash).toEqual({
@@ -305,8 +365,8 @@ describe("custom-subjects API refusals", () => {
     ];
 
     const { status, json } = await updateCustomSubject(customKanaWord.id, {
-      ...kanaWordInput,
-      data: { ...kanaWordInput.data, meanings },
+      ...customKanaWordInput,
+      data: { ...customKanaWordInput.data, meanings },
     });
 
     expect(status).toBe(400);
@@ -321,12 +381,12 @@ describe("custom-subjects API refusals", () => {
     setCustomSubjectsFile(customSubjectFixture);
 
     const changedObject = await updateCustomSubject(customKanaWord.id, {
-      ...kanaWordInput,
+      ...customKanaWordInput,
       object: "vocabulary",
     });
     const changedCharacters = await updateCustomSubject(customKanaWord.id, {
-      ...kanaWordInput,
-      data: { ...kanaWordInput.data, characters: "どうも" },
+      ...customKanaWordInput,
+      data: { ...customKanaWordInput.data, characters: "どうも" },
     });
 
     expect(changedObject.status).toBe(400);
@@ -338,11 +398,13 @@ describe("custom-subjects API refusals", () => {
 
   test("PUT and DELETE of an unknown or a hidden id are a 404", async () => {
     setCustomSubjectsFile(customSubjectFixture);
-    const hiddenInput = customSubjectInputOf(hiddenCustomWord);
 
     for (const id of [UNKNOWN_CUSTOM_ID, hiddenCustomWord.id]) {
       const error = { ok: false, error: `custom subject ${id} not found` };
-      expect(await updateCustomSubject(id, hiddenInput)).toEqual({ status: 404, json: error });
+      expect(await updateCustomSubject(id, hiddenCustomWordInput)).toEqual({
+        status: 404,
+        json: error,
+      });
       expect(await deleteCustomSubject(id)).toEqual({ status: 404, json: error });
     }
     expect(writeCalls).toHaveLength(0);
@@ -352,7 +414,10 @@ describe("custom-subjects API refusals", () => {
     for (const id of [String(WANIKANI_KANJI_ID), "abc", "1e6"]) {
       const error = { ok: false, error: `Invalid id: ${id} is not a custom subject id` };
       expect(await getCustomSubject(id)).toEqual({ status: 400, json: error });
-      expect(await updateCustomSubject(id, kanaWordInput)).toEqual({ status: 400, json: error });
+      expect(await updateCustomSubject(id, customKanaWordInput)).toEqual({
+        status: 400,
+        json: error,
+      });
       expect(await deleteCustomSubject(id)).toEqual({ status: 400, json: error });
     }
     expect(writeCalls).toHaveLength(0);

@@ -18,6 +18,7 @@ import {
 import { ensureRepositoryInitialized, resetFsMock, writeCalls } from "@/test/preload.ts";
 import {
   customKanaWord,
+  customKanaVerb,
   customSubjectFixture,
   customVerb,
   hiddenCustomWord,
@@ -557,7 +558,7 @@ describe("media cache for a word", () => {
 describe("reading audio of a custom word", () => {
   beforeEach(() => setCustomSubjectsFile(customSubjectFixture));
 
-  test("each reading gets one TTS clip in the voice of the hashed gender, primary first (下す)", async () => {
+  test("each accepted reading gets one TTS clip in the voice of the hashed gender, primary first (下す)", async () => {
     const result = await addToAnkiJson({ id: customVerb.id, type: "vocabulary" });
     expect(result.ok).toBe(true);
 
@@ -595,6 +596,7 @@ describe("reading audio of a custom word", () => {
 
     const gender = hashNumber("reading-gender:くだす") % 2 === 0 ? "female" : "male";
     const readingVoice = gender === "female" ? "ja-JP-TestFemaleNeural" : "ja-JP-TestMaleNeural";
+    // げす is not an accepted answer
     expect(spokenTexts()).toEqual([
       { voice: readingVoice, text: "くだす" },
       { voice: readingVoice, text: "おろす" },
@@ -641,11 +643,38 @@ describe("reading audio of a custom word", () => {
         ok: false,
         error: "AZURE_TTS_VOICES needs exactly two voices, female first",
       });
-      expect(ankiCalls.some((call) => call.action === "addNote")).toBe(false);
+      const writes = ["addNote", "updateNoteFields", "storeMediaFile"];
+      expect(ankiCalls.filter((call) => writes.includes(call.action))).toEqual([]);
       expect(ttsRequests).toEqual([]);
     } finally {
       process.env.AZURE_TTS_VOICES = voices;
     }
+  });
+});
+
+describe("conjugations of a kana verb", () => {
+  beforeEach(() => setCustomSubjectsFile(customSubjectFixture));
+
+  test("a custom kana verb writes its own conjugations (くれる)", async () => {
+    const result = await addToAnkiJson({ id: customKanaVerb.id, type: "kana_vocabulary" });
+    expect(result.ok).toBe(true);
+
+    const fields = findVocabularyFields("addNote", "くれる");
+    expect([fields.conjugations, fields.masu_form]).toEqual([
+      "くれる, くれます, くれて, くれない",
+      "くれます",
+    ]);
+  });
+
+  test("a WaniKani kana verb writes its conjugations from the LLM file (する)", async () => {
+    const result = await addToAnkiJson({ id: 9180, type: "kana_vocabulary" });
+    expect(result.ok).toBe(true);
+
+    const fields = findVocabularyFields("addNote", "する");
+    expect([fields.conjugations, fields.masu_form]).toEqual([
+      "する, します, して, しない",
+      "します",
+    ]);
   });
 });
 
