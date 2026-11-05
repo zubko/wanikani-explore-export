@@ -405,12 +405,12 @@ Every error answer is `{ ok: false, error }` with `as const`. The id of GET by i
 - Create: `.claude/skills/add-custom-word/SKILL.md`
 - Modify: `.claude/skills/add-iknow-vocab/SKILL.md`
 
-- [ ] write the frontmatter (`name`, `description` with the trigger phrases "add a custom word", "add my own word", "add <word> as a custom word", "WaniKani does not have <word>")
-- [ ] write the eight numbered sections from Technical Details, with the `curl` commands, the body template for a kana word and for a verb, the three reading mnemonic cases, the five ways the user can answer a shown mnemonic block, and the resume path through an `isCustom` search hit
-- [ ] write the stop rules: a WaniKani search hit, a 409, a failed add (the record stays, the next run resumes), a kanji that is not in WaniKani (the word cannot be a custom word yet, say so)
-- [ ] `add-iknow-vocab/SKILL.md`: the "WaniKani does not teach this word" triage case points to the new skill
-- [ ] run the skill once by hand on どうぞ with the dev server, check the card in the browser and in Anki, then drop the `problems` entry of どうぞ in `iknow-vocabulary-status.json`
-- [ ] no tests, a skill is prose; check that `bun run format` leaves the file alone
+- [x] write the frontmatter (`name`, `description` with the trigger phrases "add a custom word", "add my own word", "add <word> as a custom word", "WaniKani does not have <word>")
+- [x] write the eight numbered sections from Technical Details, with the `curl` commands, the body template for a kana word and for a verb, the three reading mnemonic cases, the five ways the user can answer a shown mnemonic block, and the resume path through an `isCustom` search hit
+- [x] write the stop rules: a WaniKani search hit, a 409, a failed add (the record stays, the next run resumes), a kanji that is not in WaniKani (the word cannot be a custom word yet, say so)
+- [x] `add-iknow-vocab/SKILL.md`: the "WaniKani does not teach this word" triage case points to the new skill
+- [x] run the skill once by hand on どうぞ with the dev server, check the card in the browser and in Anki, then drop the `problems` entry of どうぞ in `iknow-vocabulary-status.json` (done: id 1000000, Anki note checked through notesInfo and getMediaFilesNames; the browser check was skipped, the Chrome extension was not connected)
+- [x] no tests, a skill is prose; check that `bun run format` leaves the file alone (`bun run format` covers only src and scripts; `prettier --check` passes on both skill files too)
 
 ### Task 10: Verify acceptance criteria
 

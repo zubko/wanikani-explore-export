@@ -102,8 +102,9 @@ The interesting part. Look at the `problems` entries the run just appended.
 
 About one iKnow word in five is not in the WaniKani data — 218 of the Core 1000. Sort each new one:
 
-- **Grammar word WaniKani does not teach** (なる, そう, どうぞ, もっと, とても). Nothing to do. Say so
-  and leave the entry in `problems`.
+- **Grammar word WaniKani does not teach** (なる, そう, どうぞ, もっと, とても). Say so, and offer to
+  add it as a custom word with the `add-custom-word` skill. That skill drops the `problems` entry
+  after the add. Leave the entry alone when the user says no.
 - **WaniKani spells it differently** (すぐ → 直ぐ, あと → 後). Search the spelling you expect:
 
   ```bash
