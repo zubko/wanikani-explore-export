@@ -14,6 +14,7 @@ const kanaVocabulary: KanaVocabulary = {
   slug: "ここ",
   level: 1,
   documentUrl: "https://www.wanikani.com/vocabulary/ここ",
+  isCustom: false,
   meanings: [{ meaning: "Here", primary: true, accepted_answer: true }],
   auxiliaryMeanings: [],
   meaningMnemonic: "Here you are.",
@@ -22,6 +23,7 @@ const kanaVocabulary: KanaVocabulary = {
   pronunciationAudios: [],
   studyMaterial: null,
   localStudyMaterial: null,
+  conjugations: null,
 };
 
 const vocabulary: Vocabulary = {
@@ -31,6 +33,7 @@ const vocabulary: Vocabulary = {
   slug: "毎晩",
   level: 1,
   documentUrl: "https://www.wanikani.com/vocabulary/毎晩",
+  isCustom: false,
   meanings: [{ meaning: "Every Evening", primary: true, accepted_answer: true }],
   auxiliaryMeanings: [],
   meaningMnemonic: "Every evening.",

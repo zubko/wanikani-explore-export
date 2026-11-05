@@ -7,6 +7,7 @@ import type {
   SubjectReference,
   SubjectType,
 } from "./wanikani.ts";
+import { ValidationError } from "./validation-error.ts";
 
 const SUBJECT_TYPES_WITHOUT_READING: SubjectType[] = ["radical", "kana_vocabulary"];
 
@@ -106,18 +107,21 @@ export function applyLocalStudyMaterialPatch(
   return Object.keys(next).length > 0 ? next : null;
 }
 
-/** The problem with the value of a study material field, or null. The field name is not checked. */
-export function localStudyMaterialValueProblem(field: string, value: unknown): string | null {
+/** Throws when the value does not fit the study material field. The field name is not checked. */
+export function validateLocalStudyMaterialValue(field: string, value: unknown): void {
   if (field === "meaning_synonyms") {
     const isStringList = Array.isArray(value) && value.every((item) => typeof item === "string");
-    return isStringList ? null : "must be an array of strings";
+    if (!isStringList) throw new ValidationError("must be an array of strings");
+    return;
   }
-  return typeof value === "string" ? null : "must be a string";
+  if (typeof value !== "string") throw new ValidationError("must be a string");
 }
 
-/** The problem with a `reading_note` on this subject type, or null. */
-export function readingNoteProblem(type: SubjectType): string | null {
-  return SUBJECT_TYPES_WITHOUT_READING.includes(type) ? `a ${type} has no reading` : null;
+/** Throws when this subject type cannot hold a `reading_note`. */
+export function validateReadingNote(type: SubjectType): void {
+  if (SUBJECT_TYPES_WITHOUT_READING.includes(type)) {
+    throw new ValidationError(`a ${type} has no reading`);
+  }
 }
 
 export function buildSubjectReference(params: {

@@ -3441,6 +3441,7 @@ exports[`search API find vocabulary by characters (毎晩) 1`] = `
   ],
   "documentUrl": "https://www.wanikani.com/vocabulary/%E6%AF%8E%E6%99%A9",
   "id": 3766,
+  "isCustom": false,
   "level": 15,
   "localStudyMaterial": {
     "meaning_note": "Every evening, the same routine",
@@ -4808,6 +4809,7 @@ exports[`search API find vocabulary with a local synonym next to a WaniKani one 
   ],
   "documentUrl": "https://www.wanikani.com/vocabulary/%E3%82%A2%E3%83%A1%E3%83%AA%E3%82%AB%E4%BA%BA",
   "id": 2478,
+  "isCustom": false,
   "level": 3,
   "localStudyMaterial": {
     "meaning_synonyms": [
@@ -4934,6 +4936,7 @@ exports[`search API find kana vocabulary (ここ) 1`] = `
     },
   ],
   "characters": "ここ",
+  "conjugations": null,
   "contextSentences": [
     {
       "en": "Let's eat here!",
@@ -4951,6 +4954,7 @@ exports[`search API find kana vocabulary (ここ) 1`] = `
   ],
   "documentUrl": "https://www.wanikani.com/vocabulary/%E3%81%93%E3%81%93",
   "id": 9209,
+  "isCustom": false,
   "level": 8,
   "localStudyMaterial": null,
   "meaningMnemonic": "Remember how words beginning with こ are close to you? It ends with こ too, which is a clue that we’re talking about a place. So ここ means <vocabulary>here</vocabulary>.",

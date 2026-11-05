@@ -3,10 +3,11 @@ import {
   applyLocalStudyMaterialPatch,
   findStudyMaterial,
   getAlternativeMeanings,
-  localStudyMaterialValueProblem,
   mergeStudyMaterial,
-  readingNoteProblem,
+  validateLocalStudyMaterialValue,
+  validateReadingNote,
 } from "../subject-utils.ts";
+import { ValidationError } from "../validation-error.ts";
 import type { Meaning, StudyMaterial, StudyMaterialData } from "../wanikani.ts";
 
 function studyMaterial(data: Partial<StudyMaterialData>): StudyMaterial {
@@ -216,30 +217,36 @@ describe("applyLocalStudyMaterialPatch", () => {
   });
 });
 
-describe("localStudyMaterialValueProblem", () => {
+describe("validateLocalStudyMaterialValue", () => {
   it("takes a string for a note and for a synonym operation", () => {
-    expect(localStudyMaterialValueProblem("meaning_note", "text")).toBeNull();
-    expect(localStudyMaterialValueProblem("add_synonym", "word")).toBeNull();
-    expect(localStudyMaterialValueProblem("reading_note", 5)).toBe("must be a string");
+    expect(() => validateLocalStudyMaterialValue("meaning_note", "text")).not.toThrow();
+    expect(() => validateLocalStudyMaterialValue("add_synonym", "word")).not.toThrow();
+    expect(() => validateLocalStudyMaterialValue("reading_note", 5)).toThrow(
+      new ValidationError("must be a string")
+    );
   });
 
   it("takes a list of strings for the stored synonyms", () => {
-    expect(localStudyMaterialValueProblem("meaning_synonyms", ["one"])).toBeNull();
-    expect(localStudyMaterialValueProblem("meaning_synonyms", "one")).toBe(
-      "must be an array of strings"
+    expect(() => validateLocalStudyMaterialValue("meaning_synonyms", ["one"])).not.toThrow();
+    expect(() => validateLocalStudyMaterialValue("meaning_synonyms", "one")).toThrow(
+      new ValidationError("must be an array of strings")
     );
-    expect(localStudyMaterialValueProblem("meaning_synonyms", ["one", 2])).toBe(
-      "must be an array of strings"
+    expect(() => validateLocalStudyMaterialValue("meaning_synonyms", ["one", 2])).toThrow(
+      new ValidationError("must be an array of strings")
     );
   });
 });
 
-describe("readingNoteProblem", () => {
-  it("names the types that have no reading", () => {
-    expect(readingNoteProblem("radical")).toBe("a radical has no reading");
-    expect(readingNoteProblem("kana_vocabulary")).toBe("a kana_vocabulary has no reading");
-    expect(readingNoteProblem("kanji")).toBeNull();
-    expect(readingNoteProblem("vocabulary")).toBeNull();
+describe("validateReadingNote", () => {
+  it("refuses the types that have no reading", () => {
+    expect(() => validateReadingNote("radical")).toThrow(
+      new ValidationError("a radical has no reading")
+    );
+    expect(() => validateReadingNote("kana_vocabulary")).toThrow(
+      new ValidationError("a kana_vocabulary has no reading")
+    );
+    expect(() => validateReadingNote("kanji")).not.toThrow();
+    expect(() => validateReadingNote("vocabulary")).not.toThrow();
   });
 });
 

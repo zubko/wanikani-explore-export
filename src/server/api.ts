@@ -32,9 +32,10 @@ import { upsertLocalStudyMaterial } from "./repository/study-material.ts";
 import {
   getPrimaryMeaning,
   isVisibleSubject,
-  localStudyMaterialValueProblem,
-  readingNoteProblem,
+  validateLocalStudyMaterialValue,
+  validateReadingNote,
 } from "@/model/subject-utils.ts";
+import { ValidationError } from "@/model/validation-error.ts";
 import type { AnkiDeckType } from "./services/anki-connect.ts";
 import {
   addOrUpdateRadical,
@@ -61,20 +62,26 @@ function addSubjectToAnki(subject: Subject): Promise<AnkiAddResult> {
   return addVocabularyWithKanjiAndRadicals(subject);
 }
 
-function validateStudyMaterialPatch(patch: Record<string, unknown>): string | null {
+function validateStudyMaterialPatch(patch: Record<string, unknown>): void {
   const fields = Object.keys(patch);
-  if (fields.length === 0) return "Missing required parameter: at least one field besides id";
+  if (fields.length === 0) {
+    throw new ValidationError("Missing required parameter: at least one field besides id");
+  }
 
   const knownFields: readonly string[] = LOCAL_STUDY_MATERIAL_PATCH_FIELDS;
   const unknown = fields.find((key) => !knownFields.includes(key));
-  if (unknown !== undefined) return `Invalid field: ${unknown}`;
+  if (unknown !== undefined) throw new ValidationError(`Invalid field: ${unknown}`);
 
   for (const field of fields) {
-    const problem = localStudyMaterialValueProblem(field, patch[field]);
-    if (problem) return `Invalid ${field}: ${problem}`;
+    try {
+      validateLocalStudyMaterialValue(field, patch[field]);
+    } catch (error) {
+      if (error instanceof ValidationError) {
+        throw new ValidationError(`Invalid ${field}: ${error.message}`);
+      }
+      throw error;
+    }
   }
-
-  return null;
 }
 
 async function readJsonObjectBody(c: Context): Promise<Record<string, unknown> | null> {
@@ -256,9 +263,11 @@ const app = new Hono()
     }
 
     const patch = Object.fromEntries(Object.entries(body).filter(([key]) => key !== "id"));
-    const invalid = validateStudyMaterialPatch(patch);
-    if (invalid) {
-      return c.json({ ok: false as const, error: invalid }, 400);
+    try {
+      validateStudyMaterialPatch(patch);
+    } catch (error) {
+      if (!(error instanceof ValidationError)) throw error;
+      return c.json({ ok: false as const, error: error.message }, 400);
     }
 
     const type = findSubjectTypeById(id);
@@ -267,9 +276,13 @@ const app = new Hono()
       return c.json({ ok: false as const, error: "Subject not found" }, 404);
     }
 
-    const readingProblem = "reading_note" in patch ? readingNoteProblem(type) : null;
-    if (readingProblem) {
-      return c.json({ ok: false as const, error: `Invalid reading_note: ${readingProblem}` }, 400);
+    if ("reading_note" in patch) {
+      try {
+        validateReadingNote(type);
+      } catch (error) {
+        if (!(error instanceof ValidationError)) throw error;
+        return c.json({ ok: false as const, error: `Invalid reading_note: ${error.message}` }, 400);
+      }
     }
 
     console.log(`[API] Study material ${type} id=${id}: ${Object.keys(patch).join(", ")}`);

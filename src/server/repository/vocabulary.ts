@@ -47,6 +47,7 @@ async function mapVocabularyDataToVocabulary(data: VocabularyData): Promise<Voca
     slug: data.data.slug,
     level: data.data.level,
     documentUrl: data.data.document_url,
+    isCustom: false,
     meanings: data.data.meanings,
     auxiliaryMeanings: data.data.auxiliary_meanings,
     meaningMnemonic: data.data.meaning_mnemonic,
@@ -75,6 +76,7 @@ async function mapKanaVocabularyDataToKanaVocabulary(
     slug: data.data.slug,
     level: data.data.level,
     documentUrl: data.data.document_url,
+    isCustom: false,
     meanings: data.data.meanings,
     auxiliaryMeanings: data.data.auxiliary_meanings,
     meaningMnemonic: data.data.meaning_mnemonic,
@@ -83,6 +85,7 @@ async function mapKanaVocabularyDataToKanaVocabulary(
     pronunciationAudios: data.data.pronunciation_audios,
     studyMaterial: findStudyMaterial(studyMaterials, data.id, "kana_vocabulary"),
     localStudyMaterial: findLocalStudyMaterial(localStudyMaterials, data.id),
+    conjugations: null,
   };
 }
 

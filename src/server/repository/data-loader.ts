@@ -9,7 +9,8 @@ import type {
   VerbConjugations,
 } from "@/model/wanikani.ts";
 import { LOCAL_STUDY_MATERIAL_FIELDS } from "@/model/wanikani.ts";
-import { localStudyMaterialValueProblem, readingNoteProblem } from "@/model/subject-utils.ts";
+import { validateLocalStudyMaterialValue, validateReadingNote } from "@/model/subject-utils.ts";
+import { ValidationError } from "@/model/validation-error.ts";
 import { readFile } from "fs/promises";
 import { LOCAL_STUDY_MATERIALS_PATH } from "./data-paths.ts";
 import { loadMnemonicImageRegistry } from "./mnemonic-image-fetcher.ts";
@@ -105,8 +106,13 @@ export function checkLocalStudyMaterialSubjects(params: {
       continue;
     }
 
-    const problem = "reading_note" in record ? readingNoteProblem(type) : null;
-    if (problem) throw invalidFile(`subject ${subjectId} field reading_note ${problem}`);
+    if ("reading_note" in record) {
+      validateField({
+        subjectId,
+        field: "reading_note",
+        validate: () => validateReadingNote(type),
+      });
+    }
   }
 }
 
@@ -160,11 +166,23 @@ function parseLocalStudyMaterials(value: unknown): Record<string, LocalStudyMate
       if (!knownFields.includes(field)) {
         throw invalidFile(`subject ${subjectId} field ${field} is not a known field`);
       }
-      const problem = localStudyMaterialValueProblem(field, fieldValue);
-      if (problem) throw invalidFile(`subject ${subjectId} field ${field} ${problem}`);
+      validateField({
+        subjectId,
+        field,
+        validate: () => validateLocalStudyMaterialValue(field, fieldValue),
+      });
     }
   }
   return value as Record<string, LocalStudyMaterial>;
+}
+
+function validateField(params: { subjectId: string; field: string; validate: () => void }): void {
+  try {
+    params.validate();
+  } catch (error) {
+    if (!(error instanceof ValidationError)) throw error;
+    throw invalidFile(`subject ${params.subjectId} field ${params.field} ${error.message}`);
+  }
 }
 
 /**

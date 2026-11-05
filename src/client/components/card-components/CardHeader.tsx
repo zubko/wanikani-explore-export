@@ -8,7 +8,7 @@ type CardHeaderProps = {
   subtitle?: string;
   character?: string | null;
   characterImage?: React.ReactNode;
-  documentUrl?: string;
+  documentUrl?: string | null;
   actions?: React.ReactNode;
 };
 
