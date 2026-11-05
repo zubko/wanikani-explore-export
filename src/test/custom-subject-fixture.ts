@@ -1,8 +1,23 @@
-import type { CustomSubject, KanaVocabularyData, VocabularyData } from "@/model/wanikani.ts";
+import type {
+  CustomSubject,
+  CustomSubjectInput,
+  KanaVocabularyData,
+  VocabularyData,
+} from "@/model/wanikani.ts";
 import { CUSTOM_SUBJECTS_PATH } from "@server/repository/data-paths.ts";
 import { setFileContent } from "./preload.ts";
 
 const CREATED_AT = "2026-11-05T10:00:00.000Z";
+const FIXED_DATA_FIELDS = [
+  "slug",
+  "level",
+  "hidden_at",
+  "document_url",
+  "created_at",
+  "pronunciation_audios",
+  "lesson_position",
+  "spaced_repetition_system_id",
+];
 // 下 in the real WaniKani data
 export const CUSTOM_VERB_KANJI_ID = 451;
 
@@ -107,6 +122,13 @@ export const customSubjectFixture: CustomSubject[] = [
 /** Changes the file behind the repository, like a hand edit or a git pull does. */
 export function setCustomSubjectsFile(records: unknown[]): void {
   setFileContent(CUSTOM_SUBJECTS_PATH, JSON.stringify(records, null, 2) + "\n");
+}
+
+/** The body an agent would send for this record: the record without the fixed fields. */
+export function customSubjectInputOf(record: CustomSubject): CustomSubjectInput {
+  const data: Record<string, unknown> = { ...record.data };
+  for (const field of FIXED_DATA_FIELDS) delete data[field];
+  return { object: record.object, data } as unknown as CustomSubjectInput;
 }
 
 function fixedFields(characters: string) {

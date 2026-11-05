@@ -33,6 +33,12 @@ import {
 } from "./repository/data-loader.ts";
 import { upsertLocalStudyMaterial } from "./repository/study-material.ts";
 import {
+  CustomSubjectWriteError,
+  createCustomSubject,
+  deleteCustomSubject,
+  updateCustomSubject,
+} from "./repository/custom-subject.ts";
+import {
   getPrimaryMeaning,
   isVisibleSubject,
   validateLocalStudyMaterialValue,
@@ -97,6 +103,30 @@ async function readJsonObjectBody(c: Context): Promise<Record<string, unknown> |
   const body = await c.req.json().catch(() => null);
   if (typeof body !== "object" || body === null || Array.isArray(body)) return null;
   return body as Record<string, unknown>;
+}
+
+/** Answers `null` for an id that is not a custom subject id, so a WaniKani id is a 400. */
+function parseCustomSubjectId(param: string): number | null {
+  if (!/^\d+$/.test(param)) return null;
+  const id = Number(param);
+  return isCustomSubjectId(id) ? id : null;
+}
+
+/** The shape every write body needs. The write module checks the content. */
+function checkCustomSubjectBody(body: Record<string, unknown> | null): string | null {
+  if (!body) return "Invalid body: must be a JSON object";
+  if (!("object" in body) || !("data" in body)) {
+    return "Missing required parameters: object and data";
+  }
+  const data = body.data;
+  if (typeof data !== "object" || data === null || Array.isArray(data)) {
+    return "Invalid data: must be an object";
+  }
+  return null;
+}
+
+function customSubjectErrorStatus(error: unknown): 400 | 404 | 409 | 500 {
+  return error instanceof CustomSubjectWriteError ? error.status : 500;
 }
 
 async function findStudyMaterialSubjectType(id: number): Promise<SubjectType | null> {
@@ -326,6 +356,106 @@ const app = new Hono()
       const message = getErrorMessage(err);
       console.error(`[API] Study material id=${id} — error: ${message}`);
       return c.json({ ok: false as const, error: message }, 500);
+    }
+  })
+  .get("/custom-subjects", async (c) => {
+    console.log("[API] List custom subjects");
+    try {
+      const data = await getCustomSubjects();
+      console.log(`[API] List custom subjects — ${data.length} records`);
+      return c.json({ ok: true as const, data });
+    } catch (err) {
+      const message = getErrorMessage(err);
+      console.error(`[API] List custom subjects — error: ${message}`);
+      return c.json({ ok: false as const, error: message }, 500);
+    }
+  })
+  .get("/custom-subjects/:id", async (c) => {
+    const param = c.req.param("id");
+    const id = parseCustomSubjectId(param);
+    if (id === null) {
+      return c.json(
+        { ok: false as const, error: `Invalid id: ${param} is not a custom subject id` },
+        400
+      );
+    }
+
+    console.log(`[API] Get custom subject id=${id}`);
+    try {
+      const data = findCustomSubject(await getCustomSubjects(), id);
+      if (!data) {
+        console.log(`[API] Get custom subject id=${id} — not found`);
+        return c.json({ ok: false as const, error: `custom subject ${id} not found` }, 404);
+      }
+      return c.json({ ok: true as const, data });
+    } catch (err) {
+      const message = getErrorMessage(err);
+      console.error(`[API] Get custom subject id=${id} — error: ${message}`);
+      return c.json({ ok: false as const, error: message }, 500);
+    }
+  })
+  .post("/custom-subjects", async (c) => {
+    const body = await readJsonObjectBody(c);
+    const bodyProblem = checkCustomSubjectBody(body);
+    if (bodyProblem) return c.json({ ok: false as const, error: bodyProblem }, 400);
+
+    console.log("[API] Create custom subject");
+    try {
+      const data = await createCustomSubject(body);
+      console.log(
+        `[API] Create custom subject — saved ${data.object} id=${data.id} "${data.data.characters}"`
+      );
+      return c.json({ ok: true as const, data }, 201);
+    } catch (err) {
+      const message = getErrorMessage(err);
+      console.error(`[API] Create custom subject — error: ${message}`);
+      return c.json({ ok: false as const, error: message }, customSubjectErrorStatus(err));
+    }
+  })
+  .put("/custom-subjects/:id", async (c) => {
+    const param = c.req.param("id");
+    const id = parseCustomSubjectId(param);
+    if (id === null) {
+      return c.json(
+        { ok: false as const, error: `Invalid id: ${param} is not a custom subject id` },
+        400
+      );
+    }
+
+    const body = await readJsonObjectBody(c);
+    const bodyProblem = checkCustomSubjectBody(body);
+    if (bodyProblem) return c.json({ ok: false as const, error: bodyProblem }, 400);
+
+    console.log(`[API] Update custom subject id=${id}`);
+    try {
+      const data = await updateCustomSubject(id, body);
+      console.log(`[API] Update custom subject id=${id} — saved`);
+      return c.json({ ok: true as const, data });
+    } catch (err) {
+      const message = getErrorMessage(err);
+      console.error(`[API] Update custom subject id=${id} — error: ${message}`);
+      return c.json({ ok: false as const, error: message }, customSubjectErrorStatus(err));
+    }
+  })
+  .delete("/custom-subjects/:id", async (c) => {
+    const param = c.req.param("id");
+    const id = parseCustomSubjectId(param);
+    if (id === null) {
+      return c.json(
+        { ok: false as const, error: `Invalid id: ${param} is not a custom subject id` },
+        400
+      );
+    }
+
+    console.log(`[API] Delete custom subject id=${id}`);
+    try {
+      await deleteCustomSubject(id);
+      console.log(`[API] Delete custom subject id=${id} — hidden`);
+      return c.json({ ok: true as const });
+    } catch (err) {
+      const message = getErrorMessage(err);
+      console.error(`[API] Delete custom subject id=${id} — error: ${message}`);
+      return c.json({ ok: false as const, error: message }, customSubjectErrorStatus(err));
     }
   })
   .post("/anki-sync", async (c) => {

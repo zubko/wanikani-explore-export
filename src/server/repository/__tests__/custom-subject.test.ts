@@ -1,11 +1,12 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { CUSTOM_SUBJECT_ID_FLOOR } from "@/model/wanikani.ts";
-import type { CustomSubject, CustomSubjectInput } from "@/model/wanikani.ts";
+import type { CustomSubject } from "@/model/wanikani.ts";
 import { holdFsOp, resetFsMock, setFileContent, setFsError, writeCalls } from "@/test/preload.ts";
 import {
   CUSTOM_VERB_KANJI_ID,
   customKanaWord,
   customSubjectFixture,
+  customSubjectInputOf,
   customVerb,
   hiddenCustomWord,
   setCustomSubjectsFile,
@@ -24,22 +25,6 @@ import { ensureRepositoryInitialized } from "./setup.ts";
 // 口 and 毎晩 in the real WaniKani data
 const OTHER_KANJI_ID = 452;
 const WANIKANI_WORD_ID = 3766;
-const FIXED_DATA_FIELDS = [
-  "slug",
-  "level",
-  "hidden_at",
-  "document_url",
-  "created_at",
-  "pronunciation_audios",
-  "lesson_position",
-  "spaced_repetition_system_id",
-];
-
-function inputOf(record: CustomSubject): CustomSubjectInput {
-  const data: Record<string, unknown> = { ...record.data };
-  for (const field of FIXED_DATA_FIELDS) delete data[field];
-  return { object: record.object, data } as unknown as CustomSubjectInput;
-}
 
 function lastWrittenRecords(): CustomSubject[] {
   const call = writeCalls.at(-1);
@@ -58,8 +43,8 @@ async function writeError(promise: Promise<unknown>): Promise<CustomSubjectWrite
   return error;
 }
 
-const kanaWordInput = inputOf(customKanaWord);
-const verbInput = inputOf(customVerb);
+const kanaWordInput = customSubjectInputOf(customKanaWord);
+const verbInput = customSubjectInputOf(customVerb);
 
 beforeAll(ensureRepositoryInitialized);
 
@@ -99,7 +84,7 @@ describe("createCustomSubject", () => {
   test("the characters of a hidden word are free again", async () => {
     setCustomSubjectsFile(customSubjectFixture);
 
-    const saved = await createCustomSubject(inputOf(hiddenCustomWord));
+    const saved = await createCustomSubject(customSubjectInputOf(hiddenCustomWord));
 
     expect(saved.id).toBe(hiddenCustomWord.id + 1);
     expect(saved.data.hidden_at).toBeNull();
@@ -213,7 +198,7 @@ describe("updateCustomSubject", () => {
 
     const unknown = await writeError(updateCustomSubject(hiddenCustomWord.id + 1, verbInput));
     const hidden = await writeError(
-      updateCustomSubject(hiddenCustomWord.id, inputOf(hiddenCustomWord))
+      updateCustomSubject(hiddenCustomWord.id, customSubjectInputOf(hiddenCustomWord))
     );
 
     expect([unknown.status, hidden.status]).toEqual([404, 404]);
