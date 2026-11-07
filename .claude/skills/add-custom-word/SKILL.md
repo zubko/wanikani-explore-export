@@ -78,34 +78,69 @@ Draft the whole body (templates below). Then show the user each mnemonic block b
 saved. A kana word has only the meaning block. A word with kanji has the meaning block and the
 reading block.
 
+### Look at existing mnemonics first
+
+Before you write, read what already exists. Use these sources for ideas. Do not copy a text
+unless the user picks it.
+
+- **WaniKani data.** The kanji search of step 3 gives the meaning and reading mnemonics of every
+  kanji of the word. A story can build on them, like WaniKani's own words do.
+- **WaniKani Community Mnemonics 2 (WKCM2).** Mnemonics that WaniKani users wrote and voted on.
+  The read needs no key. Ask for the word (`type=v`) and for each of its kanji (`type=k`):
+
+  ```bash
+  curl -sL -m 60 -G --data-urlencode "exec=get" --data-urlencode "type=v" \
+    --data-urlencode "item=<word>" \
+    "https://script.google.com/macros/s/AKfycby_Kqff92G40TGXr0PSulvQ2gqx6bkHVEl6LplZ-zc5ZIHhJGwe7AA8I4nDErKMiu2GEw/exec"
+  ```
+
+  The answer is `null` when nobody wrote one. That is the usual case for a custom word, because
+  WKCM2 only knows WaniKani items. Otherwise `Meaning_Mnem` and `Reading_Mnem` are JSON strings
+  in the shape `{"<user>": ["<text>", ...]}`, and `Meaning_Score` / `Reading_Score` hold the
+  votes. A `"!"` key is a request for a mnemonic, not a mnemonic. The texts use `[kan]`, `[voc]`,
+  `[rad]` and `[read]` tags. Turn them into the WaniKani tags when you save one.
+
+Pick at most two existing mnemonics per block, the ones with the best score that fit this word.
+The sources state no license, so a picked text keeps a short credit at its end, like
+`(WKCM2, by <user>)`.
+
 ### The meaning mnemonic
 
-One draft. It holds a short story, where the word is used, and its nuance. When the meaning of the
-word is not the kanji meanings put together, add a line that says so.
+Write three options of your own. Each one holds a short story, where the word is used, and its
+nuance. Make them differ: another sound hook, another scene. When the meaning of the word is not
+the kanji meanings put together, every option says so in one line.
 
 ### The reading mnemonic
 
 Pick the case by the reading each kanji has in this word:
 
-1. Every kanji uses its primary taught reading. One draft in the WaniKani style, with no new story.
-   For a jukugo word, WaniKani writes "This is a jukugo word, which usually means on'yomi
-   readings from the kanji. If you know the readings of your kanji you'll know how to read this
-   as well."
-2. A kanji uses a taught reading that is not its primary one. One draft that names it as the other
-   reading WaniKani teaches for that kanji. Reuse that kanji's reading mnemonic where it fits.
-3. An untaught reading, or an exception (a sound change, a special reading). Two or three story
-   options, each with the reading in `<reading>` tags.
+1. Every kanji uses its primary taught reading. One draft in the WaniKani style, with no new story
+   and no options. For a jukugo word, WaniKani writes "This is a jukugo word, which usually means
+   on'yomi readings from the kanji. If you know the readings of your kanji you'll know how to
+   read this as well."
+2. A kanji uses a taught reading that is not its primary one. Three options that name it as the
+   other reading WaniKani teaches for that kanji. Reuse that kanji's reading mnemonic where it
+   fits.
+3. An untaught reading, or an exception (a sound change, a special reading). Three story options,
+   each with the reading in `<reading>` tags.
 
-### The answer of the user
+### Show it to the user
 
-Show every block as one draft or as two or three options. For each block the user can answer in
-one of five ways:
+Show everything in one message, in this order:
 
-1. Accept the draft as is.
-2. Pick one of the options.
-3. Write the whole text.
-4. Give a hint, a correction or a direction. You write the block again.
-5. Pick an option or the draft and add a note. You work the note in.
+1. Every mnemonic block as one numbered list: the existing mnemonics first, each with its source,
+   author and score, then your three options.
+2. The rest of the body: type, parts of speech, meanings, readings, conjugations and sentences.
+3. The answers the user can give.
+
+For each block the user can answer in one of these ways:
+
+1. Pick one option as is.
+2. Write the whole text.
+3. Give a hint, a correction or a direction. You write three new options.
+4. Pick an option and add a note. You work the note in.
+
+The user can also change any part of the rest of the body.
 
 After every change, show the new text again. Save nothing the user has not seen.
 
