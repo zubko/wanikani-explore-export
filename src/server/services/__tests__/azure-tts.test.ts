@@ -1,20 +1,33 @@
 import { describe, test, expect, beforeEach, afterEach, afterAll } from "bun:test";
 import { createFetchMock, resolveUrl } from "@/test/fetch-utils.ts";
 import {
-  buildSentenceSsml,
-  generateSentenceAudio,
-  pickSentenceVoice,
+  buildSpeechSsml,
+  generateSpeechAudio,
+  pickVoice,
   readAzureTtsConfig,
-  sentenceAudioHash,
-  SENTENCE_AUDIO_OUTPUT_FORMAT,
+  speechAudioHash,
+  SPEECH_AUDIO_OUTPUT_FORMAT,
   type AzureTtsConfig,
 } from "@server/services/azure-tts.ts";
 
 type RecordedRequest = { url: string; method?: string; headers: Headers; body?: string };
 
-const ENV_NAMES = ["AZURE_TTS_KEY", "AZURE_TTS_REGION", "AZURE_TTS_VOICES"];
-const VOICES = ["ja-JP-Nanami:DragonHDLatestNeural", "ja-JP-Masaru:DragonHDLatestNeural"];
-const CONFIG: AzureTtsConfig = { key: "secret-key", region: "westeurope", voices: VOICES };
+const ENV_NAMES = [
+  "AZURE_TTS_KEY",
+  "AZURE_TTS_REGION",
+  "AZURE_TTS_FEMALE_VOICES",
+  "AZURE_TTS_MALE_VOICES",
+  "AZURE_TTS_VOICES",
+];
+const FEMALE_VOICES = ["ja-JP-Nanami:DragonHDLatestNeural", "ja-JP-Mayu:DragonHDLatestNeural"];
+const MALE_VOICES = ["ja-JP-Masaru:DragonHDLatestNeural"];
+const VOICES = [...FEMALE_VOICES, ...MALE_VOICES];
+const CONFIG: AzureTtsConfig = {
+  key: "secret-key",
+  region: "westeurope",
+  voices: VOICES,
+  voicesByGender: { female: FEMALE_VOICES, male: MALE_VOICES },
+};
 
 // Other test files install their own fetch mock, so this is not the real fetch
 const previousFetch = globalThis.fetch;
@@ -40,7 +53,9 @@ beforeEach(() => {
   savedEnv = Object.fromEntries(ENV_NAMES.map((name) => [name, process.env[name]]));
   process.env.AZURE_TTS_KEY = CONFIG.key;
   process.env.AZURE_TTS_REGION = CONFIG.region;
-  process.env.AZURE_TTS_VOICES = VOICES.join(", ");
+  process.env.AZURE_TTS_FEMALE_VOICES = FEMALE_VOICES.join(", ");
+  process.env.AZURE_TTS_MALE_VOICES = MALE_VOICES.join(", ");
+  delete process.env.AZURE_TTS_VOICES;
   requests = [];
   answer = defaultAnswer;
 });
@@ -58,13 +73,13 @@ afterAll(() => {
 });
 
 describe("readAzureTtsConfig", () => {
-  test("reads the three values and splits the voice list", () => {
+  test("reads the values and splits both voice lists, female voices first", () => {
     expect(readAzureTtsConfig()).toEqual(CONFIG);
   });
 
   test("throws with the name of the first missing variable", () => {
     delete process.env.AZURE_TTS_REGION;
-    delete process.env.AZURE_TTS_VOICES;
+    delete process.env.AZURE_TTS_MALE_VOICES;
     expect(() => readAzureTtsConfig()).toThrow("Missing AZURE_TTS_REGION in the root env file");
   });
 
@@ -73,33 +88,63 @@ describe("readAzureTtsConfig", () => {
     expect(() => readAzureTtsConfig()).toThrow("Missing AZURE_TTS_KEY in the root env file");
   });
 
-  test("an empty entry in the voice list is refused", () => {
-    for (const voices of [`${VOICES[0]},`, `${VOICES[0]},,${VOICES[1]}`, ` , ${VOICES[0]}`]) {
-      process.env.AZURE_TTS_VOICES = voices;
+  test("each gender needs a voice list", () => {
+    for (const name of ["AZURE_TTS_FEMALE_VOICES", "AZURE_TTS_MALE_VOICES"]) {
+      const value = process.env[name];
+      delete process.env[name];
+      expect(() => readAzureTtsConfig()).toThrow(`Missing ${name} in the root env file`);
+      process.env[name] = value;
+    }
+  });
+
+  test("an empty entry in a voice list is refused", () => {
+    const [male] = MALE_VOICES;
+    const otherMale = "ja-JP-Keita:DragonHDLatestNeural";
+    for (const voices of [`${male},`, `${male},,${otherMale}`, ` , ${male}`]) {
+      process.env.AZURE_TTS_MALE_VOICES = voices;
       expect(() => readAzureTtsConfig()).toThrow(
-        "Empty voice in AZURE_TTS_VOICES in the root env file"
+        "Empty voice in AZURE_TTS_MALE_VOICES in the root env file"
       );
     }
   });
-});
 
-describe("pickSentenceVoice", () => {
-  test("gives one slug the same voice every time", () => {
-    const voice = pickSentenceVoice(VOICES, "毎晩");
-    expect(VOICES).toContain(voice);
-    expect(pickSentenceVoice(VOICES, "毎晩")).toBe(voice);
+  test("a voice in both lists is refused", () => {
+    process.env.AZURE_TTS_MALE_VOICES = `${MALE_VOICES[0]},${FEMALE_VOICES[1]}`;
+    expect(() => readAzureTtsConfig()).toThrow(
+      `Voice ${FEMALE_VOICES[1]} is in both AZURE_TTS_FEMALE_VOICES and AZURE_TTS_MALE_VOICES in the root env file`
+    );
   });
 
-  test("uses both voices over a set of slugs", () => {
-    const slugs = ["毎晩", "入る", "平壌", "高校", "ここ", "実る", "人", "大人"];
-    const usedVoices = new Set(slugs.map((slug) => pickSentenceVoice(VOICES, slug)));
+  test("the old AZURE_TTS_VOICES list fails, with or without the new lists", () => {
+    const message =
+      "AZURE_TTS_VOICES is no longer read. Put the female voices in AZURE_TTS_FEMALE_VOICES " +
+      "and the male voices in AZURE_TTS_MALE_VOICES, then remove AZURE_TTS_VOICES from the root env file";
+    process.env.AZURE_TTS_VOICES = VOICES.join(",");
+    expect(() => readAzureTtsConfig()).toThrow(message);
+
+    delete process.env.AZURE_TTS_FEMALE_VOICES;
+    delete process.env.AZURE_TTS_MALE_VOICES;
+    expect(() => readAzureTtsConfig()).toThrow(message);
+  });
+});
+
+describe("pickVoice", () => {
+  test("gives one slug the same voice every time", () => {
+    const voice = pickVoice(VOICES, "毎晩");
+    expect(VOICES).toContain(voice);
+    expect(pickVoice(VOICES, "毎晩")).toBe(voice);
+  });
+
+  test("uses every voice over a set of slugs", () => {
+    const slugs = ["毎晩", "入る", "平壌", "高校", "ここ", "実る", "人", "大人", "下す", "どうぞ"];
+    const usedVoices = new Set(slugs.map((slug) => pickVoice(VOICES, slug)));
     expect([...usedVoices].sort()).toEqual([...VOICES].sort());
   });
 });
 
-describe("buildSentenceSsml", () => {
+describe("buildSpeechSsml", () => {
   test("escapes the text and holds the voice name and its language", () => {
-    const ssml = buildSentenceSsml({ text: "A < B & C", voice: VOICES[0]! });
+    const ssml = buildSpeechSsml({ text: "A < B & C", voice: VOICES[0]! });
     expect(ssml).toMatchInlineSnapshot(`
       "<speak version='1.0' xml:lang='ja-JP'>
           <voice name='ja-JP-Nanami:DragonHDLatestNeural'>A &lt; B &amp; C</voice>
@@ -108,22 +153,22 @@ describe("buildSentenceSsml", () => {
   });
 });
 
-describe("sentenceAudioHash", () => {
+describe("speechAudioHash", () => {
   test("gives one SSML the same hash and another voice a new one", () => {
-    const ssml = buildSentenceSsml({ text: "毎晩", voice: VOICES[0]! });
-    const otherVoiceSsml = buildSentenceSsml({ text: "毎晩", voice: VOICES[1]! });
+    const ssml = buildSpeechSsml({ text: "毎晩", voice: VOICES[0]! });
+    const otherVoiceSsml = buildSpeechSsml({ text: "毎晩", voice: VOICES[1]! });
 
-    expect(sentenceAudioHash(ssml)).toMatch(/^[0-9a-f]{8}$/);
-    expect(sentenceAudioHash(ssml)).toBe(sentenceAudioHash(ssml));
-    expect(sentenceAudioHash(otherVoiceSsml)).not.toBe(sentenceAudioHash(ssml));
+    expect(speechAudioHash(ssml)).toMatch(/^[0-9a-f]{8}$/);
+    expect(speechAudioHash(ssml)).toBe(speechAudioHash(ssml));
+    expect(speechAudioHash(otherVoiceSsml)).not.toBe(speechAudioHash(ssml));
   });
 });
 
-describe("generateSentenceAudio", () => {
+describe("generateSpeechAudio", () => {
   test("posts the SSML with the three headers and answers an mp3", async () => {
-    const ssml = buildSentenceSsml({ text: "毎晩", voice: VOICES[0]! });
+    const ssml = buildSpeechSsml({ text: "毎晩", voice: VOICES[0]! });
 
-    const media = await generateSentenceAudio({ ssml, config: CONFIG });
+    const media = await generateSpeechAudio({ ssml, config: CONFIG });
 
     expect(media.extension).toBe("mp3");
     expect(media.data.length).toBe(100);
@@ -135,15 +180,15 @@ describe("generateSentenceAudio", () => {
     expect(Object.fromEntries(request?.headers ?? [])).toEqual({
       "ocp-apim-subscription-key": CONFIG.key,
       "content-type": "application/ssml+xml",
-      "x-microsoft-outputformat": SENTENCE_AUDIO_OUTPUT_FORMAT,
+      "x-microsoft-outputformat": SPEECH_AUDIO_OUTPUT_FORMAT,
     });
   });
 
   test("a bad status throws with the status and the answer text", async () => {
     answer = () => new Response("Quota exceeded", { status: 429 });
-    const ssml = buildSentenceSsml({ text: "毎晩", voice: VOICES[0]! });
+    const ssml = buildSpeechSsml({ text: "毎晩", voice: VOICES[0]! });
 
-    await expect(generateSentenceAudio({ ssml, config: CONFIG })).rejects.toThrow(
+    await expect(generateSpeechAudio({ ssml, config: CONFIG })).rejects.toThrow(
       "Azure TTS error: 429 - Quota exceeded"
     );
   });

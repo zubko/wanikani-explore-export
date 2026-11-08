@@ -1,17 +1,38 @@
-import { afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeAll, beforeEach, describe, expect, spyOn, test } from "bun:test";
+import { readFileSync } from "fs";
 import { unlink } from "fs/promises";
-import type { LocalStudyMaterial } from "@/model/wanikani.ts";
+import { CUSTOM_SUBJECT_ID_FLOOR } from "@/model/wanikani.ts";
+import type { LocalStudyMaterial, RadicalData } from "@/model/wanikani.ts";
 import { holdFsOp, resetFsMock, setFileContent, setFsError, writeCalls } from "@/test/preload.ts";
 import { setStudyMaterialFile, studyMaterialFixture } from "@/test/study-material-fixture.ts";
 import {
+  CUSTOM_VERB_KANJI_ID,
+  customKanaVerb,
+  customKanaWord,
+  customSubjectFixture,
+  customVerb,
+  hiddenCustomWord,
+  setCustomSubjectsFile,
+} from "@/test/custom-subject-fixture.ts";
+import {
   checkLocalStudyMaterialSubjects,
   ensureLocalStudyMaterialsFile,
+  getCustomSubjects,
+  getCustomWordsByKanji,
+  getKanaVocabularyData,
   getLocalStudyMaterials,
+  getVocabularyData,
   initRepository,
   readLocalStudyMaterials,
 } from "../data-loader.ts";
-import { LOCAL_STUDY_MATERIALS_PATH, MNEMONIC_IMAGES_PATH } from "../data-paths.ts";
+import {
+  CUSTOM_SUBJECTS_PATH,
+  LOCAL_STUDY_MATERIALS_PATH,
+  MNEMONIC_IMAGES_PATH,
+} from "../data-paths.ts";
 import { ensureRepositoryInitialized } from "./setup.ts";
+
+const UNKNOWN_CUSTOM_ID = CUSTOM_SUBJECT_ID_FLOOR + 99;
 
 function setFile(content: unknown): void {
   setFileContent(
@@ -148,7 +169,11 @@ describe("checkLocalStudyMaterialSubjects", () => {
     unknownSubject: "fail" | "skip" = "fail"
   ): string {
     try {
-      checkLocalStudyMaterialSubjects({ records, unknownSubject });
+      checkLocalStudyMaterialSubjects({
+        records,
+        unknownSubject,
+        customSubjects: customSubjectFixture,
+      });
       return "no error";
     } catch (error) {
       return String(error);
@@ -212,6 +237,165 @@ describe("checkLocalStudyMaterialSubjects", () => {
       "subject 9176 field reading_note a kana_vocabulary has no reading"
     );
   });
+
+  test("a custom id and a hidden custom id pass", () => {
+    expect(
+      subjectError({
+        [customVerb.id]: { reading_note: "Kudasu" },
+        [hiddenCustomWord.id]: { meaning_note: "Below" },
+      })
+    ).toBe("no error");
+  });
+
+  test("an unknown custom id is refused, and passes with skip", () => {
+    expect(subjectError({ [UNKNOWN_CUSTOM_ID]: { meaning_note: "Typo" } })).toContain(
+      `subject ${UNKNOWN_CUSTOM_ID} is not a custom subject`
+    );
+    expect(subjectError({ [UNKNOWN_CUSTOM_ID]: { meaning_note: "Newer" } }, "skip")).toBe(
+      "no error"
+    );
+  });
+
+  test("a reading note on a custom kana word is refused in both modes", () => {
+    for (const mode of ["fail", "skip"] as const) {
+      expect(subjectError({ [customKanaWord.id]: { reading_note: "Douzo" } }, mode)).toContain(
+        `subject ${customKanaWord.id} field reading_note a kana_vocabulary has no reading`
+      );
+    }
+  });
+});
+
+describe("getCustomSubjects", () => {
+  beforeAll(ensureRepositoryInitialized);
+
+  async function customError(): Promise<string> {
+    return await getCustomSubjects().then(
+      () => "no error",
+      (error: unknown) => String(error)
+    );
+  }
+
+  test("the seeded empty file answers no record", async () => {
+    expect(await getCustomSubjects()).toEqual([]);
+  });
+
+  test("a change from outside shows on the next read", async () => {
+    await getCustomSubjects();
+    setCustomSubjectsFile(customSubjectFixture);
+
+    expect(await getCustomSubjects()).toEqual(customSubjectFixture);
+  });
+
+  test("broken JSON names the path", async () => {
+    setFileContent(CUSTOM_SUBJECTS_PATH, "[ broken");
+
+    expect(await customError()).toContain(`Cannot read ${CUSTOM_SUBJECTS_PATH}`);
+  });
+
+  test("a bad record names the path and the record", async () => {
+    setCustomSubjectsFile([{ ...customVerb, data: { ...customVerb.data, level: 3 } }]);
+
+    expect(await customError()).toContain(
+      `Invalid ${CUSTOM_SUBJECTS_PATH}: record ${customVerb.id}: data.level must be 0`
+    );
+  });
+
+  test("a missing file is refused and not created", async () => {
+    await unlink(CUSTOM_SUBJECTS_PATH);
+
+    expect(await customError()).toContain(`${CUSTOM_SUBJECTS_PATH} is missing`);
+    expect(writeCalls).toHaveLength(0);
+  });
+
+  test("an unknown kanji id logs a warning and keeps the record", async () => {
+    const word = { ...customVerb, data: { ...customVerb.data, component_subject_ids: [999999] } };
+    const warn = spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      setCustomSubjectsFile([word]);
+
+      expect(await getCustomSubjects()).toEqual([word]);
+      expect(warn.mock.calls.map(([line]) => String(line))).toEqual([
+        `[Repository] ${CUSTOM_SUBJECTS_PATH}: custom subject ${word.id} uses 999999, which is no visible WaniKani kanji`,
+      ]);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  // 下手 (id=2538) is a WaniKani word
+  test("a WaniKani clash logs a warning and keeps the record", async () => {
+    const word = {
+      ...customVerb,
+      data: { ...customVerb.data, characters: "下手", slug: "下手" },
+    };
+    const warn = spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      setCustomSubjectsFile([word]);
+
+      expect(await getCustomSubjects()).toEqual([word]);
+      expect(warn.mock.calls.map(([line]) => String(line))).toEqual([
+        `[Repository] ${CUSTOM_SUBJECTS_PATH}: custom subject ${word.id} "下手" has the same characters as WaniKani 2538`,
+      ]);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  test("a clash with a WaniKani kana word logs a warning too (ちょっと, id=9176)", async () => {
+    const word = {
+      ...customKanaWord,
+      data: { ...customKanaWord.data, characters: "ちょっと", slug: "ちょっと" },
+    };
+    const warn = spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      setCustomSubjectsFile([word]);
+
+      expect(await getCustomSubjects()).toEqual([word]);
+      expect(warn.mock.calls.map(([line]) => String(line))).toEqual([
+        `[Repository] ${CUSTOM_SUBJECTS_PATH}: custom subject ${word.id} "ちょっと" has the same characters as WaniKani 9176`,
+      ]);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  test("a hidden record and a kana record log no warning", async () => {
+    const hiddenWithProblems = {
+      ...hiddenCustomWord,
+      data: {
+        ...hiddenCustomWord.data,
+        characters: "下手",
+        slug: "下手",
+        component_subject_ids: [999999],
+      },
+    };
+    const warn = spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      setCustomSubjectsFile([customKanaWord, hiddenWithProblems]);
+
+      expect(await getCustomSubjects()).toEqual([customKanaWord, hiddenWithProblems]);
+      expect(warn).not.toHaveBeenCalled();
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  test("the words by kanji list the verb and not the hidden word", async () => {
+    setCustomSubjectsFile(customSubjectFixture);
+
+    expect((await getCustomWordsByKanji()).get(CUSTOM_VERB_KANJI_ID)).toEqual([customVerb.id]);
+  });
+
+  test("the vocabulary getters append the custom records of their type, hidden ones included", async () => {
+    setCustomSubjectsFile(customSubjectFixture);
+
+    const vocabularyIds = (await getVocabularyData()).map((item) => item.id);
+    const kanaIds = (await getKanaVocabularyData()).map((item) => item.id);
+
+    expect(vocabularyIds.slice(-2)).toEqual([customVerb.id, hiddenCustomWord.id]);
+    expect(kanaIds.slice(-2)).toEqual([customKanaWord.id, customKanaVerb.id]);
+    expect(vocabularyIds).not.toContain(customKanaWord.id);
+  });
 });
 
 describe("getLocalStudyMaterials", () => {
@@ -222,6 +406,37 @@ describe("getLocalStudyMaterials", () => {
 
     await expect(getLocalStudyMaterials()).rejects.toThrow(
       "subject 1 field reading_note a radical has no reading"
+    );
+  });
+
+  test("a pulled reading note on a custom kana word fails until the file is fixed", async () => {
+    setCustomSubjectsFile(customSubjectFixture);
+    setStudyMaterialFile({
+      ...studyMaterialFixture,
+      [customKanaWord.id]: { reading_note: "Douzo" },
+    });
+
+    await expect(getLocalStudyMaterials()).rejects.toThrow(
+      `subject ${customKanaWord.id} field reading_note a kana_vocabulary has no reading`
+    );
+    await expect(getLocalStudyMaterials()).rejects.toThrow("has no reading");
+
+    const fixed = { ...studyMaterialFixture, [customKanaWord.id]: { meaning_note: "Douzo" } };
+    setStudyMaterialFile(fixed);
+
+    expect(await getLocalStudyMaterials()).toEqual(fixed);
+  });
+
+  test("a change of only the custom file runs the subject rules again", async () => {
+    setCustomSubjectsFile(customSubjectFixture);
+    const file = { ...studyMaterialFixture, [customVerb.id]: { reading_note: "Kudasu" } };
+    setStudyMaterialFile(file);
+    expect(await getLocalStudyMaterials()).toEqual(file);
+
+    setCustomSubjectsFile([{ ...customKanaWord, id: customVerb.id }]);
+
+    await expect(getLocalStudyMaterials()).rejects.toThrow(
+      `subject ${customVerb.id} field reading_note a kana_vocabulary has no reading`
     );
   });
 
@@ -254,6 +469,55 @@ describe("initRepository", () => {
     setStudyMaterialFile({ ...studyMaterialFixture, "999999": { meaning_note: "Typo" } });
 
     await expect(initRepository()).rejects.toThrow("subject 999999 is not a WaniKani subject");
+  });
+
+  test("creates a missing custom subjects file", async () => {
+    await unlink(CUSTOM_SUBJECTS_PATH);
+
+    await initRepository();
+
+    expect(writeCalls).toEqual([{ path: CUSTOM_SUBJECTS_PATH, data: "[]\n" }]);
+  });
+
+  test("a broken custom subjects file fails the start", async () => {
+    setFileContent(CUSTOM_SUBJECTS_PATH, "[ broken");
+
+    await expect(initRepository()).rejects.toThrow(`Cannot read ${CUSTOM_SUBJECTS_PATH}`);
+  });
+
+  test("a note on a custom word passes the start, one on an unknown custom id fails it", async () => {
+    setCustomSubjectsFile(customSubjectFixture);
+    setStudyMaterialFile({
+      ...studyMaterialFixture,
+      [hiddenCustomWord.id]: { meaning_note: "Below" },
+    });
+
+    await initRepository();
+
+    setStudyMaterialFile({
+      ...studyMaterialFixture,
+      [UNKNOWN_CUSTOM_ID]: { meaning_note: "Typo" },
+    });
+
+    await expect(initRepository()).rejects.toThrow(
+      `subject ${UNKNOWN_CUSTOM_ID} is not a custom subject`
+    );
+  });
+
+  test("a WaniKani id at the custom floor fails the start", async () => {
+    const radicalsPath = "./data/userdata/radicals.json";
+    const radicals = JSON.parse(readFileSync(radicalsPath, "utf-8")) as RadicalData[];
+    const id = CUSTOM_SUBJECT_ID_FLOOR;
+    setFileContent(radicalsPath, JSON.stringify([...radicals, { ...radicals[0], id }]));
+    try {
+      await expect(initRepository()).rejects.toThrow(
+        `WaniKani id ${id} reached CUSTOM_SUBJECT_ID_FLOOR`
+      );
+    } finally {
+      resetFsMock();
+      // the failed start kept the changed radicals, so the next tests need the real ones
+      await initRepository();
+    }
   });
 
   test("a broken registry line fails the start", async () => {

@@ -12,29 +12,17 @@ import {
   getPrimaryMeaning,
   isVisibleSubject,
 } from "@/model/subject-utils.ts";
+import { isCustomSubjectId } from "@/model/custom-subject-utils.ts";
 import {
-  vocabulary,
-  kanaVocabulary,
   studyMaterials,
   getLocalStudyMaterials,
+  getVocabularyData,
+  getKanaVocabularyData,
+  getWords,
   verbConjugations,
   sentenceReadings,
 } from "./data-loader.ts";
 import { getKanjis } from "./kanji.ts";
-
-function getConjugations(subjectId: number): Conjugations | null {
-  const raw = verbConjugations[subjectId];
-  return raw ? { type: "verb", ...raw } : null;
-}
-
-function enrichContextSentencesWithReadings(
-  subjectId: number,
-  sentences: ContextSentence[]
-): ContextSentence[] {
-  const entry = sentenceReadings[subjectId];
-  if (!entry) return sentences;
-  return sentences.map((s) => (s.ja === entry.ja ? { ...s, reading: entry.reading } : s));
-}
 
 async function mapVocabularyDataToVocabulary(data: VocabularyData): Promise<Vocabulary> {
   const componentKanji = await getKanjis(data.data.component_subject_ids);
@@ -47,6 +35,7 @@ async function mapVocabularyDataToVocabulary(data: VocabularyData): Promise<Voca
     slug: data.data.slug,
     level: data.data.level,
     documentUrl: data.data.document_url,
+    isCustom: isCustomSubjectId(data.id),
     meanings: data.data.meanings,
     auxiliaryMeanings: data.data.auxiliary_meanings,
     meaningMnemonic: data.data.meaning_mnemonic,
@@ -54,12 +43,12 @@ async function mapVocabularyDataToVocabulary(data: VocabularyData): Promise<Voca
     readingMnemonic: data.data.reading_mnemonic,
     partsOfSpeech: data.data.parts_of_speech,
     componentSubjectIds: componentKanji.map((kanjiItem) => kanjiItem.id),
-    contextSentences: enrichContextSentencesWithReadings(data.id, data.data.context_sentences),
+    contextSentences: getContextSentences(data),
     pronunciationAudios: data.data.pronunciation_audios,
     studyMaterial: findStudyMaterial(studyMaterials, data.id, "vocabulary"),
     localStudyMaterial: findLocalStudyMaterial(localStudyMaterials, data.id),
     componentKanji,
-    conjugations: getConjugations(data.id),
+    conjugations: getConjugations(data),
   };
 }
 
@@ -75,43 +64,37 @@ async function mapKanaVocabularyDataToKanaVocabulary(
     slug: data.data.slug,
     level: data.data.level,
     documentUrl: data.data.document_url,
+    isCustom: isCustomSubjectId(data.id),
     meanings: data.data.meanings,
     auxiliaryMeanings: data.data.auxiliary_meanings,
     meaningMnemonic: data.data.meaning_mnemonic,
     partsOfSpeech: data.data.parts_of_speech,
-    contextSentences: enrichContextSentencesWithReadings(data.id, data.data.context_sentences),
+    contextSentences: getContextSentences(data),
     pronunciationAudios: data.data.pronunciation_audios,
     studyMaterial: findStudyMaterial(studyMaterials, data.id, "kana_vocabulary"),
     localStudyMaterial: findLocalStudyMaterial(localStudyMaterials, data.id),
+    conjugations: getConjugations(data),
   };
 }
 
 async function findAndBuildVocabulary(
   predicate: (v: VocabularyData | KanaVocabularyData) => boolean
 ): Promise<Vocabulary | KanaVocabulary | null> {
-  const isMatch = (v: VocabularyData | KanaVocabularyData) => isVisibleSubject(v) && predicate(v);
-
-  const vocabData = vocabulary.find(isMatch);
-  if (vocabData) {
-    return mapVocabularyDataToVocabulary(vocabData);
-  }
-
-  const kanaVocabData = kanaVocabulary.find(isMatch);
-  if (kanaVocabData) {
-    return mapKanaVocabularyDataToKanaVocabulary(kanaVocabData);
-  }
-
-  return null;
+  const word = (await getWords()).find((v) => isVisibleSubject(v) && predicate(v));
+  if (!word) return null;
+  return word.object === "vocabulary"
+    ? mapVocabularyDataToVocabulary(word)
+    : mapKanaVocabularyDataToKanaVocabulary(word);
 }
 
 export async function getVocabulary(id: number): Promise<Vocabulary | null> {
-  const data = vocabulary.find((v) => v.id === id && isVisibleSubject(v));
+  const data = (await getVocabularyData()).find((v) => v.id === id && isVisibleSubject(v));
   if (!data) return null;
   return mapVocabularyDataToVocabulary(data);
 }
 
 export async function getKanaVocabulary(id: number): Promise<KanaVocabulary | null> {
-  const data = kanaVocabulary.find((v) => v.id === id && isVisibleSubject(v));
+  const data = (await getKanaVocabularyData()).find((v) => v.id === id && isVisibleSubject(v));
   if (!data) return null;
   return mapKanaVocabularyDataToKanaVocabulary(data);
 }
@@ -129,4 +112,19 @@ export async function findVocabularyByMeaning(
   return findAndBuildVocabulary(
     (v) => getPrimaryMeaning(v.data.meanings).toLowerCase() === normalizedMeaning
   );
+}
+
+// A custom record holds its conjugations and sentence readings itself, a WaniKani word gets them
+// from the two LLM files
+function getConjugations(data: VocabularyData | KanaVocabularyData): Conjugations | null {
+  const raw = isCustomSubjectId(data.id) ? data.data.conjugations : verbConjugations[data.id];
+  return raw ? { type: "verb", ...raw } : null;
+}
+
+function getContextSentences(data: VocabularyData | KanaVocabularyData): ContextSentence[] {
+  const sentences = data.data.context_sentences;
+  if (isCustomSubjectId(data.id)) return sentences;
+  const entry = sentenceReadings[data.id];
+  if (!entry) return sentences;
+  return sentences.map((s) => (s.ja === entry.ja ? { ...s, reading: entry.reading } : s));
 }

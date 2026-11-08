@@ -10,6 +10,7 @@ A web app for creating Anki flashcards from WaniKani data. Search for radicals, 
 - Verb conjugations for vocabulary cards, with the masu form on the answer side
 - Alternative meanings and your own synonyms on the answer side of kanji and vocabulary cards
 - TTS audio for context sentences (via Azure TTS)
+- Custom words for words WaniKani does not teach, like どうぞ or くれる. They live in `data/userdata/custom_subjects.json`. The search finds them, the card shows a "custom" label, and the add to Anki writes them like WaniKani words. Their reading audio comes from Azure TTS. An AI agent adds them through the `/api/custom-subjects` routes and the `add-custom-word` skill
 - A media cache in `data/userdata/media/`: every radical image, mnemonic picture and audio clip is downloaded or generated once, so a re-sync of all notes downloads nothing. The radical mnemonic picture is stored in Anki's media folder, so it shows offline too
 - Dark mode support in Anki cards
 
@@ -68,7 +69,7 @@ Search for a vocabulary word to see its full breakdown — kanji composition, ra
 - [Bun](https://bun.sh)
 - [Anki](https://apps.ankiweb.net/) desktop with the [AnkiConnect](https://ankiweb.net/shared/info/2055492159) plugin
 - A [WaniKani](https://www.wanikani.com/) account and API token
-- [Azure TTS](https://docs.microsoft.com/en-us/azure/cognitive-services/speech-service/overview) credentials for context sentence audio. The server does not run without them
+- [Azure TTS](https://docs.microsoft.com/en-us/azure/cognitive-services/speech-service/overview) credentials for context sentence audio and the reading audio of custom words. The voices are two comma lists, `AZURE_TTS_FEMALE_VOICES` and `AZURE_TTS_MALE_VOICES`, with at least one voice each. The server does not run without them. A left-over `AZURE_TTS_VOICES` stops the start with a message that names the new variables
 - (Optional) An OpenAI-compatible LLM endpoint for the two generate scripts (`LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL` in `scripts/.env`)
 
 ## Setup
@@ -83,7 +84,7 @@ Copy the example env files and fill in your values:
 
 ```bash
 cp scripts/.env.example scripts/.env   # WaniKani API token (required), LLM settings (optional)
-cp .env.example .env                   # Azure TTS for sentence audio (required)
+cp .env.example .env                   # Azure TTS for sentence and custom reading audio (required)
 ```
 
 Download WaniKani data (saved to `data/userdata/`, which is gitignored):
@@ -138,13 +139,23 @@ curl -s -G --data-urlencode "q=食べる" -d type=vocabulary "http://localhost:5
 curl -X POST "http://localhost:5173/api/add-to-anki" \
   -H "Content-Type: application/json" \
   -d '{"id": 2547, "type": "vocabulary"}'
+
+# List the custom words, hidden ones included
+curl -s "http://localhost:5173/api/custom-subjects"
+
+# Create a custom word from a JSON file. The server fills the fixed fields and answers the new id
+curl -s -X POST "http://localhost:5173/api/custom-subjects" \
+  -H "Content-Type: application/json" \
+  --data-binary @custom-word.json
 ```
+
+Every POST, PUT and PATCH with a body must send `Content-Type: application/json`, the server answers 415 otherwise. `PUT /api/custom-subjects/<id>` replaces the content of a custom word, and `DELETE /api/custom-subjects/<id>` hides it. A DELETE keeps the Anki note, delete it in Anki by hand. `CLAUDE.md` lists every route and its answers.
 
 ## Data Scripts
 
 | Command                              | Description                                                                                                                                                                   |
 | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `bun run download-subjects`          | Download WaniKani subjects                                                                                                                                                    |
+| `bun run download-subjects`          | Download WaniKani subjects. Then warns about a custom word that now has the same characters as a WaniKani word                                                                |
 | `bun run download-study-materials`   | Download study materials                                                                                                                                                      |
 | `bun run patch-subjects`             | Apply the corrections in `data/wanikani-fixes.yaml` to the downloaded subjects. Run after every download. Writes nothing unless every patch applies                           |
 | `bun run generate-verb-conjugations` | Generate verb conjugations via LLM. Only fills missing verbs, in batches of 20                                                                                                |

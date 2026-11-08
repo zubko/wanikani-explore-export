@@ -1,6 +1,9 @@
 export const SUBJECT_TYPES = ["radical", "kanji", "vocabulary", "kana_vocabulary"] as const;
 export type SubjectType = (typeof SUBJECT_TYPES)[number];
 
+/** Custom subject ids start here, far above the WaniKani ids, so the two never clash. */
+export const CUSTOM_SUBJECT_ID_FLOOR = 1_000_000;
+
 export function isSubjectType(value: string): value is SubjectType {
   return SUBJECT_TYPES.includes(value as SubjectType);
 }
@@ -123,6 +126,9 @@ export type VerbConjugations = {
 
 export type Conjugations = VerbConjugations;
 
+/** The forms of a verb as the data files store them, with no `type`. */
+export type VerbConjugationForms = Omit<VerbConjugations, "type">;
+
 export type SubjectReference = {
   id: number;
   characters: string;
@@ -137,7 +143,6 @@ type BaseSubjectDataFields = {
   level: number;
   slug: string;
   hidden_at: string | null;
-  document_url: string;
   characters: string | null;
   meanings: Meaning[];
   auxiliary_meanings: AuxiliaryMeaning[];
@@ -147,11 +152,13 @@ type BaseSubjectDataFields = {
 };
 
 type RadicalDataFields = BaseSubjectDataFields & {
+  document_url: string;
   character_images: CharacterImage[];
   amalgamation_subject_ids: number[];
 };
 
 type KanjiDataFields = BaseSubjectDataFields & {
+  document_url: string;
   readings: KanjiReading[];
   component_subject_ids: number[];
   amalgamation_subject_ids: number[];
@@ -162,24 +169,29 @@ type KanjiDataFields = BaseSubjectDataFields & {
 };
 
 type VocabularyDataFields = BaseSubjectDataFields & {
+  document_url: string | null;
   readings: VocabularyReading[];
   parts_of_speech: string[];
   component_subject_ids: number[];
   context_sentences: ContextSentence[];
   pronunciation_audios: PronunciationAudio[];
   reading_mnemonic: string;
+  // A WaniKani record never has it, a custom verb record does
+  conjugations?: VerbConjugationForms;
 };
 
 type KanaVocabularyDataFields = BaseSubjectDataFields & {
+  document_url: string | null;
   parts_of_speech: string[];
   context_sentences: ContextSentence[];
   pronunciation_audios: PronunciationAudio[];
+  conjugations?: VerbConjugationForms;
 };
 
 type BaseSubjectWrapper<T extends SubjectType, D> = {
   id: number;
   object: T;
-  url: string;
+  url: string | null;
   data_updated_at: string;
   data: D;
 };
@@ -190,6 +202,44 @@ export type VocabularyData = BaseSubjectWrapper<"vocabulary", VocabularyDataFiel
 export type KanaVocabularyData = BaseSubjectWrapper<"kana_vocabulary", KanaVocabularyDataFields>;
 
 export type SubjectData = RadicalData | KanjiData | VocabularyData | KanaVocabularyData;
+
+/** A record of the custom subjects file. */
+export type CustomSubject = VocabularyData | KanaVocabularyData;
+
+/** The fields of a custom word body that both types have. */
+export const CUSTOM_SUBJECT_COMMON_INPUT_FIELDS = [
+  "characters",
+  "meanings",
+  "auxiliary_meanings",
+  "parts_of_speech",
+  "meaning_mnemonic",
+  "context_sentences",
+  "conjugations",
+] as const;
+/** The fields of a custom word body that only a `vocabulary` word has. */
+export const CUSTOM_VOCABULARY_ONLY_INPUT_FIELDS = [
+  "readings",
+  "reading_mnemonic",
+  "component_subject_ids",
+] as const;
+
+// A custom word always has characters, only a WaniKani radical can have none
+type CommonInputField = Exclude<(typeof CUSTOM_SUBJECT_COMMON_INPUT_FIELDS)[number], "characters">;
+
+type CustomVocabularyInputData = { characters: string } & Pick<
+  VocabularyDataFields,
+  CommonInputField | (typeof CUSTOM_VOCABULARY_ONLY_INPUT_FIELDS)[number]
+>;
+
+type CustomKanaVocabularyInputData = { characters: string } & Pick<
+  KanaVocabularyDataFields,
+  CommonInputField
+>;
+
+/** The body an agent sends to create or update a custom subject. The server fills the fixed fields. */
+export type CustomSubjectInput =
+  | { object: "vocabulary"; data: CustomVocabularyInputData }
+  | { object: "kana_vocabulary"; data: CustomKanaVocabularyInputData };
 
 // Enriched types (flat, no nested .data property)
 
@@ -241,7 +291,8 @@ export type Vocabulary = {
   characters: string;
   slug: string;
   level: number;
-  documentUrl: string;
+  documentUrl: string | null;
+  isCustom: boolean;
   meanings: Meaning[];
   auxiliaryMeanings: AuxiliaryMeaning[];
   meaningMnemonic: string;
@@ -263,7 +314,8 @@ export type KanaVocabulary = {
   characters: string;
   slug: string;
   level: number;
-  documentUrl: string;
+  documentUrl: string | null;
+  isCustom: boolean;
   meanings: Meaning[];
   auxiliaryMeanings: AuxiliaryMeaning[];
   meaningMnemonic: string;
@@ -272,6 +324,7 @@ export type KanaVocabulary = {
   pronunciationAudios: PronunciationAudio[];
   studyMaterial: StudyMaterial | null;
   localStudyMaterial: LocalStudyMaterial | null;
+  conjugations: Conjugations | null;
 };
 
 export type Subject = Radical | Kanji | Vocabulary | KanaVocabulary;

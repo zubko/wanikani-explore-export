@@ -35,11 +35,11 @@ import {
   VOCABULARY_EXPECTED_FIELDS,
 } from "@/model/anki-models.ts";
 import {
-  buildSentenceSsml,
-  generateSentenceAudio,
-  pickSentenceVoice,
+  buildSpeechSsml,
+  generateSpeechAudio,
+  pickVoice,
   readAzureTtsConfig,
-  sentenceAudioHash,
+  speechAudioHash,
   type AzureTtsConfig,
 } from "@/server/services/azure-tts.ts";
 import {
@@ -92,6 +92,8 @@ type KanjiNoteFields = {
   reading_hint: string;
   reading_note: string;
 };
+
+type ReadingAudioTags = Record<VoiceGender, string>;
 
 type VocabularyNoteFields = {
   characters: string;
@@ -592,7 +594,7 @@ function getComponentKanji(vocabulary: Vocabulary | KanaVocabulary): Kanji[] {
 
 /**
  * A fixed gender per word keeps the clip names stable, so a re-sync reads every clip from disk.
- * The sentence voice hashes the slug. With two voices, female first, the same hash would always
+ * The sentence voice hashes the slug. With one voice per gender, the same hash would always
  * give the reading the same gender as the sentence voice. A kana word's reading is its slug, so
  * the hash input gets its own prefix.
  */
@@ -622,6 +624,69 @@ function pickReadingAudios(
   return { gender: preferredGender, readingAudios: [] };
 }
 
+/**
+ * Anki auto-plays every [sound:] tag on the card back, so only one gender is filled.
+ * All readings of it are kept: 平壌 needs both ぴょんやん and へいじょう.
+ */
+async function storeWaniKaniReadingAudios(params: {
+  deckId: number;
+  vocabulary: Vocabulary | KanaVocabulary;
+}): Promise<ReadingAudioTags> {
+  const { deckId, vocabulary } = params;
+  const { gender, readingAudios } = pickReadingAudios(
+    vocabulary,
+    preferredReadingGender(vocabulary)
+  );
+  if (readingAudios.length === 0) {
+    console.log(`[Anki] No audio available for ${vocabulary.characters}`);
+  }
+  const soundTags: string[] = [];
+  for (const audio of readingAudios) {
+    const ankiFilename = await storeReadingAudio({ deckId, slug: vocabulary.slug, gender, audio });
+    soundTags.push(`[sound:${ankiFilename}]`);
+  }
+  return readingAudioTagsFor(gender, soundTags);
+}
+
+/** WaniKani has no clips for a custom word, so Azure reads every reading in the voice of the gender. */
+async function storeCustomReadingAudios(params: {
+  deckId: number;
+  vocabulary: Vocabulary | KanaVocabulary;
+  azureTtsConfig: AzureTtsConfig;
+}): Promise<ReadingAudioTags> {
+  const { deckId, vocabulary, azureTtsConfig } = params;
+  const slug = vocabulary.slug;
+  const gender = preferredReadingGender(vocabulary);
+  const voice = pickVoice(azureTtsConfig.voicesByGender[gender], slug);
+  console.log(`[Anki] Reading audio ${slug}: TTS (custom word)`);
+  const soundTags: string[] = [];
+  for (const reading of acceptedReadingsPrimaryFirst(vocabulary)) {
+    const ssml = buildSpeechSsml({ text: reading, voice });
+    const ankiFilename = await storeCachedMedia({
+      deckId,
+      folder: "readings",
+      nameWithoutExtension: `${slug}_${gender}_${speechAudioHash(ssml)}`,
+      fetch: () => generateSpeechAudio({ ssml, config: azureTtsConfig }),
+    });
+    soundTags.push(`[sound:${ankiFilename}]`);
+  }
+  return readingAudioTagsFor(gender, soundTags);
+}
+
+function readingAudioTagsFor(gender: VoiceGender, soundTags: string[]): ReadingAudioTags {
+  return { female: "", male: "", [gender]: soundTags.join(" ") };
+}
+
+function acceptedReadingsPrimaryFirst(vocabulary: Vocabulary | KanaVocabulary): string[] {
+  if (vocabulary.object !== "vocabulary") return [vocabulary.characters];
+  const primaryReading = getPrimaryReading(vocabulary.readings);
+  const otherReadings = vocabulary.readings
+    .filter((r) => r.accepted_answer)
+    .map((r) => r.reading)
+    .filter((reading) => reading !== primaryReading);
+  return [primaryReading, ...otherReadings];
+}
+
 function storeReadingAudio(params: {
   deckId: number;
   slug: string;
@@ -649,20 +714,20 @@ async function storeSentenceAudio(params: {
 
   // The Dragon HD voice is on trial to read the kanji itself. The generated
   // kana reading only fills the furigana field.
-  const voice = pickSentenceVoice(azureTtsConfig.voices, slug);
-  const ssml = buildSentenceSsml({ text: sentence.ja, voice });
+  const voice = pickVoice(azureTtsConfig.voices, slug);
+  const ssml = buildSpeechSsml({ text: sentence.ja, voice });
   return storeCachedMedia({
     deckId,
     folder: "sentences",
-    nameWithoutExtension: `${slug}_${sentenceAudioHash(ssml)}`,
-    fetch: () => generateSentenceAudio({ ssml, config: azureTtsConfig }),
+    nameWithoutExtension: `${slug}_${speechAudioHash(ssml)}`,
+    fetch: () => generateSpeechAudio({ ssml, config: azureTtsConfig }),
   });
 }
 
 function buildVocabularyNoteFields(params: {
   vocabulary: Vocabulary | KanaVocabulary;
   componentKanji: Kanji[];
-  readingAudioTags: { female: string; male: string };
+  readingAudioTags: ReadingAudioTags;
   shortestSentence: ContextSentence | null;
   sentenceAudioFilename: string;
 }): VocabularyNoteFields {
@@ -678,7 +743,7 @@ function buildVocabularyNoteFields(params: {
     vocabulary.localStudyMaterial
   );
 
-  const conjugations = vocabData?.conjugations;
+  const conjugations = vocabulary.conjugations;
   const conjugationsStr = conjugations
     ? `${conjugations.dictionary}, ${conjugations.masu}, ${conjugations.te}, ${conjugations.nai}`
     : "";
@@ -720,24 +785,9 @@ async function addOrUpdateVocabularyCore(params: {
 
   const deckId = await getDeckId(VOCABULARY_DECK_NAME);
   const slug = vocabulary.slug;
-  // Anki auto-plays every [sound:] tag on the card back, so only one gender is
-  // filled. All readings of it are kept: 平壌 needs both ぴょんやん and へいじょう.
-  const { gender, readingAudios } = pickReadingAudios(
-    vocabulary,
-    preferredReadingGender(vocabulary)
-  );
-
-  const readingAudioTags = { female: "", male: "" };
-
-  if (readingAudios.length === 0) {
-    console.log(`[Anki] No audio available for ${characters}`);
-  }
-  const soundTags: string[] = [];
-  for (const audio of readingAudios) {
-    const ankiFilename = await storeReadingAudio({ deckId, slug, gender, audio });
-    soundTags.push(`[sound:${ankiFilename}]`);
-  }
-  readingAudioTags[gender] = soundTags.join(" ");
+  const readingAudioTags = vocabulary.isCustom
+    ? await storeCustomReadingAudios({ deckId, vocabulary, azureTtsConfig })
+    : await storeWaniKaniReadingAudios({ deckId, vocabulary });
 
   const shortestSentence = getShortestSentence(vocabulary.contextSentences);
   const sentenceAudioFilename = await storeSentenceAudio({

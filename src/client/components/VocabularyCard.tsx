@@ -54,6 +54,7 @@ export function VocabularyCard({ vocabulary }: VocabularyCardProps) {
         title={primaryMeaning}
         character={vocabulary.characters}
         documentUrl={vocabulary.documentUrl}
+        sourceLabel={vocabulary.isCustom ? "custom" : undefined}
         actions={<AddToAnkiButton onClick={handleAddToAnki} />}
       />
       <div className="divide-y divide-gray-200">
@@ -62,7 +63,7 @@ export function VocabularyCard({ vocabulary }: VocabularyCardProps) {
           meanings={vocabulary.meanings}
           synonyms={synonymProps(vocabulary)}
           partsOfSpeech={vocabulary.partsOfSpeech}
-          conjugations={vocabData?.conjugations ?? null}
+          conjugations={vocabulary.conjugations}
           mnemonic={vocabulary.meaningMnemonic}
           note={noteProps(vocabulary, "meaning_note")}
         />

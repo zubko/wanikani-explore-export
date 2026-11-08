@@ -3,11 +3,19 @@ import {
   ensureRepositoryInitialized,
   resetFsMock,
   writeCalls,
+  setFileContent,
   setFsError,
 } from "@/test/preload.ts";
+import {
+  customKanaWord,
+  customSubjectFixture,
+  customVerb,
+  hiddenCustomWord,
+  setCustomSubjectsFile,
+} from "@/test/custom-subject-fixture.ts";
 import { lastWrite, studyMaterialFixture as fixture } from "@/test/study-material-fixture.ts";
 import { getLocalStudyMaterials } from "../repository/data-loader.ts";
-import { LOCAL_STUDY_MATERIALS_PATH } from "../repository/data-paths.ts";
+import { CUSTOM_SUBJECTS_PATH, LOCAL_STUDY_MATERIALS_PATH } from "../repository/data-paths.ts";
 import { api } from "../api.ts";
 
 async function patchJson(body: unknown, rawBody?: string) {
@@ -216,5 +224,68 @@ describe("study-materials API upsert", () => {
 
     expect(writeCalls).toHaveLength(1);
     expect(writeCalls[0]!.path).toBe(LOCAL_STUDY_MATERIALS_PATH);
+  });
+});
+
+describe("study-materials API on custom words", () => {
+  beforeEach(() => setCustomSubjectsFile(customSubjectFixture));
+
+  test("saves a note on a custom word", async () => {
+    const { status, json } = await patchJson({ id: customVerb.id, reading_note: "Kudasu" });
+
+    expect(status).toBe(200);
+    expect(json).toEqual({ ok: true, data: { reading_note: "Kudasu" } });
+    expect(lastWrite()[String(customVerb.id)]).toEqual({ reading_note: "Kudasu" });
+    expect((await getLocalStudyMaterials())[String(customVerb.id)]).toEqual({
+      reading_note: "Kudasu",
+    });
+  });
+
+  test("a hidden custom word returns 404", async () => {
+    const { status, json } = await patchJson({ id: hiddenCustomWord.id, meaning_note: "Note" });
+
+    expect(status).toBe(404);
+    expect(json).toEqual({ ok: false, error: "Subject not found" });
+    expect(writeCalls).toHaveLength(0);
+  });
+
+  test("a reading note on a custom kana word returns 400", async () => {
+    const { status, json } = await patchJson({ id: customKanaWord.id, reading_note: "Note" });
+
+    expect(status).toBe(400);
+    expect(json).toEqual({
+      ok: false,
+      error: "Invalid reading_note: a kana_vocabulary has no reading",
+    });
+    expect(writeCalls).toHaveLength(0);
+  });
+
+  test("a broken custom subjects file returns a JSON 500 and writes nothing", async () => {
+    setFileContent(CUSTOM_SUBJECTS_PATH, "{ broken");
+
+    const { status, json } = await patchJson({ id: customVerb.id, meaning_note: "Note" });
+
+    expect(status).toBe(500);
+    expect(json.ok).toBe(false);
+    expect(json.error).toContain(`Cannot read ${CUSTOM_SUBJECTS_PATH}`);
+    expect(writeCalls).toHaveLength(0);
+  });
+
+  test("an unknown custom id returns 404", async () => {
+    const { status, json } = await patchJson({ id: 1_000_999, meaning_note: "Note" });
+
+    expect(status).toBe(404);
+    expect(json).toEqual({ ok: false, error: "Subject not found" });
+    expect(writeCalls).toHaveLength(0);
+  });
+
+  test("a WaniKani id still saves when the custom subjects file is broken (毎晩)", async () => {
+    setFileContent(CUSTOM_SUBJECTS_PATH, "{ broken");
+
+    const { status, json } = await patchJson({ id: 3766, meaning_note: "Note" });
+
+    expect(status).toBe(200);
+    expect(json.ok).toBe(true);
+    expect(lastWrite()["3766"]?.meaning_note).toBe("Note");
   });
 });

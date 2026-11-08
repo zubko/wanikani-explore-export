@@ -8,7 +8,8 @@ type CardHeaderProps = {
   subtitle?: string;
   character?: string | null;
   characterImage?: React.ReactNode;
-  documentUrl?: string;
+  documentUrl?: string | null;
+  sourceLabel?: string;
   actions?: React.ReactNode;
 };
 
@@ -18,6 +19,7 @@ export function CardHeader({
   character,
   characterImage,
   documentUrl,
+  sourceLabel,
   actions,
 }: CardHeaderProps) {
   return (
@@ -29,7 +31,14 @@ export function CardHeader({
         >
           {character ?? characterImage ?? "?"}
         </div>
-        <h2 className="text-3xl text-gray-900 max-sm:col-span-2 max-sm:row-start-2">{title}</h2>
+        <h2 className="text-3xl text-gray-900 max-sm:col-span-2 max-sm:row-start-2">
+          {title}
+          {sourceLabel && (
+            <span className="ml-2 inline-block rounded border border-gray-300 px-1.5 align-middle text-sm text-gray-500">
+              {sourceLabel}
+            </span>
+          )}
+        </h2>
       </div>
       <div className="flex items-center gap-2">
         {actions}

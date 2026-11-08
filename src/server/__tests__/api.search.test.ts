@@ -14,8 +14,19 @@ import {
   setStudyMaterialFile,
   studyMaterialFixture as fixture,
 } from "@/test/study-material-fixture.ts";
+import {
+  customKanaWord,
+  customSubjectFixture,
+  customVerb,
+  hiddenCustomWord,
+  setCustomSubjectsFile,
+} from "@/test/custom-subject-fixture.ts";
 import { getLocalStudyMaterials } from "../repository/data-loader.ts";
-import { LOCAL_STUDY_MATERIALS_PATH, MNEMONIC_IMAGES_PATH } from "../repository/data-paths.ts";
+import {
+  CUSTOM_SUBJECTS_PATH,
+  LOCAL_STUDY_MATERIALS_PATH,
+  MNEMONIC_IMAGES_PATH,
+} from "../repository/data-paths.ts";
 import { api } from "../api.ts";
 
 installFetchInterceptor();
@@ -162,5 +173,82 @@ describe("search API with the local study materials changed outside the app", ()
     const response = await searchApi("type=kanji&q=川");
     expect(response.status).toBe(200);
     expect((await response.json()).data.localStudyMaterial).toEqual(fixture["456"]!);
+  });
+});
+
+describe("search API with custom words", () => {
+  beforeEach(() => setCustomSubjectsFile(customSubjectFixture));
+
+  test("finds a custom verb (下す)", async () => {
+    const result = await searchJson("type=vocabulary&q=下す");
+    expect(result.found).toBe(true);
+    expect(result.data.id).toBe(customVerb.id);
+    expect(result.data.isCustom).toBe(true);
+    expect(result.data).toMatchSnapshot();
+  });
+
+  test("never finds the hidden custom word (下記)", async () => {
+    const response = await searchApi("type=vocabulary&q=下記");
+    expect(response.status).toBe(404);
+  });
+
+  test("the kanji card lists the custom verb and not the hidden word (下)", async () => {
+    const result = await searchJson("type=kanji&q=下");
+    const ids = result.data.foundInVocabulary.map((reference: { id: number }) => reference.id);
+    expect(ids).toContain(customVerb.id);
+    expect(ids).not.toContain(hiddenCustomWord.id);
+    expect(result.data.amalgamationSubjectIds).toContain(customVerb.id);
+  });
+});
+
+describe("search API when a custom word clashes with a WaniKani word", () => {
+  test("the WaniKani word wins a characters search (ちょっと)", async () => {
+    const clash = {
+      ...customKanaWord,
+      data: { ...customKanaWord.data, characters: "ちょっと", slug: "ちょっと" },
+    };
+    setCustomSubjectsFile([clash]);
+
+    const result = await searchJson(`type=vocabulary&q=${encodeURIComponent("ちょっと")}`);
+    expect(result.data.id).toBe(9176);
+  });
+
+  test("a WaniKani kana word wins a meaning search over a custom word (Hotel, ホテル)", async () => {
+    const meanings = [{ meaning: "Hotel", primary: true, accepted_answer: true }];
+    setCustomSubjectsFile([{ ...customVerb, data: { ...customVerb.data, meanings } }]);
+
+    const result = await searchJson("type=vocabulary&q=Hotel");
+    expect(result.data.id).toBe(9178);
+  });
+});
+
+describe("a broken custom subjects file", () => {
+  beforeEach(() => setFileContent(CUSTOM_SUBJECTS_PATH, "{ broken"));
+
+  test("fails a vocabulary search with a 500", async () => {
+    const response = await searchApi(`type=vocabulary&q=${encodeURIComponent("毎晩")}`);
+    expect(response.status).toBe(500);
+  });
+
+  test("answers ok:false for the vocabulary notes, the kanji notes still list", async () => {
+    const vocabulary = await (await api.request("/anki-notes?type=vocabulary")).json();
+    const kanji = await (await api.request("/anki-notes?type=kanji")).json();
+
+    expect(vocabulary.ok).toBe(false);
+    expect(vocabulary.error).toContain(`Cannot read ${CUSTOM_SUBJECTS_PATH}`);
+    expect(kanji.ok).toBe(true);
+  });
+
+  test("answers ok:false for an add to Anki and writes no note (毎晩)", async () => {
+    const response = await api.request("/add-to-anki", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: 3766, type: "vocabulary" }),
+    });
+
+    expect(response.status).toBe(200);
+    const result = await response.json();
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain(`Cannot read ${CUSTOM_SUBJECTS_PATH}`);
   });
 });

@@ -3,6 +3,7 @@ import { readFileSync } from "fs";
 import { readFile } from "fs/promises";
 import { basename, dirname, normalize } from "path";
 import {
+  CUSTOM_SUBJECTS_PATH,
   LOCAL_STUDY_MATERIALS_PATH,
   MEDIA_ROOT_PATH,
   MNEMONIC_IMAGES_PATH,
@@ -34,6 +35,7 @@ export const STUDY_MATERIALS_FIXTURE_PATH = "src/test/fixtures/study_materials_e
 const SEEDED_FILES = [
   { path: MNEMONIC_IMAGES_PATH, fixturePath: "src/test/fixtures/mnemonic-images.jsonl" },
   { path: LOCAL_STUDY_MATERIALS_PATH, fixturePath: STUDY_MATERIALS_FIXTURE_PATH },
+  { path: CUSTOM_SUBJECTS_PATH, fixturePath: "src/test/fixtures/custom_subjects.json" },
 ];
 
 // A seeded or media file that is not in the mock must read as missing, never as the user's real
@@ -200,7 +202,10 @@ mock.module("fs/promises", () => ({
 // sentence clip names in the snapshots from machine to machine
 process.env.AZURE_TTS_KEY = "test-key";
 process.env.AZURE_TTS_REGION = "eastus";
-process.env.AZURE_TTS_VOICES = "ja-JP-TestNeural";
+process.env.AZURE_TTS_FEMALE_VOICES = "ja-JP-TestFemaleNeural";
+process.env.AZURE_TTS_MALE_VOICES = "ja-JP-TestMaleNeural";
+// The root env file may still hold the old list, and readAzureTtsConfig refuses it
+delete process.env.AZURE_TTS_VOICES;
 
 let initialized = false;
 

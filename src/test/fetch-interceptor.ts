@@ -23,6 +23,8 @@ const SVG_CONTENT_TYPE = "image/svg+xml";
 export const ankiCalls: AnkiCall[] = [];
 /** Every fetched URL that is not AnkiConnect, so a test can see a cache hit made no request. */
 export const externalFetches: string[] = [];
+/** The SSML body of every TTS call, so a test can see the spoken text and the voice. */
+export const ttsRequests: string[] = [];
 
 const responseOverrides = new Map<string, unknown>();
 const errorOverrides = new Map<string, AnkiErrorOverride>();
@@ -84,6 +86,7 @@ export function installFetchInterceptor() {
     }
 
     if (url.includes(".tts.speech.microsoft.com")) {
+      ttsRequests.push(String(init?.body));
       return new Response(new ArrayBuffer(100), {
         status: 200,
         headers: { "Content-Type": "audio/mpeg" },
@@ -120,6 +123,7 @@ export function setMediaContentType(contentType: string | null) {
 export function resetFetchInterceptor() {
   ankiCalls.length = 0;
   externalFetches.length = 0;
+  ttsRequests.length = 0;
   responseOverrides.clear();
   errorOverrides.clear();
   callCounts.clear();

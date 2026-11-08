@@ -8,11 +8,13 @@ import {
 } from "../src/model/anki-models.ts";
 import type {
   AnkiNoteItem,
+  CustomSubject,
   KanjiData,
   RadicalData,
   VocabularyData,
 } from "../src/model/wanikani.ts";
 import { ankiInvoke } from "./lib/anki-templates.ts";
+import { CUSTOM_SUBJECTS_FILE } from "./lib/data-paths.ts";
 import { formatError } from "./lib/format-error.ts";
 import {
   buildReferenceLookup,
@@ -175,12 +177,21 @@ Options:
 }
 
 async function loadReferenceLookup(): Promise<ReferenceLookup> {
-  const [vocabulary, kanji, radicals] = await Promise.all([
+  const [vocabulary, customSubjects, kanji, radicals] = await Promise.all([
     readJsonFile<VocabularyData[]>(`${DATA_DIR}/vocabulary.json`),
+    readJsonFile<CustomSubject[]>(CUSTOM_SUBJECTS_FILE),
     readJsonFile<KanjiData[]>(`${DATA_DIR}/kanji.json`),
     readJsonFile<RadicalData[]>(`${DATA_DIR}/radicals.json`),
   ]);
-  return buildReferenceLookup({ vocabulary, kanji, radicals });
+  const customVocabulary = customSubjects.filter(
+    (subject): subject is VocabularyData => subject.object === "vocabulary"
+  );
+  // The lookup keeps the last word of each spelling, and the WaniKani word must win, like on the server
+  return buildReferenceLookup({
+    vocabulary: [...customVocabulary, ...vocabulary],
+    kanji,
+    radicals,
+  });
 }
 
 async function fetchIdsInAnki(baseUrl: string): Promise<Set<number>> {

@@ -1,16 +1,19 @@
 import { Hono } from "hono";
 import type { Context } from "hono";
+import { createMiddleware } from "hono/factory";
 import { isSubjectType, LOCAL_STUDY_MATERIAL_PATCH_FIELDS } from "@/model/wanikani.ts";
 import type {
   AnkiAddResult,
   AnkiNoteItem,
   Kanji,
   KanaVocabulary,
+  KanaVocabularyData,
   LocalStudyMaterialPatch,
   Radical,
   Subject,
   SubjectType,
   Vocabulary,
+  VocabularyData,
 } from "@/model/wanikani.ts";
 
 import { getRadical, findRadicalByCharacters, findRadicalByName } from "./repository/radical.ts";
@@ -24,17 +27,25 @@ import {
 import {
   radicals as radicalData,
   kanji as kanjiData,
-  vocabulary as vocabularyData,
-  kanaVocabulary as kanaVocabularyData,
+  findSubjectTypeWithCustom,
+  getCustomSubjects,
+  getWords,
 } from "./repository/data-loader.ts";
-import { findSubjectTypeById } from "./repository/data-loader.ts";
 import { upsertLocalStudyMaterial } from "./repository/study-material.ts";
+import {
+  CustomSubjectWriteError,
+  createCustomSubject,
+  deleteCustomSubject,
+  updateCustomSubject,
+} from "./repository/custom-subject.ts";
 import {
   getPrimaryMeaning,
   isVisibleSubject,
-  localStudyMaterialValueProblem,
-  readingNoteProblem,
+  validateLocalStudyMaterialValue,
+  validateReadingNote,
 } from "@/model/subject-utils.ts";
+import { findCustomSubject, isCustomSubjectId } from "@/model/custom-subject-utils.ts";
+import { ValidationError } from "@/model/validation-error.ts";
 import type { AnkiDeckType } from "./services/anki-connect.ts";
 import {
   addOrUpdateRadical,
@@ -47,6 +58,17 @@ import {
 import { getErrorMessage } from "./utils/error-utils.ts";
 
 const ANKI_DECK_TYPES: AnkiDeckType[] = ["radical", "kanji", "vocabulary"];
+
+// A page of another origin can POST text/plain or a form with no CORS preflight, and CORS only
+// hides the answer, so the route would still run. A JSON content type needs a preflight, and the
+// CORS rule in app.ts refuses it for another origin.
+const requireJsonContentType = createMiddleware(async (c, next) => {
+  const mediaType = c.req.header("Content-Type")?.split(";")[0]?.trim().toLowerCase();
+  if (mediaType !== "application/json") {
+    return c.json({ ok: false as const, error: "Content-Type must be application/json" }, 415);
+  }
+  await next();
+});
 
 async function findSubjectForAnki(id: number, type: SubjectType): Promise<Subject | null> {
   if (type === "radical") return getRadical(id);
@@ -61,32 +83,55 @@ function addSubjectToAnki(subject: Subject): Promise<AnkiAddResult> {
   return addVocabularyWithKanjiAndRadicals(subject);
 }
 
-function validateStudyMaterialPatch(patch: Record<string, unknown>): string | null {
+function validateStudyMaterialPatch(patch: Record<string, unknown>): void {
   const fields = Object.keys(patch);
-  if (fields.length === 0) return "Missing required parameter: at least one field besides id";
+  if (fields.length === 0) {
+    throw new ValidationError("Missing required parameter: at least one field besides id");
+  }
 
   const knownFields: readonly string[] = LOCAL_STUDY_MATERIAL_PATCH_FIELDS;
   const unknown = fields.find((key) => !knownFields.includes(key));
-  if (unknown !== undefined) return `Invalid field: ${unknown}`;
+  if (unknown !== undefined) throw new ValidationError(`Invalid field: ${unknown}`);
 
   for (const field of fields) {
-    const problem = localStudyMaterialValueProblem(field, patch[field]);
-    if (problem) return `Invalid ${field}: ${problem}`;
+    try {
+      validateLocalStudyMaterialValue(field, patch[field]);
+    } catch (error) {
+      if (error instanceof ValidationError) {
+        throw new ValidationError(`Invalid ${field}: ${error.message}`);
+      }
+      throw error;
+    }
   }
+}
 
-  return null;
+function readJsonBody(c: Context): Promise<unknown> {
+  return c.req.json().catch(() => null);
 }
 
 async function readJsonObjectBody(c: Context): Promise<Record<string, unknown> | null> {
-  const body = await c.req.json().catch(() => null);
+  const body = await readJsonBody(c);
   if (typeof body !== "object" || body === null || Array.isArray(body)) return null;
   return body as Record<string, unknown>;
 }
 
-function resolveWkSubject(
-  deckType: AnkiDeckType,
-  characters: string
-): { id: number; type: SubjectType } | null {
+/** Answers `null` for an id that is not a custom subject id, so a WaniKani id is a 400. */
+function parseCustomSubjectId(param: string): number | null {
+  if (!/^\d+$/.test(param)) return null;
+  const id = Number(param);
+  return isCustomSubjectId(id) ? id : null;
+}
+
+function customSubjectErrorStatus(error: unknown): 400 | 404 | 409 | 500 {
+  return error instanceof CustomSubjectWriteError ? error.status : 500;
+}
+
+function resolveWkSubject(params: {
+  deckType: AnkiDeckType;
+  characters: string;
+  words: (VocabularyData | KanaVocabularyData)[];
+}): { id: number; type: SubjectType } | null {
+  const { deckType, characters, words } = params;
   if (deckType === "radical") {
     const matches = radicalData.filter(
       (r) =>
@@ -109,15 +154,8 @@ function resolveWkSubject(
   }
 
   // vocabulary deck can contain both vocabulary and kana_vocabulary
-  const vocab = vocabularyData.find((v) => isVisibleSubject(v) && v.data.characters === characters);
-  if (vocab) return { id: vocab.id, type: "vocabulary" };
-
-  const kanaVocab = kanaVocabularyData.find(
-    (v) => isVisibleSubject(v) && v.data.characters === characters
-  );
-  if (kanaVocab) return { id: kanaVocab.id, type: "kana_vocabulary" };
-
-  return null;
+  const word = words.find((w) => isVisibleSubject(w) && w.data.characters === characters);
+  return word ? { id: word.id, type: word.object } : null;
 }
 
 const app = new Hono()
@@ -181,9 +219,15 @@ const app = new Hono()
 
     try {
       const deckNotes = await getDeckNotes(deckType);
+      // One read of the custom file per request, not one per note
+      const words = deckType === "vocabulary" ? await getWords() : [];
 
       const data: AnkiNoteItem[] = deckNotes.map((note) => {
-        const resolved = resolveWkSubject(deckType, note.characters);
+        const resolved = resolveWkSubject({
+          deckType,
+          characters: note.characters,
+          words,
+        });
         return {
           characters: note.characters,
           meaning: note.meaning,
@@ -203,7 +247,7 @@ const app = new Hono()
       return c.json({ ok: false as const, error: message });
     }
   })
-  .post("/add-to-anki", async (c) => {
+  .post("/add-to-anki", requireJsonContentType, async (c) => {
     const body = await c.req.json<{ id: number; type: string; sync?: boolean }>();
     const { id, type, sync = true } = body;
 
@@ -244,7 +288,7 @@ const app = new Hono()
       return c.json({ ok: false as const, error: message });
     }
   })
-  .patch("/study-materials", async (c) => {
+  .patch("/study-materials", requireJsonContentType, async (c) => {
     const body = await readJsonObjectBody(c);
     if (!body) {
       return c.json({ ok: false as const, error: "Invalid body: must be a JSON object" }, 400);
@@ -256,32 +300,140 @@ const app = new Hono()
     }
 
     const patch = Object.fromEntries(Object.entries(body).filter(([key]) => key !== "id"));
-    const invalid = validateStudyMaterialPatch(patch);
-    if (invalid) {
-      return c.json({ ok: false as const, error: invalid }, 400);
+    try {
+      validateStudyMaterialPatch(patch);
+    } catch (error) {
+      if (!(error instanceof ValidationError)) throw error;
+      return c.json({ ok: false as const, error: error.message }, 400);
     }
-
-    const type = findSubjectTypeById(id);
-    if (!type) {
-      console.log(`[API] Study material id=${id} — subject not found`);
-      return c.json({ ok: false as const, error: "Subject not found" }, 404);
-    }
-
-    const readingProblem = "reading_note" in patch ? readingNoteProblem(type) : null;
-    if (readingProblem) {
-      return c.json({ ok: false as const, error: `Invalid reading_note: ${readingProblem}` }, 400);
-    }
-
-    console.log(`[API] Study material ${type} id=${id}: ${Object.keys(patch).join(", ")}`);
 
     try {
+      const type = findSubjectTypeWithCustom({
+        id,
+        // A WaniKani id must still save when the custom subjects file is broken
+        customSubjects: isCustomSubjectId(id) ? await getCustomSubjects() : [],
+        includeHiddenCustom: false,
+      });
+      if (!type) {
+        console.log(`[API] Study material id=${id} — subject not found`);
+        return c.json({ ok: false as const, error: "Subject not found" }, 404);
+      }
+
+      if ("reading_note" in patch) {
+        try {
+          validateReadingNote(type);
+        } catch (error) {
+          if (!(error instanceof ValidationError)) throw error;
+          return c.json(
+            { ok: false as const, error: `Invalid reading_note: ${error.message}` },
+            400
+          );
+        }
+      }
+
+      console.log(`[API] Study material ${type} id=${id}: ${Object.keys(patch).join(", ")}`);
+
       const data = await upsertLocalStudyMaterial(id, patch as LocalStudyMaterialPatch);
       console.log(`[API] Study material ${type} id=${id} — ${data ? "saved" : "removed"}`);
       return c.json({ ok: true as const, data });
     } catch (err) {
       const message = getErrorMessage(err);
-      console.error(`[API] Study material ${type} id=${id} — error: ${message}`);
+      console.error(`[API] Study material id=${id} — error: ${message}`);
       return c.json({ ok: false as const, error: message }, 500);
+    }
+  })
+  .get("/custom-subjects", async (c) => {
+    console.log("[API] List custom subjects");
+    try {
+      const data = await getCustomSubjects();
+      console.log(`[API] List custom subjects — ${data.length} records`);
+      return c.json({ ok: true as const, data });
+    } catch (err) {
+      const message = getErrorMessage(err);
+      console.error(`[API] List custom subjects — error: ${message}`);
+      return c.json({ ok: false as const, error: message }, 500);
+    }
+  })
+  .get("/custom-subjects/:id", async (c) => {
+    const param = c.req.param("id");
+    const id = parseCustomSubjectId(param);
+    if (id === null) {
+      return c.json(
+        { ok: false as const, error: `Invalid id: ${param} is not a custom subject id` },
+        400
+      );
+    }
+
+    console.log(`[API] Get custom subject id=${id}`);
+    try {
+      const data = findCustomSubject(await getCustomSubjects(), id);
+      if (!data) {
+        console.log(`[API] Get custom subject id=${id} — not found`);
+        return c.json({ ok: false as const, error: `Custom subject ${id} not found` }, 404);
+      }
+      return c.json({ ok: true as const, data });
+    } catch (err) {
+      const message = getErrorMessage(err);
+      console.error(`[API] Get custom subject id=${id} — error: ${message}`);
+      return c.json({ ok: false as const, error: message }, 500);
+    }
+  })
+  .post("/custom-subjects", requireJsonContentType, async (c) => {
+    const body = await readJsonBody(c);
+    console.log("[API] Create custom subject");
+    try {
+      const data = await createCustomSubject(body);
+      console.log(
+        `[API] Create custom subject — saved ${data.object} id=${data.id} "${data.data.characters}"`
+      );
+      return c.json({ ok: true as const, data }, 201);
+    } catch (err) {
+      const message = getErrorMessage(err);
+      console.error(`[API] Create custom subject — error: ${message}`);
+      return c.json({ ok: false as const, error: message }, customSubjectErrorStatus(err));
+    }
+  })
+  .put("/custom-subjects/:id", requireJsonContentType, async (c) => {
+    const param = c.req.param("id");
+    const id = parseCustomSubjectId(param);
+    if (id === null) {
+      return c.json(
+        { ok: false as const, error: `Invalid id: ${param} is not a custom subject id` },
+        400
+      );
+    }
+
+    const body = await readJsonBody(c);
+    console.log(`[API] Update custom subject id=${id}`);
+    try {
+      const data = await updateCustomSubject(id, body);
+      console.log(`[API] Update custom subject id=${id} — saved`);
+      return c.json({ ok: true as const, data });
+    } catch (err) {
+      const message = getErrorMessage(err);
+      console.error(`[API] Update custom subject id=${id} — error: ${message}`);
+      return c.json({ ok: false as const, error: message }, customSubjectErrorStatus(err));
+    }
+  })
+  .delete("/custom-subjects/:id", async (c) => {
+    const param = c.req.param("id");
+    const id = parseCustomSubjectId(param);
+    if (id === null) {
+      return c.json(
+        { ok: false as const, error: `Invalid id: ${param} is not a custom subject id` },
+        400
+      );
+    }
+
+    console.log(`[API] Delete custom subject id=${id}`);
+    try {
+      await deleteCustomSubject(id);
+      console.log(`[API] Delete custom subject id=${id} — hidden`);
+      return c.json({ ok: true as const });
+    } catch (err) {
+      const message = getErrorMessage(err);
+      console.error(`[API] Delete custom subject id=${id} — error: ${message}`);
+      return c.json({ ok: false as const, error: message }, customSubjectErrorStatus(err));
     }
   })
   .post("/anki-sync", async (c) => {
