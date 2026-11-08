@@ -29,13 +29,13 @@ const FIXED_DATA_FIELDS = {
 const RECORD_FIELDS = ["id", "object", "url", "data_updated_at", "data"];
 const CONJUGATION_FIELDS = ["dictionary", "masu", "te", "nai"];
 // `characters` becomes `slug`, and `slug` is part of the media file names
-const CHARACTERS_PATTERN = /^[\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Han}ー々]+$/u;
+export const CHARACTERS_PATTERN = /^[\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Han}ー々]+$/u;
 // 々 is in the Han script too, but it only repeats the kanji before it
 const KANJI_PATTERN = /(?!々)\p{Script=Han}/u;
 // WaniKani has 々 as a kanji of its own, and every WaniKani word with 々 lists its id
 const COMPONENT_KANJI_PATTERN = /\p{Script=Han}/gu;
 // Azure TTS reads the reading of a custom word, so a kanji or romaji reading gives a wrong clip
-const KANA_PATTERN = /^[\p{Script=Hiragana}\p{Script=Katakana}ー]+$/u;
+export const KANA_PATTERN = /^[\p{Script=Hiragana}\p{Script=Katakana}ー]+$/u;
 
 export function isCustomSubjectId(id: number): boolean {
   return Number.isInteger(id) && id >= CUSTOM_SUBJECT_ID_FLOOR;

@@ -7,7 +7,6 @@ import {
   VOCABULARY_MODEL_NAME,
 } from "../src/model/anki-models.ts";
 import type {
-  AnkiNoteItem,
   CustomSubject,
   KanjiData,
   RadicalData,
@@ -15,6 +14,7 @@ import type {
 } from "../src/model/wanikani.ts";
 import { ankiInvoke } from "./lib/anki-templates.ts";
 import { CUSTOM_SUBJECTS_FILE } from "./lib/data-paths.ts";
+import { DEFAULT_BASE_URL, addToAnki, fetchAnkiNotes, syncAnkiWeb } from "./lib/dev-server-api.ts";
 import { formatError } from "./lib/format-error.ts";
 import {
   buildReferenceLookup,
@@ -36,14 +36,7 @@ type NoteInfo = {
   fields: Record<string, { value: string }>;
 };
 
-type AnkiNotesResponse = { ok: true; data: AnkiNoteItem[] } | { ok: false; error: string };
-
-type AddToAnkiResponse = { ok: true; data: unknown } | { ok: false; error: string };
-
-type AnkiSyncResponse = { ok: true } | { ok: false; error: string };
-
 const DATA_DIR = "./data/userdata";
-const DEFAULT_BASE_URL = "http://localhost:5173";
 const SAME_AS_KANJI = /same as the kanji/i;
 const NOTE_TYPES: ReferenceType[] = ["radical", "kanji", "vocabulary"];
 
@@ -223,7 +216,7 @@ async function addReferences(params: {
       return `${reference.characters} was added, but Anki still does not list it`;
     }
     process.stdout.write(`  Adding ${describeReference(reference)}... `);
-    const answer = await addToAnki({ baseUrl, reference });
+    const answer = await addToAnki({ baseUrl, id: reference.id, type: reference.type });
     if (!answer.ok) {
       console.log("FAILED");
       return answer.error;
@@ -260,34 +253,6 @@ function printSameAsKanji(params: {
     );
     console.log(`  ${mnemonic}`);
   }
-}
-
-async function fetchAnkiNotes(baseUrl: string, type: ReferenceType): Promise<AnkiNoteItem[]> {
-  const response = await fetch(`${baseUrl}/api/anki-notes?type=${type}`);
-  const result = (await response.json()) as AnkiNotesResponse;
-  if (!result.ok) throw new Error(result.error);
-  return result.data;
-}
-
-async function addToAnki(params: {
-  baseUrl: string;
-  reference: MissingReference;
-}): Promise<AddToAnkiResponse> {
-  const { baseUrl, reference } = params;
-  const response = await fetch(`${baseUrl}/api/add-to-anki`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ id: reference.id, type: reference.type, sync: false }),
-  });
-  if (!response.headers.get("content-type")?.includes("application/json")) {
-    throw new Error(`Add ${reference.characters} failed with status ${response.status}`);
-  }
-  return (await response.json()) as AddToAnkiResponse;
-}
-
-async function syncAnkiWeb(baseUrl: string): Promise<AnkiSyncResponse> {
-  const response = await fetch(`${baseUrl}/api/anki-sync`, { method: "POST" });
-  return (await response.json()) as AnkiSyncResponse;
 }
 
 function toSourceNote(type: ReferenceType, note: NoteInfo): SourceNote {

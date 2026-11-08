@@ -69,6 +69,7 @@ src/
     fetch-utils.ts        # Shared fetch mock utilities
 
 scripts/                # Utility scripts. Top level holds only entry points, shared code goes to lib/
+  CLAUDE.md                      # Rules for the script code only (see "Where Rules Go")
   download-subjects.ts
   download-study-materials.ts
   patch-subjects.ts              # Apply data/wanikani-fixes.yaml to the downloaded subjects
@@ -79,10 +80,14 @@ scripts/                # Utility scripts. Top level holds only entry points, sh
   sync-anki-notes.ts             # Re-generate all Anki notes through the dev server API
   add-iknow-vocab.ts             # Add the next iKnow Core 1000 words to the Anki vocabulary deck
   add-references.ts              # Add the items that the new notes mention (needs the dev server)
+  split-text-vocab.ts            # Split the word list of a text run into not in Anki and not in WaniKani
+  add-text-vocab.ts              # Add the words of a text run to the Anki vocabulary deck
   lib/                           # Modules shared by the scripts, never run directly
     anki-templates.ts            # Shared by the two sync scripts: template table, ankiInvoke, field diff
     anki-template-fields.ts      # Pure markdown parsing of the template files (unit-tested)
     format-error.ts              # formatError(err) shared by all scripts
+    dev-server-api.ts            # Dev server calls of add-iknow-vocab, add-references and the two text scripts (sync-anki-notes keeps its own)
+    text-vocab.ts                # Text import helpers: run folder, word list read and parse, classifyWord (unit-tested)
     generator-cli.ts             # Shared by the two LLM scripts: flags, log, summary, stop rule
     llm-utils.ts                 # Shared by the two LLM scripts: chunk, JSON answers, atomic save
     vocabulary-data.ts           # Shared by the two LLM scripts: load vocabulary, primary reading
@@ -112,8 +117,19 @@ data/                   # Data files
   verb_conjugations.json  # Verb conjugations keyed by vocabulary ID (LLM-generated)
   sentence_readings.json  # Kana readings for context sentences keyed by vocabulary ID (LLM-generated)
 docs/                   # Documentation (API references, prompts, lists)
+tmp/                    # Gitignored. tmp/text-vocab/<run>/ holds the files of one text run (see "Text Vocabulary Import")
 src/anki-templates/     # Anki card template documentation (Front/Back/CSS)
 ```
+
+## Where Rules Go
+
+This file loads in every session, so it holds only the rules that matter to most tasks. Keep the rest local:
+
+- A rule that matters only for the code of one folder goes into a `CLAUDE.md` in that folder. Claude loads that file only after it reads a file in that folder or below it. `scripts/CLAUDE.md` is an example.
+- The flow of a skill goes into its `SKILL.md` and nowhere else. Never copy the steps of a skill into a `CLAUDE.md`.
+- A fact that reaches other folders stays in the parent file, like a constant in `src/model/` that the scripts also use.
+- The parent file keeps a short entry for each local file: one or two sentences on what the feature is, the facts that reach other folders, and the path of the local file.
+- Before you add a rule to this file, check whether it matters only for one folder or one skill. If it does, put it there. This also holds for `/learn` and the Post-Implementation step.
 
 ## Development
 
@@ -141,6 +157,8 @@ bun run sync-anki-templates            # Sync Anki templates to Anki
 bun run sync-anki-notes                # Sync all Anki vocabulary notes, kanji notes with no word and radical notes with no kanji (requires dev server running)
 bun run add-iknow-vocab                # Add the next iKnow Core 1000 words (requires dev server running)
 bun run add-references                 # Add the items that today's new notes mention (requires dev server running)
+bun run split-text-vocab               # Split the word list of a text run by Anki and WaniKani (requires dev server running)
+bun run add-text-vocab                 # Add the words of a text run to Anki (requires dev server running)
 ```
 
 The verb conjugation script has CLI options: `--limit <n>`, `--batch-size <n>` (default 20), `--dry-run`, `--show-prompt`, `--help`
@@ -315,6 +333,14 @@ The `.claude/skills/add-iknow-vocab/` skill runs the script and triages the new 
 The `.claude/skills/add-references/` skill runs after every add. A mnemonic, hint or note often names another item ("The reading comes from 狙い"), and the card needs that item in Anki too. `bun run add-references` (`--days <n>`, default 1, `--base-url`, `--dry-run`) reads the notes added to Anki in that time straight from AnkiConnect, so it also sees adds from the web UI and the phone. It reads only the mnemonic, hint and note fields: a context sentence is full of other words and points to none of them. Each kanji run in them is looked up as a word with exactly these characters first, then a kanji, then a radical. The words are the WaniKani `vocabulary` and the visible custom `vocabulary` words of `custom_subjects.json`. The script reads that file at `CUSTOM_SUBJECTS_FILE` from `scripts/lib/data-paths.ts`, and a test checks that it equals `CUSTOM_SUBJECTS_PATH`. A mention of the note's own characters is skipped. Every item that is not in Anki is added with no question, through `/api/add-to-anki` with `sync: false`, and the new notes are checked the same way until nothing is missing. It syncs with AnkiWeb once at the start and once at the end. The first failed add stops the run with exit 1. The pure parts are in `scripts/lib/references.ts`.
 
 The same script lists the new radicals whose mnemonic only says they are the same as a kanji. Such a mnemonic names the kanji by its meaning, not by its character, so the lookup above never finds it. It marks `ADD KANJI` on a radical with no picture whose kanji is not in Anki. The skill still reads the mnemonic and adds that kanji by hand, because a radical with a story of its own keeps its card alone.
+
+### Text Vocabulary Import
+
+The `.claude/skills/add-text-vocab/` skill adds every word of a Japanese text to the Anki vocabulary deck. Two scripts do the fixed parts: `split-text-vocab` checks Anki and WaniKani, `add-text-vocab` adds the words. The words that WaniKani does not have go through steps 2 to 5 of `add-custom-word` first.
+
+- Each run keeps its buffer files in `tmp/text-vocab/<run>/`. `/tmp/` is in `.gitignore`. The data repo is the wrong place, because the Linux auto-pull job commits every few minutes and would push half-done files.
+- The TSV word check uses `CHARACTERS_PATTERN` and `KANA_PATTERN` from `src/model/custom-subject-utils.ts`. A change there also changes what the two scripts accept.
+- The rules of the scripts are in `scripts/CLAUDE.md`. The flow, the user questions and the commits are in `.claude/skills/add-text-vocab/SKILL.md`.
 
 ### Anki Template Development
 
@@ -577,7 +603,7 @@ After making code changes:
    - Improve naming and readability
    - Extract shared utilities when appropriate
 
-2. Run `/learn` to extract learnings and update CLAUDE.md
+2. Run `/learn` to extract learnings and update the right `CLAUDE.md` (see "Where Rules Go")
 
 ## Git Workflow
 
@@ -587,7 +613,8 @@ The project has two git repositories: the main one and `data/userdata/`. A reque
 - When a local change in `data/userdata/` touches a file the pull also changes, commit it first and then pull. `mnemonic-images.jsonl` then merges by itself through `merge=union`, and a media file that both sides added merges through `merge=ours` (see "Two Machines"). A conflict in `media/` means the clone misses `git config merge.ours.driver true`. Any other conflict, like one in `study_materials_extra.json` or `custom_subjects.json`, is resolved by hand.
 - Commit and push each repo on its own.
 - Afterwards, return the working directory to the main project root.
-- After an add to Anki, commit and push `data/userdata/` right away, without asking. This is a standing request from the user. An add counts when at least one `/api/add-to-anki` call answered `"ok":true`, by hand or through `add-iknow-vocab`, `add-references` or `add-custom-word`. The commit holds the new media, the registry lines, the status file changes and `custom_subjects.json`, with a message like `data: add 着く and its media to Anki`. The rule covers only the data repo: the main repo still needs an explicit request for every commit.
+- After an add to Anki, commit and push `data/userdata/` right away, without asking. This is a standing request from the user. An add counts when at least one `/api/add-to-anki` call answered `"ok":true`, by hand or through `add-iknow-vocab`, `add-text-vocab`, `add-references` or `add-custom-word`. The commit holds the new media, the registry lines, the status file changes and `custom_subjects.json`, with a message like `data: add 着く and its media to Anki`. The rule covers only the data repo: the main repo still needs an explicit request for every commit.
+- The same standing request covers a saved custom word before its add, like the commit at the end of step 7 of `add-text-vocab`. A save counts when a POST, PUT or DELETE to `/api/custom-subjects` answered `"ok":true`. Commit and push the data repo right away, so the other machine never gives the new ids to other words. Use a message like `data: add the custom words of the text run <name>`.
 
 ## Testing
 
@@ -616,7 +643,7 @@ The project has two git repositories: the main one and `data/userdata/`. A reque
 - `holdFsOp(op)` makes every call of one op wait until the test calls `release()`. Its `reached` promise resolves when the first call waits. A test uses it to act while a write is in the middle, like a second registry lookup during the append. `resetFsMock()` releases every hold
 - `bun test` runs every file in one process, so module-level state survives a file. A file that writes through the fs mock, or changes a seeded file, calls `resetFsMock()` in `beforeEach` and in `afterEach`. Otherwise its media files, registry lines and study material records leak into the next file
 - **Repository tests** (`src/server/repository/__tests__/`): test repository functions directly, use a simple fetch mock from `setup.ts`
-- **Script unit tests** (`scripts/lib/__tests__/`): test the pure script helpers directly, no mock needed. The one exception is the `saveJsonAtomic` copy in `llm-utils.ts`: its tests use the fs mock of the preload, with the same cases as `json-utils.test.ts`
+- **Script unit tests** (`scripts/lib/__tests__/`): test the pure script helpers directly, no mock needed. There are four exceptions. Three use the fs mock of the preload: `llm-utils.test.ts` for the `saveJsonAtomic` copy, with the same cases as `json-utils.test.ts`, `custom-subject-clash.test.ts` for the custom file it reads, and `text-vocab.test.ts` for `readWordList`. The fourth is `dev-server-api.test.ts`: it replaces `globalThis.fetch` with `createFetchMock` at file load and puts the old `fetch` back in `afterAll`
 - **API E2E tests** (`src/server/__tests__/`): test full API through `api.request()` (Hono handles directly, no HTTP server), use `src/test/fetch-interceptor.ts` which routes by URL pattern (AnkiConnect, WaniKani SVGs/audio/pages)
 - The fetch interceptor answers every AnkiConnect action with success. `setAnkiError({ action, message, onCall })` makes one action answer an error. `onCall` picks one call of it, counted from 1, so a test can fail the second `sync` of an add and keep the first. `resetFetchInterceptor()` clears it and the call counts. `externalFetches` lists every URL that is not AnkiConnect, so a test can check that a cache hit made no request. `setMediaStatus(status)` and `setMediaContentType(type)` change the answer for every `files.wanikani.com` URL. Only the mnemonic picture reads the content type. `ttsRequests` holds the SSML body of every Azure TTS call in order, so a test can check the spoken text and the voice. `resetFetchInterceptor()` clears it too
 - The custom subjects fixture `src/test/fixtures/custom_subjects.json` is `[]`, so every other test sees no custom word. A test that needs one writes the records with `setCustomSubjectsFile(records)` from `src/test/custom-subject-fixture.ts`, which wraps `setFileContent`. That module holds the four fixture records: the kana word どうぞ (`customKanaWord`), the kana verb くれる (`customKanaVerb`), the `vocabulary` verb 下す on the WaniKani kanji 下 with its primary reading listed second (`customVerb`), and the hidden word 下記 (`hiddenCustomWord`). `customSubjectFixture` lists all four, and `customSubjectInputOf(record)` turns a record into a POST body. Such a test calls `resetFsMock()` in `beforeEach` and `afterEach`

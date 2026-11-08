@@ -38,3 +38,6 @@ data/userdata
 
 # ralphex progress logs
 .ralphex/progress/
+
+# text vocabulary run folders
+/tmp/

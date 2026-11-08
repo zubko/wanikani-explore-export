@@ -1,6 +1,6 @@
 ---
 name: add-references
-description: After any add to Anki, add the WaniKani items that the new notes mention in their mnemonics, hints or notes, and check whether a new radical is only "the same as the kanji". Use it right after every POST to /api/add-to-anki (a word, a kanji or a radical), after every real run of add-iknow-vocab or sync-anki-notes, and when the user says they added words, kanji or radicals in the web UI or from the phone. Also use it when the user says "add the references", "check the new radicals" or "check radicals for kanji".
+description: After any add to Anki, add the WaniKani items that the new notes mention in their mnemonics, hints or notes, and check whether a new radical is only "the same as the kanji". Use it right after every POST to /api/add-to-anki (a word, a kanji or a radical), after every real run of add-iknow-vocab, add-text-vocab or sync-anki-notes, and when the user says they added words, kanji or radicals in the web UI or from the phone. Also use it when the user says "add the references", "check the new radicals" or "check radicals for kanji".
 ---
 
 # Add the referenced items

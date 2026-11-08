@@ -5,6 +5,12 @@ description: Add a word that WaniKani does not have as a custom word, then add i
 
 # Add a custom word
 
+Inside the `add-text-vocab` skill, do steps 2 to 5 only. A hit in step 2 that the user already
+refused in `add-text-vocab` does not stop. Go on to step 3. A custom hit with the same characters
+means the word is saved already. Go on with the next word. Any other stop skips the word, and the
+loop goes on with the next one. The add to Anki, the iKnow entry and the data repo commit happen
+once for the whole run.
+
 A custom word lives in `data/userdata/custom_subjects.json`, apart from the WaniKani data. The
 server treats it like a WaniKani word: the search finds it, the web app shows it with a "custom"
 badge, and `/api/add-to-anki` writes its note. Its id starts at 1,000,000.
@@ -103,6 +109,38 @@ unless the user picks it.
 Pick at most two existing mnemonics per block, the ones with the best score that fit this word.
 The sources state no license, so a picked text keeps a short credit at its end, like
 `(WKCM2, by <user>)`.
+
+### Reuse the sound hooks
+
+WaniKani ties every sound to one hook word, and uses that word in every story with that sound:
+どう is always a doughnut, じん is always jeans. The learner knows the hook already, so a new story
+must use the same hook word. A new hook for a known sound breaks the link.
+
+Before you write a story with a sound hook, look up the sound in the WaniKani data and in the
+custom words:
+
+```bash
+bun -e '
+const sound = process.argv.at(-1);
+for (const file of ["kanji", "vocabulary", "kana_vocabulary", "custom_subjects"]) {
+  for (const subject of JSON.parse(require("fs").readFileSync(`data/userdata/${file}.json`, "utf8"))) {
+    if (subject.data.hidden_at) continue;
+    for (const text of [subject.data.reading_mnemonic, subject.data.meaning_mnemonic]) {
+      for (const sentence of (text ?? "").split(/(?<=[.!?])\s+/)) {
+        if (sentence.includes(`(${sound})`)) console.log(`${subject.data.characters}: ${sentence.trim()}`);
+      }
+    }
+  }
+}' どう
+```
+
+It prints every mnemonic sentence that marks the sound, like `<reading>dou</reading>ghnut (どう)`.
+
+- Look up every sound that a story uses: the whole kana word (どう), and each part of a reading
+  (に, ほん and じん of にほんじん).
+- Use the hook word that the sentences use. When a sound has two hooks, take the one most stories
+  use, and name both to the user.
+- When nothing is found, pick a new hook word, and say in the draft that it is new.
 
 ### The meaning mnemonic
 

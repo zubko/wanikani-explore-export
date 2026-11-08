@@ -11,6 +11,7 @@ A web app for creating Anki flashcards from WaniKani data. Search for radicals, 
 - Alternative meanings and your own synonyms on the answer side of kanji and vocabulary cards
 - TTS audio for context sentences (via Azure TTS)
 - Custom words for words WaniKani does not teach, like どうぞ or くれる. They live in `data/userdata/custom_subjects.json`. The search finds them, the card shows a "custom" label, and the add to Anki writes them like WaniKani words. Their reading audio comes from Azure TTS. An AI agent adds them through the `/api/custom-subjects` routes and the `add-custom-word` skill
+- Add every word of a Japanese text, given as screenshots or as a text block. The `add-text-vocab` skill picks the words, checks Anki and WaniKani, makes custom words for the missing ones and adds the rest to Anki
 - A media cache in `data/userdata/media/`: every radical image, mnemonic picture and audio clip is downloaded or generated once, so a re-sync of all notes downloads nothing. The radical mnemonic picture is stored in Anki's media folder, so it shows offline too
 - Dark mode support in Anki cards
 
@@ -163,6 +164,10 @@ Every POST, PUT and PATCH with a body must send `Content-Type: application/json`
 | `bun run sync-anki-fields`           | Add note-type fields a template lists and Anki lacks. Interactive, needs a real terminal. Changes the collection schema, so Anki then asks for a one-way sync (choose upload) |
 | `bun run sync-anki-templates`        | Sync card templates to Anki. Refuses to sync when a note type has a missing or extra field                                                                                    |
 | `bun run sync-anki-notes`            | Re-generate all Anki notes from current data and code, then sync to AnkiWeb once (requires dev server)                                                                        |
+| `bun run add-iknow-vocab`            | Add the next iKnow Core 1000 words to the Anki vocabulary deck (requires dev server)                                                                                          |
+| `bun run add-references`             | Add the items that the new Anki notes mention in their mnemonics, hints or notes (requires dev server)                                                                        |
+| `bun run split-text-vocab`           | Split the word list of the run `tmp/text-vocab/<name>/` (`--run <name>`) into the words not in Anki and not in WaniKani. Writes nothing to Anki (requires dev server)         |
+| `bun run add-text-vocab`             | Add the words of the text run in `tmp/text-vocab/<name>/` (`--run <name>`) to the Anki vocabulary deck. `--dry-run` adds nothing (requires dev server)                        |
 
 ## Tech Stack
 

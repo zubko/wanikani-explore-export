@@ -3,7 +3,17 @@ import { readFile } from "fs/promises";
 import { join } from "path";
 
 import { getPrimaryMeaning } from "../src/model/subject-utils.ts";
-import type { AnkiNoteItem, KanaVocabulary, Vocabulary } from "../src/model/wanikani.ts";
+import type { KanaVocabulary, Vocabulary } from "../src/model/wanikani.ts";
+import {
+  DEFAULT_BASE_URL,
+  addToAnki,
+  fetchAnkiNotes,
+  searchVocabulary,
+  syncAnkiWeb,
+  type AddToAnkiResponse,
+  type AnkiSyncResponse,
+  type SearchResponse,
+} from "./lib/dev-server-api.ts";
 import { formatError } from "./lib/format-error.ts";
 import { saveJsonAtomic } from "./lib/llm-utils.ts";
 import {
@@ -26,16 +36,6 @@ type CliArgs = {
   limit: number;
 };
 
-type SearchResponse = { found: true; data: Vocabulary | KanaVocabulary } | { found: false };
-
-type AnkiNotesResponse = { ok: true; data: AnkiNoteItem[] } | { ok: false; error: string };
-
-type AddToAnkiResponse =
-  | { ok: true; data: unknown }
-  | { ok: false; error: string; reason?: "fields" };
-
-type AnkiSyncResponse = { ok: true } | { ok: false; error: string };
-
 type AnkiContents = {
   words: Set<string>;
   kanjiIds: Set<number>;
@@ -54,7 +54,6 @@ type RunCounts = {
 const IKNOW_DIR = "data/userdata/iknow";
 const SERIES_FILE = join(IKNOW_DIR, "japanese-core-1000-series.json");
 const STATUS_FILE = "data/userdata/iknow-vocabulary-status.json";
-const DEFAULT_BASE_URL = "http://localhost:5173";
 const DEFAULT_LIMIT = 15;
 
 // === CLI ===
@@ -116,15 +115,6 @@ Options:
 
 // === API ===
 
-async function search(baseUrl: string, word: string): Promise<SearchResponse> {
-  const url = `${baseUrl}/api/search?type=vocabulary&q=${encodeURIComponent(word)}`;
-  const response = await fetch(url);
-  if (!response.ok && response.status !== 404) {
-    throw new Error(`Search ${word} failed with status ${response.status}`);
-  }
-  return (await response.json()) as SearchResponse;
-}
-
 async function fetchAnkiContents(baseUrl: string): Promise<AnkiContents> {
   const [words, kanji, radicals] = await Promise.all([
     fetchAnkiNotes(baseUrl, "vocabulary"),
@@ -137,41 +127,6 @@ async function fetchAnkiContents(baseUrl: string): Promise<AnkiContents> {
     // a radical note holds its primary name in this field
     radicalNames: new Set(radicals.map((note) => note.characters)),
   };
-}
-
-async function fetchAnkiNotes(
-  baseUrl: string,
-  type: "vocabulary" | "kanji" | "radical"
-): Promise<AnkiNoteItem[]> {
-  const response = await fetch(`${baseUrl}/api/anki-notes?type=${type}`);
-  const result = (await response.json()) as AnkiNotesResponse;
-  if (!result.ok) throw new Error(result.error);
-  return result.data;
-}
-
-async function addToAnki(params: {
-  baseUrl: string;
-  id: number;
-  type: string;
-}): Promise<AddToAnkiResponse> {
-  const { baseUrl, id, type } = params;
-  const response = await fetch(`${baseUrl}/api/add-to-anki`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    // syncing per word would answer ok:false for a word that is already written, and run one
-    // full AnkiWeb sync per word — the run syncs once at the start, so every lookup sees the
-    // current AnkiWeb state, and once at the end
-    body: JSON.stringify({ id, type, sync: false }),
-  });
-  if (!response.headers.get("content-type")?.includes("application/json")) {
-    throw new Error(`Add ${id} failed with status ${response.status}`);
-  }
-  return (await response.json()) as AddToAnkiResponse;
-}
-
-async function syncAnkiWeb(baseUrl: string): Promise<AnkiSyncResponse> {
-  const response = await fetch(`${baseUrl}/api/anki-sync`, { method: "POST" });
-  return (await response.json()) as AnkiSyncResponse;
 }
 
 // === Main ===
@@ -367,7 +322,7 @@ async function processItem(params: {
 
   let found: SearchResponse;
   try {
-    found = await search(args.baseUrl, item.word);
+    found = await searchVocabulary(args.baseUrl, item.word);
   } catch (err) {
     console.log(`${label} — SEARCH FAILED ${formatError(err)}`);
     addProblem("error", formatError(err));
