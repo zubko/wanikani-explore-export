@@ -124,11 +124,17 @@ async function ankiInvoke<T>(action: string, params: Record<string, unknown> = {
   try {
     response = await fetch(ANKI_CONNECT_URL, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      // AnkiConnect closes the socket after every answer but never says so. When the close comes
+      // late, as it does while Anki runs its own sync, a reused socket fails the next request
+      headers: { "Content-Type": "application/json", Connection: "close" },
       body: JSON.stringify({ action, version: 6, params }),
     });
-  } catch {
-    throw createAnkiError("Failed to connect to Anki. Is Anki running?", action, params);
+  } catch (err) {
+    throw createAnkiError(
+      `Failed to connect to Anki. Is Anki running? (${fetchErrorCause(err)})`,
+      action,
+      params
+    );
   }
 
   const data = await response.json();
@@ -139,6 +145,12 @@ async function ankiInvoke<T>(action: string, params: Record<string, unknown> = {
   }
 
   return data.result as T;
+}
+
+// Node's fetch says only "fetch failed" and keeps the real network error in `cause`
+function fetchErrorCause(err: unknown): string {
+  const cause = err instanceof Error ? err.cause : undefined;
+  return getErrorMessage(cause ?? err);
 }
 
 async function getDeckId(deckName: string): Promise<number> {
