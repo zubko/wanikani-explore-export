@@ -202,7 +202,10 @@ mock.module("fs/promises", () => ({
 // sentence clip names in the snapshots from machine to machine
 process.env.AZURE_TTS_KEY = "test-key";
 process.env.AZURE_TTS_REGION = "eastus";
-process.env.AZURE_TTS_VOICES = "ja-JP-TestFemaleNeural,ja-JP-TestMaleNeural";
+process.env.AZURE_TTS_FEMALE_VOICES = "ja-JP-TestFemaleNeural";
+process.env.AZURE_TTS_MALE_VOICES = "ja-JP-TestMaleNeural";
+// The root env file may still hold the old list, and readAzureTtsConfig refuses it
+delete process.env.AZURE_TTS_VOICES;
 
 let initialized = false;
 

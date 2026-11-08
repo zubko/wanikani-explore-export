@@ -634,20 +634,20 @@ describe("reading audio of a custom word", () => {
     expect(spokenTexts()[0]?.voice).toBe("ja-JP-TestFemaleNeural");
   });
 
-  test("a list of one voice fails the add before any note is written", async () => {
-    const voices = process.env.AZURE_TTS_VOICES;
-    process.env.AZURE_TTS_VOICES = "ja-JP-TestFemaleNeural";
+  test("a missing male voice list fails the add before any note is written", async () => {
+    const voices = process.env.AZURE_TTS_MALE_VOICES;
+    delete process.env.AZURE_TTS_MALE_VOICES;
     try {
       const result = await addToAnkiJson({ id: customVerb.id, type: "vocabulary" });
       expect(result).toEqual({
         ok: false,
-        error: "AZURE_TTS_VOICES needs exactly two voices, female first",
+        error: "Missing AZURE_TTS_MALE_VOICES in the root env file",
       });
       const writes = ["addNote", "updateNoteFields", "storeMediaFile"];
       expect(ankiCalls.filter((call) => writes.includes(call.action))).toEqual([]);
       expect(ttsRequests).toEqual([]);
     } finally {
-      process.env.AZURE_TTS_VOICES = voices;
+      process.env.AZURE_TTS_MALE_VOICES = voices;
     }
   });
 });

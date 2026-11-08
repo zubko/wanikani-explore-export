@@ -69,7 +69,7 @@ Search for a vocabulary word to see its full breakdown — kanji composition, ra
 - [Bun](https://bun.sh)
 - [Anki](https://apps.ankiweb.net/) desktop with the [AnkiConnect](https://ankiweb.net/shared/info/2055492159) plugin
 - A [WaniKani](https://www.wanikani.com/) account and API token
-- [Azure TTS](https://docs.microsoft.com/en-us/azure/cognitive-services/speech-service/overview) credentials for context sentence audio and the reading audio of custom words. `AZURE_TTS_VOICES` must hold exactly two voices, female first. The server does not run without them
+- [Azure TTS](https://docs.microsoft.com/en-us/azure/cognitive-services/speech-service/overview) credentials for context sentence audio and the reading audio of custom words. The voices are two comma lists, `AZURE_TTS_FEMALE_VOICES` and `AZURE_TTS_MALE_VOICES`, with at least one voice each. The server does not run without them. A left-over `AZURE_TTS_VOICES` stops the start with a message that names the new variables
 - (Optional) An OpenAI-compatible LLM endpoint for the two generate scripts (`LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL` in `scripts/.env`)
 
 ## Setup

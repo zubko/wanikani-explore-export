@@ -82,7 +82,7 @@ Steps marked **root** need sudo. An AI agent can do the rest.
    curl 127.0.0.1:8765 -d '{"action":"sync","version":6}'         # {"result": null, "error": null}
    ```
 
-9. The app. `bun install` in the repo, then `scp` `.env` and `scripts/.env` from the main machine. `.env` holds the three Azure TTS values and is required. Without one of them the dev server still starts, but the first API request fails, and the dev server log names the missing variable. `AZURE_TTS_VOICES` must hold exactly two voices, female first, or the server fails the same way. Keep the list the same on both machines. The voice is part of the sentence clip name, and of the reading clip name of a custom word (`{slug}_{gender}_{ssmlHash}.mp3`, the hash covers the SSML with the voice). So a different list makes each machine create its own clips for most words.
+9. The app. `bun install` in the repo, then `scp` `.env` and `scripts/.env` from the main machine. `.env` holds the four Azure TTS values and is required. Without one of them the dev server still starts, but the first API request fails, and the dev server log names the missing variable. The voices are two lists, `AZURE_TTS_FEMALE_VOICES` and `AZURE_TTS_MALE_VOICES`. A left-over `AZURE_TTS_VOICES` fails the server the same way, with a message that names the new variables. Keep both lists the same on both machines, in the same order. The voice is part of the sentence clip name, and of the reading clip name of a custom word (`{slug}_{gender}_{ssmlHash}.mp3`, the hash covers the SSML with the voice). So different lists make each machine create its own clips for most words.
 
 ## Unit files
 

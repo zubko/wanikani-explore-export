@@ -3,7 +3,7 @@ import { createFetchMock, resolveUrl } from "@/test/fetch-utils.ts";
 import {
   buildSpeechSsml,
   generateSpeechAudio,
-  pickSentenceVoice,
+  pickVoice,
   readAzureTtsConfig,
   speechAudioHash,
   SPEECH_AUDIO_OUTPUT_FORMAT,
@@ -12,13 +12,21 @@ import {
 
 type RecordedRequest = { url: string; method?: string; headers: Headers; body?: string };
 
-const ENV_NAMES = ["AZURE_TTS_KEY", "AZURE_TTS_REGION", "AZURE_TTS_VOICES"];
-const VOICES = ["ja-JP-Nanami:DragonHDLatestNeural", "ja-JP-Masaru:DragonHDLatestNeural"];
+const ENV_NAMES = [
+  "AZURE_TTS_KEY",
+  "AZURE_TTS_REGION",
+  "AZURE_TTS_FEMALE_VOICES",
+  "AZURE_TTS_MALE_VOICES",
+  "AZURE_TTS_VOICES",
+];
+const FEMALE_VOICES = ["ja-JP-Nanami:DragonHDLatestNeural", "ja-JP-Mayu:DragonHDLatestNeural"];
+const MALE_VOICES = ["ja-JP-Masaru:DragonHDLatestNeural"];
+const VOICES = [...FEMALE_VOICES, ...MALE_VOICES];
 const CONFIG: AzureTtsConfig = {
   key: "secret-key",
   region: "westeurope",
   voices: VOICES,
-  voicesByGender: { female: VOICES[0]!, male: VOICES[1]! },
+  voicesByGender: { female: FEMALE_VOICES, male: MALE_VOICES },
 };
 
 // Other test files install their own fetch mock, so this is not the real fetch
@@ -45,7 +53,9 @@ beforeEach(() => {
   savedEnv = Object.fromEntries(ENV_NAMES.map((name) => [name, process.env[name]]));
   process.env.AZURE_TTS_KEY = CONFIG.key;
   process.env.AZURE_TTS_REGION = CONFIG.region;
-  process.env.AZURE_TTS_VOICES = VOICES.join(", ");
+  process.env.AZURE_TTS_FEMALE_VOICES = FEMALE_VOICES.join(", ");
+  process.env.AZURE_TTS_MALE_VOICES = MALE_VOICES.join(", ");
+  delete process.env.AZURE_TTS_VOICES;
   requests = [];
   answer = defaultAnswer;
 });
@@ -63,17 +73,13 @@ afterAll(() => {
 });
 
 describe("readAzureTtsConfig", () => {
-  test("reads the three values and splits the voice list", () => {
+  test("reads the values and splits both voice lists, female voices first", () => {
     expect(readAzureTtsConfig()).toEqual(CONFIG);
-  });
-
-  test("the first voice is the female one and the second the male one", () => {
-    expect(readAzureTtsConfig().voicesByGender).toEqual({ female: VOICES[0]!, male: VOICES[1]! });
   });
 
   test("throws with the name of the first missing variable", () => {
     delete process.env.AZURE_TTS_REGION;
-    delete process.env.AZURE_TTS_VOICES;
+    delete process.env.AZURE_TTS_MALE_VOICES;
     expect(() => readAzureTtsConfig()).toThrow("Missing AZURE_TTS_REGION in the root env file");
   });
 
@@ -82,35 +88,56 @@ describe("readAzureTtsConfig", () => {
     expect(() => readAzureTtsConfig()).toThrow("Missing AZURE_TTS_KEY in the root env file");
   });
 
-  test("an empty entry in the voice list is refused", () => {
-    for (const voices of [`${VOICES[0]},`, `${VOICES[0]},,${VOICES[1]}`, ` , ${VOICES[0]}`]) {
-      process.env.AZURE_TTS_VOICES = voices;
+  test("each gender needs a voice list", () => {
+    for (const name of ["AZURE_TTS_FEMALE_VOICES", "AZURE_TTS_MALE_VOICES"]) {
+      const value = process.env[name];
+      delete process.env[name];
+      expect(() => readAzureTtsConfig()).toThrow(`Missing ${name} in the root env file`);
+      process.env[name] = value;
+    }
+  });
+
+  test("an empty entry in a voice list is refused", () => {
+    const [male] = MALE_VOICES;
+    const otherMale = "ja-JP-Keita:DragonHDLatestNeural";
+    for (const voices of [`${male},`, `${male},,${otherMale}`, ` , ${male}`]) {
+      process.env.AZURE_TTS_MALE_VOICES = voices;
       expect(() => readAzureTtsConfig()).toThrow(
-        "Empty voice in AZURE_TTS_VOICES in the root env file"
+        "Empty voice in AZURE_TTS_MALE_VOICES in the root env file"
       );
     }
   });
 
-  test("a list of one or three voices is refused", () => {
-    for (const voices of [VOICES[0]!, [...VOICES, "ja-JP-Keita:DragonHDLatestNeural"].join(",")]) {
-      process.env.AZURE_TTS_VOICES = voices;
-      expect(() => readAzureTtsConfig()).toThrow(
-        "AZURE_TTS_VOICES needs exactly two voices, female first"
-      );
-    }
+  test("a voice in both lists is refused", () => {
+    process.env.AZURE_TTS_MALE_VOICES = `${MALE_VOICES[0]},${FEMALE_VOICES[1]}`;
+    expect(() => readAzureTtsConfig()).toThrow(
+      `Voice ${FEMALE_VOICES[1]} is in both AZURE_TTS_FEMALE_VOICES and AZURE_TTS_MALE_VOICES in the root env file`
+    );
+  });
+
+  test("the old AZURE_TTS_VOICES list fails, with or without the new lists", () => {
+    const message =
+      "AZURE_TTS_VOICES is no longer read. Put the female voices in AZURE_TTS_FEMALE_VOICES " +
+      "and the male voices in AZURE_TTS_MALE_VOICES, then remove AZURE_TTS_VOICES from the root env file";
+    process.env.AZURE_TTS_VOICES = VOICES.join(",");
+    expect(() => readAzureTtsConfig()).toThrow(message);
+
+    delete process.env.AZURE_TTS_FEMALE_VOICES;
+    delete process.env.AZURE_TTS_MALE_VOICES;
+    expect(() => readAzureTtsConfig()).toThrow(message);
   });
 });
 
-describe("pickSentenceVoice", () => {
+describe("pickVoice", () => {
   test("gives one slug the same voice every time", () => {
-    const voice = pickSentenceVoice(VOICES, "毎晩");
+    const voice = pickVoice(VOICES, "毎晩");
     expect(VOICES).toContain(voice);
-    expect(pickSentenceVoice(VOICES, "毎晩")).toBe(voice);
+    expect(pickVoice(VOICES, "毎晩")).toBe(voice);
   });
 
-  test("uses both voices over a set of slugs", () => {
-    const slugs = ["毎晩", "入る", "平壌", "高校", "ここ", "実る", "人", "大人"];
-    const usedVoices = new Set(slugs.map((slug) => pickSentenceVoice(VOICES, slug)));
+  test("uses every voice over a set of slugs", () => {
+    const slugs = ["毎晩", "入る", "平壌", "高校", "ここ", "実る", "人", "大人", "下す", "どうぞ"];
+    const usedVoices = new Set(slugs.map((slug) => pickVoice(VOICES, slug)));
     expect([...usedVoices].sort()).toEqual([...VOICES].sort());
   });
 });

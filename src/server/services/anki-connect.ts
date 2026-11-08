@@ -37,7 +37,7 @@ import {
 import {
   buildSpeechSsml,
   generateSpeechAudio,
-  pickSentenceVoice,
+  pickVoice,
   readAzureTtsConfig,
   speechAudioHash,
   type AzureTtsConfig,
@@ -594,7 +594,7 @@ function getComponentKanji(vocabulary: Vocabulary | KanaVocabulary): Kanji[] {
 
 /**
  * A fixed gender per word keeps the clip names stable, so a re-sync reads every clip from disk.
- * The sentence voice hashes the slug. With two voices, female first, the same hash would always
+ * The sentence voice hashes the slug. With one voice per gender, the same hash would always
  * give the reading the same gender as the sentence voice. A kana word's reading is its slug, so
  * the hash input gets its own prefix.
  */
@@ -657,7 +657,7 @@ async function storeCustomReadingAudios(params: {
   const { deckId, vocabulary, azureTtsConfig } = params;
   const slug = vocabulary.slug;
   const gender = preferredReadingGender(vocabulary);
-  const voice = azureTtsConfig.voicesByGender[gender];
+  const voice = pickVoice(azureTtsConfig.voicesByGender[gender], slug);
   console.log(`[Anki] Reading audio ${slug}: TTS (custom word)`);
   const soundTags: string[] = [];
   for (const reading of acceptedReadingsPrimaryFirst(vocabulary)) {
@@ -714,7 +714,7 @@ async function storeSentenceAudio(params: {
 
   // The Dragon HD voice is on trial to read the kanji itself. The generated
   // kana reading only fills the furigana field.
-  const voice = pickSentenceVoice(azureTtsConfig.voices, slug);
+  const voice = pickVoice(azureTtsConfig.voices, slug);
   const ssml = buildSpeechSsml({ text: sentence.ja, voice });
   return storeCachedMedia({
     deckId,
