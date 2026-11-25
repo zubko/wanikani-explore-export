@@ -1,11 +1,10 @@
 import { describe, expect, it } from "bun:test";
-import { join } from "path";
+import { SUBJECT_FILE_PATHS, WANIKANI_FIXES_PATH } from "@shared/data-paths.ts";
 import {
   checkPatch,
   formatStatusLine,
   parsePatches,
   patchSubjects,
-  SUBJECT_FILE_NAMES,
   type SubjectPatch,
   type SubjectFile,
   type SubjectRecord,
@@ -355,10 +354,7 @@ describe("patchSubjects", () => {
   });
 });
 
-describe("data/wanikani-fixes.yaml", () => {
-  const FIXES = join(import.meta.dir, "../../../data/wanikani-fixes.yaml");
-  const USERDATA = join(import.meta.dir, "../../../data/userdata");
-
+describe(WANIKANI_FIXES_PATH, () => {
   // The few ids each patch adds and removes, written by hand. The long `set` lists are pasted
   // from generated output, where a duplicated or mistyped id keeps the length; this table is
   // short enough to check by eye and pins down what each patch really does.
@@ -372,7 +368,7 @@ describe("data/wanikani-fixes.yaml", () => {
     "1:amalgamation_subject_ids": { added: [495], removed: [] },
   };
 
-  const readPatches = async () => parsePatches(await Bun.file(FIXES).text());
+  const readPatches = async () => parsePatches(await Bun.file(WANIKANI_FIXES_PATH).text());
   const sorted = (ids: number[]) => [...ids].sort((a, b) => a - b);
   const missing = (from: number[], other: number[]) => from.filter((id) => !other.includes(id));
 
@@ -405,7 +401,7 @@ describe("data/wanikani-fixes.yaml", () => {
   });
 
   it("names only ids that exist in the downloaded data", async () => {
-    const files = await loadUserdata(USERDATA);
+    const files = await loadSubjectFiles();
     const ids = new Set(files.flatMap((file) => file.subjects.map((s) => s.id)));
     for (const patch of await readPatches()) {
       for (const id of [...patch.expect, ...patch.set]) expect(ids.has(id)).toBe(true);
@@ -414,7 +410,7 @@ describe("data/wanikani-fixes.yaml", () => {
 
   it("applies cleanly to the downloaded data", async () => {
     const result = patchSubjects({
-      files: await loadUserdata(USERDATA),
+      files: await loadSubjectFiles(),
       patches: await readPatches(),
       dryRun: true,
     });
@@ -424,11 +420,11 @@ describe("data/wanikani-fixes.yaml", () => {
   });
 });
 
-async function loadUserdata(dir: string): Promise<SubjectFile[]> {
+async function loadSubjectFiles(): Promise<SubjectFile[]> {
   return Promise.all(
-    SUBJECT_FILE_NAMES.map(async (name) => ({
-      path: join(dir, name),
-      subjects: (await Bun.file(join(dir, name)).json()) as SubjectRecord[],
+    Object.values(SUBJECT_FILE_PATHS).map(async (path) => ({
+      path,
+      subjects: (await Bun.file(path).json()) as SubjectRecord[],
     }))
   );
 }

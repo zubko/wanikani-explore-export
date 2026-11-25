@@ -2,13 +2,13 @@ import { unlink, writeFile } from "fs/promises";
 import { join } from "path";
 import { parseArgs } from "util";
 
+import { getErrorMessage } from "@shared/error-message.ts";
 import {
   DEFAULT_BASE_URL,
   fetchVocabularyInAnki,
   searchVocabulary,
   syncAnkiWebAtStart,
 } from "./lib/dev-server-api.ts";
-import { formatError } from "./lib/format-error.ts";
 import {
   DICTIONARY_FILE,
   NOT_IN_ANKI_FILE,
@@ -67,7 +67,7 @@ async function main(): Promise<void> {
     } catch (err) {
       console.log(`${label} — SEARCH FAILED`);
       // a failed search taken for a miss would send the word into the custom word loop
-      throw new Error(`Search failed, no file written: ${formatError(err)}`);
+      throw new Error(`Search failed, no file written: ${getErrorMessage(err)}`);
     }
     console.log(`${label} — ${describeWord(word, charactersInAnki)}`);
     classified.push(word);
@@ -150,6 +150,6 @@ function sourceOf(hit: VocabularyHit): string {
 }
 
 main().catch((err) => {
-  console.error(`Error: ${formatError(err)}`);
+  console.error(`Error: ${getErrorMessage(err)}`);
   process.exit(1);
 });

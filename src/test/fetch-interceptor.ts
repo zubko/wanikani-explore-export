@@ -1,4 +1,5 @@
 import { createFetchMock, resolveUrl } from "@/test/fetch-utils.ts";
+import { ANKI_CONNECT_URL } from "@shared/anki/anki-connect-invoke.ts";
 import {
   RADICAL_DECK_NAME,
   RADICAL_MODEL_NAME,
@@ -9,7 +10,7 @@ import {
   VOCABULARY_DECK_NAME,
   VOCABULARY_MODEL_NAME,
   VOCABULARY_EXPECTED_FIELDS,
-} from "@/model/anki-models.ts";
+} from "@shared/anki/anki-models.ts";
 
 type AnkiCall = {
   action: string;
@@ -34,8 +35,6 @@ let mediaStatus = 200;
 let mediaContentType: string | null = SVG_CONTENT_TYPE;
 
 let nextNoteId = 1000000;
-
-const ANKI_CONNECT_URL = "http://127.0.0.1:8765";
 
 const DECK_IDS: Record<string, number> = {
   [RADICAL_DECK_NAME]: 1001,

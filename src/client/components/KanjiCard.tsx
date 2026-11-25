@@ -1,9 +1,9 @@
 import toast from "react-hot-toast";
-import type { Kanji, Radical } from "@/model/wanikani.ts";
-import { getPrimaryMeaning } from "@/model/subject-utils.ts";
-import { getRadicalSvgUrl } from "@/model/radical-utils.ts";
-import { getReadingsByType, type ReadingWithPrimary } from "@/model/kanji-utils.ts";
-import { subjectColors } from "@/config/theme.ts";
+import type { Kanji, Radical } from "@shared/wanikani/wanikani.ts";
+import { getPrimaryMeaning } from "@shared/wanikani/subject-utils.ts";
+import { getRadicalSvgUrl } from "@shared/wanikani/radical-utils.ts";
+import { getReadingsByType, type ReadingWithPrimary } from "@shared/wanikani/kanji-utils.ts";
+import { subjectColors } from "@shared/theme.ts";
 import { AddToAnkiButton } from "./card-components/AddToAnkiButton.tsx";
 import { CardHeader } from "./card-components/CardHeader.tsx";
 import { HintBox } from "./card-components/HintBox.tsx";

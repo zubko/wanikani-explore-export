@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
-import type { Radical } from "@/model/wanikani.ts";
+import type { Radical } from "@shared/wanikani/wanikani.ts";
 import { installApiMock } from "@/test/api-mock.ts";
 import { click, mountCard, typeInto } from "@/test/render.tsx";
 import { SearchResult } from "@client/components/SearchResult.tsx";

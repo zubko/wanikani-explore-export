@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import type { AnkiAddResult } from "@/model/wanikani.ts";
+import type { AnkiAddResult } from "@shared/wanikani/wanikani.ts";
 import {
   pickNotesToRefresh,
   refreshedKanjiCharacters,

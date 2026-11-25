@@ -7,10 +7,10 @@ import type {
   PronunciationAudio,
   VocabularyReading,
   Conjugations,
-} from "@/model/wanikani.ts";
-import { getPrimaryMeaning, getPrimaryReading } from "@/model/subject-utils.ts";
-import { getUniqueVoiceActors, type VoiceActor } from "@/model/vocabulary-utils.ts";
-import { subjectColors } from "@/config/theme.ts";
+} from "@shared/wanikani/wanikani.ts";
+import { getPrimaryMeaning, getPrimaryReading } from "@shared/wanikani/subject-utils.ts";
+import { getUniqueVoiceActors, type VoiceActor } from "@shared/wanikani/vocabulary-utils.ts";
+import { subjectColors } from "@shared/theme.ts";
 import { AddToAnkiButton } from "./card-components/AddToAnkiButton.tsx";
 import { CardHeader } from "./card-components/CardHeader.tsx";
 import { ExplanationBlock } from "./card-components/ExplanationBlock.tsx";

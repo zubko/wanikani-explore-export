@@ -1,6 +1,6 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
-import { CUSTOM_SUBJECT_ID_FLOOR } from "@/model/wanikani.ts";
-import type { CustomSubject } from "@/model/wanikani.ts";
+import { CUSTOM_SUBJECT_ID_FLOOR } from "@shared/wanikani/wanikani.ts";
+import type { CustomSubject } from "@shared/wanikani/wanikani.ts";
 import { holdFsOp, resetFsMock, setFileContent, setFsError, writeCalls } from "@/test/preload.ts";
 import {
   CUSTOM_VERB_KANJI_ID,
@@ -14,8 +14,8 @@ import {
   hiddenCustomWord,
   setCustomSubjectsFile,
 } from "@/test/custom-subject-fixture.ts";
+import { CUSTOM_SUBJECTS_PATH } from "@shared/data-paths.ts";
 import { getCustomSubjects, getCustomWordsByKanji } from "../data-loader.ts";
-import { CUSTOM_SUBJECTS_PATH } from "../data-paths.ts";
 import {
   CUSTOM_SUBJECT_SAVE_ATTEMPTS,
   CustomSubjectWriteError,

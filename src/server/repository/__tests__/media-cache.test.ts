@@ -1,7 +1,7 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
 import { readdir } from "fs/promises";
 import { mkdirCalls, resetFsMock, setFileContent, setFsError, writeCalls } from "@/test/preload.ts";
-import { MEDIA_ROOT_PATH } from "../data-paths.ts";
+import { MEDIA_ROOT_PATH } from "@shared/data-paths.ts";
 import { extensionOfContentType, getOrFetchMedia, type FetchedMedia } from "../media-cache.ts";
 
 const NAME = "barb_ab12cd34";

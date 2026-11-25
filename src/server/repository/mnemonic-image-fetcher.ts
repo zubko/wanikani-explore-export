@@ -1,7 +1,7 @@
 import { appendFile, readFile } from "fs/promises";
-import { isMissingFile } from "@server/utils/file-utils.ts";
+import { isMissingFile } from "@shared/files/file-utils.ts";
 import { createReloadingFile } from "@server/utils/reloading-file.ts";
-import { MNEMONIC_IMAGES_PATH } from "./data-paths.ts";
+import { MNEMONIC_IMAGES_PATH } from "@shared/data-paths.ts";
 
 type MnemonicImageLine = { page: string; image: string | null };
 

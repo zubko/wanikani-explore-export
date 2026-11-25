@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import type { Kanji } from "@/model/wanikani.ts";
+import type { Kanji } from "@shared/wanikani/wanikani.ts";
 import { click, mountCard, settle, typeInto, type Mounted } from "@/test/render.tsx";
 import { installApiMock, type ApiMock } from "@/test/api-mock.ts";
 import { KanjiCard } from "@client/components/KanjiCard.tsx";

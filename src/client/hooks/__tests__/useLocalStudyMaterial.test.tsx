@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import type { LocalStudyMaterial } from "@/model/wanikani.ts";
+import type { LocalStudyMaterial } from "@shared/wanikani/wanikani.ts";
 import { installApiMock, type ApiMock } from "@/test/api-mock.ts";
 import { mount, settle, type Mounted } from "@/test/render.tsx";
 import {

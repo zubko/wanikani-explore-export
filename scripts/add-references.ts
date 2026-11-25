@@ -1,27 +1,33 @@
-import { readFile } from "fs/promises";
 import { parseArgs } from "util";
 
 import {
+  ANKI_DECK_TYPES,
+  type AnkiDeckType,
   KANJI_MODEL_NAME,
   RADICAL_MODEL_NAME,
   VOCABULARY_MODEL_NAME,
-} from "../src/model/anki-models.ts";
+} from "@shared/anki/anki-models.ts";
+import {
+  CUSTOM_SUBJECTS_PATH,
+  KANJI_PATH,
+  RADICALS_PATH,
+  VOCABULARY_PATH,
+} from "@shared/data-paths.ts";
+import { readJson } from "@shared/files/json-file.ts";
 import type {
   CustomSubject,
   KanjiData,
   RadicalData,
   VocabularyData,
-} from "../src/model/wanikani.ts";
-import { ankiInvoke } from "./lib/anki-templates.ts";
-import { CUSTOM_SUBJECTS_FILE } from "./lib/data-paths.ts";
+} from "@shared/wanikani/wanikani.ts";
+import { invokeAnkiConnect } from "@shared/anki/anki-connect-invoke.ts";
+import { getErrorMessage } from "@shared/error-message.ts";
 import { DEFAULT_BASE_URL, addToAnki, fetchAnkiNotes, syncAnkiWeb } from "./lib/dev-server-api.ts";
-import { formatError } from "./lib/format-error.ts";
 import {
   buildReferenceLookup,
   findMissingReferences,
   type MissingReference,
   type ReferenceLookup,
-  type ReferenceType,
   type SourceNote,
 } from "./lib/references.ts";
 
@@ -36,17 +42,15 @@ type NoteInfo = {
   fields: Record<string, { value: string }>;
 };
 
-const DATA_DIR = "./data/userdata";
 const SAME_AS_KANJI = /same as the kanji/i;
-const NOTE_TYPES: ReferenceType[] = ["radical", "kanji", "vocabulary"];
 
-const MODEL_NAMES: Record<ReferenceType, string> = {
+const MODEL_NAMES: Record<AnkiDeckType, string> = {
   radical: RADICAL_MODEL_NAME,
   kanji: KANJI_MODEL_NAME,
   vocabulary: VOCABULARY_MODEL_NAME,
 };
 
-const CHARACTER_FIELDS: Record<ReferenceType, string> = {
+const CHARACTER_FIELDS: Record<AnkiDeckType, string> = {
   radical: "character",
   kanji: "character",
   vocabulary: "characters",
@@ -171,10 +175,10 @@ Options:
 
 async function loadReferenceLookup(): Promise<ReferenceLookup> {
   const [vocabulary, customSubjects, kanji, radicals] = await Promise.all([
-    readJsonFile<VocabularyData[]>(`${DATA_DIR}/vocabulary.json`),
-    readJsonFile<CustomSubject[]>(CUSTOM_SUBJECTS_FILE),
-    readJsonFile<KanjiData[]>(`${DATA_DIR}/kanji.json`),
-    readJsonFile<RadicalData[]>(`${DATA_DIR}/radicals.json`),
+    readJson<VocabularyData[]>(VOCABULARY_PATH),
+    readJson<CustomSubject[]>(CUSTOM_SUBJECTS_PATH),
+    readJson<KanjiData[]>(KANJI_PATH),
+    readJson<RadicalData[]>(RADICALS_PATH),
   ]);
   const customVocabulary = customSubjects.filter(
     (subject): subject is VocabularyData => subject.object === "vocabulary"
@@ -188,17 +192,17 @@ async function loadReferenceLookup(): Promise<ReferenceLookup> {
 }
 
 async function fetchIdsInAnki(baseUrl: string): Promise<Set<number>> {
-  const lists = await Promise.all(NOTE_TYPES.map((type) => fetchAnkiNotes(baseUrl, type)));
+  const lists = await Promise.all(ANKI_DECK_TYPES.map((type) => fetchAnkiNotes(baseUrl, type)));
   return new Set(lists.flat().flatMap((note) => (note.wkId === null ? [] : [note.wkId])));
 }
 
 async function fetchRecentNotes(days: number): Promise<SourceNote[]> {
   const lists = await Promise.all(
-    NOTE_TYPES.map(async (type) => {
-      const noteIds = await ankiInvoke<number[]>("findNotes", {
+    ANKI_DECK_TYPES.map(async (type) => {
+      const noteIds = await invokeAnkiConnect<number[]>("findNotes", {
         query: `"note:${MODEL_NAMES[type]}" added:${days}`,
       });
-      const notes = await ankiInvoke<NoteInfo[]>("notesInfo", { notes: noteIds });
+      const notes = await invokeAnkiConnect<NoteInfo[]>("notesInfo", { notes: noteIds });
       return notes.map((note) => toSourceNote(type, note));
     })
   );
@@ -255,7 +259,7 @@ function printSameAsKanji(params: {
   }
 }
 
-function toSourceNote(type: ReferenceType, note: NoteInfo): SourceNote {
+function toSourceNote(type: AnkiDeckType, note: NoteInfo): SourceNote {
   const fields = Object.fromEntries(
     Object.entries(note.fields).map(([name, field]) => [name, field.value])
   );
@@ -273,10 +277,6 @@ function describeReference(reference: MissingReference): string {
   return `${reference.characters} (${reference.type}, mentioned in ${reference.mentionedIn})`;
 }
 
-async function readJsonFile<T>(path: string): Promise<T> {
-  return JSON.parse(await readFile(path, "utf-8")) as T;
-}
-
 function stripHtml(html: string): string {
   return html
     .replace(/<[^>]*>/g, "")
@@ -285,6 +285,6 @@ function stripHtml(html: string): string {
 }
 
 main().catch((err) => {
-  console.error(`Error: ${formatError(err)}`);
+  console.error(`Error: ${getErrorMessage(err)}`);
   process.exit(1);
 });

@@ -11,7 +11,7 @@ import {
   customVerb,
   setCustomSubjectsFile,
 } from "@/test/custom-subject-fixture.ts";
-import { getPrimaryMeaning } from "@/model/subject-utils.ts";
+import { getPrimaryMeaning } from "@shared/wanikani/subject-utils.ts";
 import { api } from "../api.ts";
 import { radicals as radicalData } from "../repository/data-loader.ts";
 

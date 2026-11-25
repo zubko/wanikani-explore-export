@@ -1,4 +1,4 @@
-import type { Radical, RadicalData } from "@/model/wanikani.ts";
+import type { Radical, RadicalData } from "@shared/wanikani/wanikani.ts";
 import {
   findStudyMaterial,
   findLocalStudyMaterial,
@@ -6,7 +6,7 @@ import {
   buildSubjectReferences,
   getPrimaryMeaning,
   isVisibleSubject,
-} from "@/model/subject-utils.ts";
+} from "@shared/wanikani/subject-utils.ts";
 import { radicals, kanji, studyMaterials, getLocalStudyMaterials } from "./data-loader.ts";
 import { getMnemonicImageUrl } from "./mnemonic-image-fetcher.ts";
 

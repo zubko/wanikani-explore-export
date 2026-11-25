@@ -21,12 +21,12 @@ import {
   hiddenCustomWord,
   setCustomSubjectsFile,
 } from "@/test/custom-subject-fixture.ts";
-import { getLocalStudyMaterials } from "../repository/data-loader.ts";
 import {
   CUSTOM_SUBJECTS_PATH,
   LOCAL_STUDY_MATERIALS_PATH,
   MNEMONIC_IMAGES_PATH,
-} from "../repository/data-paths.ts";
+} from "@shared/data-paths.ts";
+import { getLocalStudyMaterials } from "../repository/data-loader.ts";
 import { api } from "../api.ts";
 
 installFetchInterceptor();

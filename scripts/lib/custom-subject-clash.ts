@@ -1,8 +1,11 @@
 import { readFile } from "fs/promises";
-import { findWaniKaniClash, validateCustomSubjects } from "../../src/model/custom-subject-utils.ts";
-import type { WordForClash } from "../../src/model/custom-subject-utils.ts";
-import type { CustomSubject } from "../../src/model/wanikani.ts";
-import { formatError } from "./format-error.ts";
+import {
+  findWaniKaniClash,
+  validateCustomSubjects,
+} from "@shared/wanikani/custom-subject-utils.ts";
+import type { WordForClash } from "@shared/wanikani/custom-subject-utils.ts";
+import type { CustomSubject } from "@shared/wanikani/wanikani.ts";
+import { getErrorMessage } from "@shared/error-message.ts";
 
 /**
  * The lines to print after a download. A missing or broken file gives one line and never throws,
@@ -21,7 +24,7 @@ export async function customSubjectClashWarnings(params: {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") {
       return [`No ${params.path}, skipped the custom subject check`];
     }
-    return [`Could not read ${params.path}: ${formatError(error)}`];
+    return [`Could not read ${params.path}: ${getErrorMessage(error)}`];
   }
 
   const clashes = findWaniKaniClash({ customSubjects, wanikaniWords: params.wanikaniWords });

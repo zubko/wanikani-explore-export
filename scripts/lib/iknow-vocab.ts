@@ -1,5 +1,5 @@
-import { getPrimaryMeaning } from "../../src/model/subject-utils.ts";
-import type { Meaning } from "../../src/model/wanikani.ts";
+import { getPrimaryMeaning } from "@shared/wanikani/subject-utils.ts";
+import type { Meaning } from "@shared/wanikani/wanikani.ts";
 
 export type IknowItem = {
   word: string;

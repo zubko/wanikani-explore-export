@@ -2,6 +2,11 @@
 
 Rules for the code in `scripts/`. The root `CLAUDE.md` holds the rules for the whole project.
 
+## Dev Server Calls
+
+- `/add-to-anki` builds its error answer as one typed value with an optional `reason`. With two `c.json` calls, one with `reason` and one without, the `reason` answer is a subtype of the plain one with the same status. TypeScript subtype reduction then drops it from the derived answer type. Hono is not the cause, and an explicit status does not help.
+- A caller checks `isFieldMismatch(result)` from `scripts/lib/dev-server-api.ts`, never `"reason" in result` by hand. The helper copies `reason` into a typed variable, so a renamed `reason` or a new value on the route fails `bun run tsc`. After `"reason" in result` alone the value is `unknown` and still compiles.
+
 ## Text Vocabulary Import
 
 The code of `split-text-vocab`, `add-text-vocab` and `scripts/lib/text-vocab.ts`. The flow, the user questions and the commits live in `.claude/skills/add-text-vocab/SKILL.md`.
@@ -22,9 +27,9 @@ A stopped run goes on from the first missing file. The user may edit any file by
 - The reading is only a hint, never a key. A reading hit can be another word: 要る and いる share a reading. The server has no reading search, so there is no kana to kanji fallback.
 - A counter, a prefix or a suffix has `〜` (U+301C) in the place of the number or the stem: 三冊 → `〜冊`. Its reading holds the kana of the kanji part only. So the reading of a `〜` word is never searched: `猛〜` has the reading もう, and もう is an unrelated WaniKani word. A custom word can never hold `〜`, because `CHARACTERS_PATTERN` refuses it.
 - `readWordList({ path, missingHint })` reads files 2 and 3 and runs `parseWordList`. A missing file fails with `<path> is missing`, plus the hint. A bad line fails the run with `<path> line <n>: <reason>`: no tab, a third column, an empty column, a space inside a column (U+3000 too), a word that is not kana and kanji with at most one `〜` at its start or end, a full-width `～` (U+FF5E) with its own message, a reading that is not kana, and a word that came before (`line 7: 食べる is already on line 3`). `formatWordList` writes the lines back.
-- The word and reading checks use `CHARACTERS_PATTERN` and `KANA_PATTERN`, exported from `src/model/custom-subject-utils.ts`, so the scripts and the server share one rule.
+- The word and reading checks use `CHARACTERS_PATTERN` and `KANA_PATTERN`, exported from `src/shared/wanikani/custom-subject-utils.ts`, so the scripts and the server share one rule.
 - `classifyWord({ entry, charactersInAnki, search })` is the one rule of both scripts. A spelling equal to the `characters` of a deck note is `in-anki`, with no search. This also covers a note that resolves to no subject, like a deleted custom word. Else a search hit on the spelling is `in-wanikani`. Then the する rule below. Else, when the reading differs from the spelling and the word holds no `〜`, a search hit on the reading is `found-by-reading`. Else the word is `not-in-wanikani`.
-- `search` answers the `SearchResponse` of `searchVocabulary`, so the tests pass a stub. A thrown search error is not caught. A saved custom word is a hit like a WaniKani word, which is the resume path. The hit keeps `isCustom`, so the split prints `custom` for it.
+- `search` answers the `SearchResponse` of `searchVocabulary`, so the tests pass a stub. `searchVocabulary` throws when the hit is not `vocabulary` or `kana_vocabulary`. A thrown search error is not caught. A saved custom word is a hit like a WaniKani word, which is the resume path. The hit keeps `isCustom`, so the split prints `custom` for it.
 - The する rule: WaniKani teaches 82 する verbs and their nouns as two words (勉強 and 勉強する), 49 only as the verb (運転する) and over a thousand nouns with no verb. So for a spelling that ends with する, `classifyWord` looks up the verb and its noun, and `in-wanikani` holds every hit that is not in Anki: one or two. It is `in-anki` when none is found and one of them is in Anki. For a noun that misses, it tries `<noun>する` before the reading. Both parts only fire for a noun of two or more characters that ends with a kanji and holds no `〜`, so 愛する, 口にする and kana words never do.
 - `ClassifiedWord` is a union: `in-wanikani` holds `hits`, `found-by-reading` holds one `hit`, the other two hold none.
 

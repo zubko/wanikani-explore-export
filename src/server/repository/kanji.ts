@@ -1,4 +1,4 @@
-import type { Kanji, KanjiData } from "@/model/wanikani.ts";
+import type { Kanji, KanjiData } from "@shared/wanikani/wanikani.ts";
 import {
   findStudyMaterial,
   findLocalStudyMaterial,
@@ -6,7 +6,7 @@ import {
   buildSubjectReferences,
   getPrimaryMeaning,
   isVisibleSubject,
-} from "@/model/subject-utils.ts";
+} from "@shared/wanikani/subject-utils.ts";
 import {
   kanji,
   studyMaterials,

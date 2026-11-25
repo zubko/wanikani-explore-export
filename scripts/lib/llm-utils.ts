@@ -1,7 +1,6 @@
-import { randomUUID } from "crypto";
-import { readFile, rename, unlink, writeFile } from "fs/promises";
+import { readFile } from "fs/promises";
 import type OpenAI from "openai";
-import { formatError } from "./format-error.ts";
+import { getErrorMessage } from "@shared/error-message.ts";
 
 export type JsonAnswer =
   | { success: true; data: Record<string, unknown> }
@@ -21,7 +20,7 @@ export async function askForJsonObject(params: {
     });
     text = completion.choices[0]?.message?.content ?? "";
   } catch (error) {
-    return { success: false, error: `API error: ${formatError(error)}` };
+    return { success: false, error: `API error: ${getErrorMessage(error)}` };
   }
 
   const data = parseJsonObject(text);
@@ -54,17 +53,6 @@ export async function loadJsonFile<T>(path: string): Promise<Record<string, T>> 
   const parsed: unknown = JSON.parse(content);
   if (!isRecord(parsed)) throw new Error(`${path} must hold a JSON object`);
   return parsed as Record<string, T>;
-}
-
-export async function saveJsonAtomic(path: string, data: unknown): Promise<void> {
-  const tempPath = `${path}.${randomUUID()}.tmp`;
-  try {
-    await writeFile(tempPath, JSON.stringify(data, null, 2) + "\n");
-    await rename(tempPath, path);
-  } catch (error) {
-    await unlink(tempPath).catch(() => {});
-    throw error;
-  }
 }
 
 export function chunk<T>(items: T[], size: number): T[][] {

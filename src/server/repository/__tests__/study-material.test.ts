@@ -1,14 +1,14 @@
 import { describe, test, expect, beforeAll, beforeEach, afterEach } from "bun:test";
 import { unlink } from "fs/promises";
-import type { LocalStudyMaterial } from "@/model/wanikani.ts";
+import type { LocalStudyMaterial } from "@shared/wanikani/wanikani.ts";
 import { holdFsOp, writeCalls, resetFsMock, setFileContent, setFsError } from "@/test/preload.ts";
 import {
   lastWrite,
   setStudyMaterialFile,
   studyMaterialFixture as fixture,
 } from "@/test/study-material-fixture.ts";
+import { LOCAL_STUDY_MATERIALS_PATH } from "@shared/data-paths.ts";
 import { findSubjectTypeById, getLocalStudyMaterials } from "../data-loader.ts";
-import { LOCAL_STUDY_MATERIALS_PATH } from "../data-paths.ts";
 import { getKanji } from "../kanji.ts";
 import { LOCAL_STUDY_MATERIAL_SAVE_ATTEMPTS, upsertLocalStudyMaterial } from "../study-material.ts";
 import { ensureRepositoryInitialized, installFetchMock } from "./setup.ts";

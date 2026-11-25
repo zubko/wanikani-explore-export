@@ -1,14 +1,17 @@
-import type { WordForClash } from "../src/model/custom-subject-utils.ts";
+import {
+  CUSTOM_SUBJECTS_PATH,
+  SUBJECT_FILE_PATHS,
+  USERDATA_DIR,
+  WANIKANI_FIXES_PATH,
+} from "@shared/data-paths.ts";
+import type { SubjectType } from "@shared/wanikani/wanikani.ts";
+import type { WordForClash } from "@shared/wanikani/custom-subject-utils.ts";
+import { saveJsonAtomic } from "@shared/files/json-file.ts";
 import { customSubjectClashWarnings } from "./lib/custom-subject-clash.ts";
-import { CUSTOM_SUBJECTS_FILE } from "./lib/data-paths.ts";
-import { saveJsonAtomic } from "./lib/llm-utils.ts";
 
 const BASE_URL = "https://api.wanikani.com/v2";
 const API_REVISION = "20170710";
 const RATE_LIMIT_MS = 1000;
-const DATA_DIR = "./data/userdata";
-
-type SubjectType = "radical" | "kanji" | "vocabulary" | "kana_vocabulary";
 
 interface WanikaniSubject {
   id: number;
@@ -97,18 +100,10 @@ function toWordForClash(subject: WanikaniSubject): WordForClash {
 }
 
 async function saveToFiles(grouped: Record<SubjectType, WanikaniSubject[]>): Promise<void> {
-  await Bun.write(`${DATA_DIR}/.gitkeep`, "");
-
-  const fileNames: Record<SubjectType, string> = {
-    radical: "radicals.json",
-    kanji: "kanji.json",
-    vocabulary: "vocabulary.json",
-    kana_vocabulary: "kana_vocabulary.json",
-  };
+  await Bun.write(`${USERDATA_DIR}/.gitkeep`, "");
 
   for (const [type, subjects] of Object.entries(grouped)) {
-    const fileName = fileNames[type as SubjectType];
-    const filePath = `${DATA_DIR}/${fileName}`;
+    const filePath = SUBJECT_FILE_PATHS[type as SubjectType];
     await saveJsonAtomic(filePath, subjects);
     console.log(`Saved ${subjects.length} ${type} subjects to ${filePath}`);
   }
@@ -132,7 +127,7 @@ async function main(): Promise<void> {
   await saveToFiles(grouped);
 
   const warnings = await customSubjectClashWarnings({
-    path: CUSTOM_SUBJECTS_FILE,
+    path: CUSTOM_SUBJECTS_PATH,
     wanikaniWords: [...grouped.vocabulary, ...grouped.kana_vocabulary].map(toWordForClash),
   });
   if (warnings.length > 0) console.log("");
@@ -140,7 +135,7 @@ async function main(): Promise<void> {
 
   console.log("\nDone!");
   console.log(
-    "Now run `bun run patch-subjects` to apply the corrections in data/wanikani-fixes.yaml"
+    `Now run \`bun run patch-subjects\` to apply the corrections in ${WANIKANI_FIXES_PATH}`
   );
 }
 

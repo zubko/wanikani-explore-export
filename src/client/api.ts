@@ -1,6 +1,6 @@
 import { hc } from "hono/client";
 import type { ApiType } from "@server/api.ts";
-import type { LocalStudyMaterialPatch, SubjectType } from "@/model/wanikani.ts";
+import type { LocalStudyMaterialPatch, SubjectType } from "@shared/wanikani/wanikani.ts";
 import { HttpStatusError } from "./utils/http-error.ts";
 
 type OkOrErrorResponse<T> = {

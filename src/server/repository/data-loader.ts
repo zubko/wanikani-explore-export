@@ -8,26 +8,37 @@ import type {
   SubjectType,
   VerbConjugationForms,
   CustomSubject,
-} from "@/model/wanikani.ts";
-import { LOCAL_STUDY_MATERIAL_FIELDS } from "@/model/wanikani.ts";
+} from "@shared/wanikani/wanikani.ts";
+import { LOCAL_STUDY_MATERIAL_FIELDS } from "@shared/wanikani/wanikani.ts";
 import {
   isVisibleSubject,
   validateLocalStudyMaterialValue,
   validateReadingNote,
-} from "@/model/subject-utils.ts";
+} from "@shared/wanikani/subject-utils.ts";
 import {
   buildCustomWordsByKanji,
   findCustomSubject,
   findWaniKaniClash,
   isCustomSubjectId,
   validateCustomSubjects,
-} from "@/model/custom-subject-utils.ts";
-import { ValidationError } from "@/model/validation-error.ts";
+} from "@shared/wanikani/custom-subject-utils.ts";
+import { ValidationError } from "@shared/wanikani/validation-error.ts";
 import { readFile } from "fs/promises";
-import { CUSTOM_SUBJECTS_PATH, LOCAL_STUDY_MATERIALS_PATH } from "./data-paths.ts";
+import {
+  CUSTOM_SUBJECTS_PATH,
+  KANA_VOCABULARY_PATH,
+  KANJI_PATH,
+  LOCAL_STUDY_MATERIALS_PATH,
+  RADICALS_PATH,
+  SENTENCE_READINGS_PATH,
+  STUDY_MATERIALS_PATH,
+  VERB_CONJUGATIONS_PATH,
+  VOCABULARY_PATH,
+} from "@shared/data-paths.ts";
+import { isMissingFile } from "@shared/files/file-utils.ts";
+import { readJson } from "@shared/files/json-file.ts";
 import { loadMnemonicImageRegistry } from "./mnemonic-image-fetcher.ts";
-import { isMissingFile } from "@server/utils/file-utils.ts";
-import { readJson, saveJsonIfMissing } from "@server/utils/json-utils.ts";
+import { saveJsonIfMissing } from "@server/utils/json-utils.ts";
 import { createReloadingFile } from "@server/utils/reloading-file.ts";
 
 export type SentenceReadingEntry = { ja: string; reading: string };
@@ -79,13 +90,13 @@ export async function initRepository(): Promise<void> {
     verbConjugations,
     sentenceReadings,
   ] = await Promise.all([
-    readJson<RadicalData[]>("./data/userdata/radicals.json"),
-    readJson<KanjiData[]>("./data/userdata/kanji.json"),
-    readJson<VocabularyData[]>("./data/userdata/vocabulary.json"),
-    readJson<KanaVocabularyData[]>("./data/userdata/kana_vocabulary.json"),
-    readJson<StudyMaterial[]>("./data/userdata/study_materials.json"),
-    readJson<Record<string, VerbConjugationForms>>("./data/verb_conjugations.json"),
-    readJson<Record<string, SentenceReadingEntry>>("./data/sentence_readings.json"),
+    readJson<RadicalData[]>(RADICALS_PATH),
+    readJson<KanjiData[]>(KANJI_PATH),
+    readJson<VocabularyData[]>(VOCABULARY_PATH),
+    readJson<KanaVocabularyData[]>(KANA_VOCABULARY_PATH),
+    readJson<StudyMaterial[]>(STUDY_MATERIALS_PATH),
+    readJson<Record<string, VerbConjugationForms>>(VERB_CONJUGATIONS_PATH),
+    readJson<Record<string, SentenceReadingEntry>>(SENTENCE_READINGS_PATH),
   ]);
   checkWaniKaniIdsBelowCustomFloor();
   await ensureCustomSubjectsFile();

@@ -11,19 +11,20 @@ import type {
   StudyMaterial,
   LocalStudyMaterial,
   MergedStudyMaterial,
-} from "@/model/wanikani.ts";
+} from "@shared/wanikani/wanikani.ts";
 import {
   getPrimaryMeaning,
   getPrimaryReading,
   getExtraMeanings,
   getAlternativeMeanings,
   mergeStudyMaterial,
-} from "@/model/subject-utils.ts";
-import { getRadicalSvgUrl } from "@/model/radical-utils.ts";
-import { getReadingsByType } from "@/model/kanji-utils.ts";
-import { selectReadingAudios, getShortestSentence } from "@/model/vocabulary-utils.ts";
-import { styleMnemonicHtml } from "@/utils/mnemonic-utils.ts";
+} from "@shared/wanikani/subject-utils.ts";
+import { getRadicalSvgUrl } from "@shared/wanikani/radical-utils.ts";
+import { getReadingsByType } from "@shared/wanikani/kanji-utils.ts";
+import { selectReadingAudios, getShortestSentence } from "@shared/wanikani/vocabulary-utils.ts";
+import { styleMnemonicHtml } from "@shared/wanikani/mnemonic-utils.ts";
 import {
+  type AnkiDeckType,
   RADICAL_DECK_NAME,
   RADICAL_MODEL_NAME,
   RADICAL_EXPECTED_FIELDS,
@@ -33,7 +34,9 @@ import {
   VOCABULARY_DECK_NAME,
   VOCABULARY_MODEL_NAME,
   VOCABULARY_EXPECTED_FIELDS,
-} from "@/model/anki-models.ts";
+} from "@shared/anki/anki-models.ts";
+import { createAnkiError, invokeAnkiConnect } from "@shared/anki/anki-connect-invoke.ts";
+import { getErrorMessage } from "@shared/error-message.ts";
 import {
   buildSpeechSsml,
   generateSpeechAudio,
@@ -49,20 +52,7 @@ import {
   type MediaFolder,
 } from "@/server/repository/media-cache.ts";
 import { mnemonicImageErrorHint } from "@/server/repository/mnemonic-image-fetcher.ts";
-import { getErrorMessage } from "@/server/utils/error-utils.ts";
 import { hashNumber, shortHash } from "@/server/utils/hash.ts";
-
-const ANKI_CONNECT_URL = "http://127.0.0.1:8765";
-
-type AnkiConnectError = {
-  message: string;
-  action: string;
-  params?: unknown;
-};
-
-function createAnkiError(message: string, action: string, params?: unknown): AnkiConnectError {
-  return { message, action, params };
-}
 
 type RadicalNoteFields = {
   character: string;
@@ -119,26 +109,13 @@ type VocabularyNoteFields = {
   sentence_eng_audio: string;
 };
 
-async function ankiInvoke<T>(action: string, params: Record<string, unknown> = {}): Promise<T> {
-  let response: Response;
+async function ankiInvoke<T>(action: string, params?: Record<string, unknown>): Promise<T> {
   try {
-    response = await fetch(ANKI_CONNECT_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action, version: 6, params }),
-    });
-  } catch {
-    throw createAnkiError("Failed to connect to Anki. Is Anki running?", action, params);
+    return await invokeAnkiConnect<T>(action, params);
+  } catch (err) {
+    console.error(`[Anki] Error from ${action}:`, getErrorMessage(err));
+    throw err;
   }
-
-  const data = await response.json();
-
-  if (data.error) {
-    console.error(`[Anki] Error from ${action}:`, data.error);
-    throw createAnkiError(String(data.error), action, params);
-  }
-
-  return data.result as T;
 }
 
 async function getDeckId(deckName: string): Promise<number> {
@@ -264,8 +241,6 @@ async function addOrUpdateNote<T extends Record<string, string>>(
 }
 
 // === Deck Notes ===
-
-export type AnkiDeckType = "radical" | "kanji" | "vocabulary";
 
 type DeckNoteInfo = { characters: string; meaning: string };
 

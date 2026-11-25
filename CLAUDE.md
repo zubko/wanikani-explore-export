@@ -34,30 +34,37 @@ src/
     api.ts              # API routes (exports ApiType for client)
     utils/              # Server-side utility functions
       hash.ts           # shortHash (first 8 hex chars of SHA-1) and hashNumber
-      error-utils.ts    # getErrorMessage for an Error or an AnkiConnect error object
-      file-utils.ts     # writeFileAtomic (temp file, then rename), writeFileAtomicIfUnchanged, writeFileIfMissing, readFileVersion, isMissingFile
-      json-utils.ts     # readJson, saveJsonAtomic, saveJsonAtomicIfUnchanged, saveJsonIfMissing, createSaveQueue, saveJsonWithRetry
+      json-utils.ts     # saveJsonAtomicIfUnchanged, saveJsonIfMissing, createSaveQueue, saveJsonWithRetry
       reloading-file.ts # createReloadingFile: reads a file again when its inode, mtime or size changed
     repository/         # Data access layer (singleton, use initRepository() first)
-                        #   data-paths.ts: the paths of the files the server writes, no imports
                         #   study-material.ts: local notes / synonyms, saved with saveJsonAtomicIfUnchanged
                         #   custom-subject.ts: create, update and delete of custom words, in one queue
                         #   mnemonic-image-fetcher.ts: mnemonic image registry, an append-only JSONL file
                         #   media-cache.ts: getOrFetchMedia, the media files in data/userdata/media/
     services/           # Server services (AnkiConnect integration, Azure TTS)
-  config/               # Shared configuration (theme colors)
-  utils/                # Shared utility functions (mnemonic-utils)
-  model/                # Shared TypeScript types and utilities (server, client and scripts)
-    wanikani.ts         # Wanikani data types
-    anki-models.ts      # Anki deck / note type names
-    subject-utils.ts    # Shared utilities (getPrimaryMeaning, findByIds, buildSubjectReferences, etc.)
-    radical-utils.ts    # Radical-specific utilities
-    kanji-utils.ts      # Kanji-specific utilities
-    vocabulary-utils.ts # Vocabulary-specific utilities
-    custom-subject-utils.ts # Pure checks and helpers of the custom words (see "Custom Subjects")
-    validation-error.ts # ValidationError, thrown by every validate... check in src/model/, no imports
-    __tests__/          # Unit tests for the pure model helpers
-
+  shared/               # Code that two or more parts use (server, client and scripts), imported as @shared/...
+    data-paths.ts       # Every path the code reads or writes under data/, no imports
+    error-message.ts    # getErrorMessage for an Error or an AnkiConnect error object
+    theme.ts            # Subject colors
+    wanikani/           # WaniKani types and utilities
+      wanikani.ts         # Wanikani data types
+      subject-utils.ts    # Shared utilities (getPrimaryMeaning, findByIds, buildSubjectReferences, etc.)
+      radical-utils.ts    # Radical-specific utilities
+      kanji-utils.ts      # Kanji-specific utilities
+      vocabulary-utils.ts # Vocabulary-specific utilities
+      custom-subject-utils.ts # Pure checks and helpers of the custom words (see "Custom Subjects")
+      validation-error.ts # ValidationError, thrown by every validate... check in src/shared/wanikani/, no imports
+      mnemonic-utils.ts   # styleMnemonicHtml and the mnemonic tags
+      __tests__/          # Unit tests for the pure WaniKani helpers
+    anki/               # Anki names and the AnkiConnect call
+      anki-models.ts      # Anki deck / note type names, ANKI_DECK_TYPES and isAnkiDeckType
+      anki-connect-invoke.ts # invokeAnkiConnect, ANKI_CONNECT_URL, createAnkiError. Not for the client
+      __tests__/          # Unit tests for the deck types and invokeAnkiConnect
+    files/              # File helpers, Node only (fs/promises, crypto)
+      file-utils.ts       # writeFileAtomic (temp file, then rename), writeFileAtomicIfUnchanged, writeFileIfMissing, readFileVersion, isMissingFile
+      json-file.ts        # readJson, saveJsonAtomic, formatJsonFile
+      __tests__/          # Unit tests for the file helpers
+    __tests__/          # Unit tests for getErrorMessage
   test/                   # Shared test infrastructure
     preload.ts            # Shared mock.module + repository init + DOM (configured in bunfig.toml)
     dom.ts                # One happy-dom window on globalThis, installed by the preload
@@ -67,6 +74,7 @@ src/
     custom-subject-fixture.ts # Four custom word records, setCustomSubjectsFile and customSubjectInputOf
     fetch-interceptor.ts  # Fetch mock for API E2E tests (AnkiConnect, WaniKani media/pages)
     fetch-utils.ts        # Shared fetch mock utilities
+    __tests__/            # eslint-border.test.ts: the border rule of eslint.config.js
 
 scripts/                # Utility scripts. Top level holds only entry points, shared code goes to lib/
   CLAUDE.md                      # Rules for the script code only (see "Where Rules Go")
@@ -83,20 +91,18 @@ scripts/                # Utility scripts. Top level holds only entry points, sh
   split-text-vocab.ts            # Split the word list of a text run into not in Anki and not in WaniKani
   add-text-vocab.ts              # Add the words of a text run to the Anki vocabulary deck
   lib/                           # Modules shared by the scripts, never run directly
-    anki-templates.ts            # Shared by the two sync scripts: template table, ankiInvoke, field diff
+    anki-templates.ts            # Shared by the two sync scripts: template table, template loading, field diff
     anki-template-fields.ts      # Pure markdown parsing of the template files (unit-tested)
-    format-error.ts              # formatError(err) shared by all scripts
-    dev-server-api.ts            # Dev server calls of add-iknow-vocab, add-references and the two text scripts (sync-anki-notes keeps its own)
+    dev-server-api.ts            # Dev server calls of every script that needs the dev server, through a typed Hono client
     text-vocab.ts                # Text import helpers: run folder, word list read and parse, classifyWord (unit-tested)
     generator-cli.ts             # Shared by the two LLM scripts: flags, log, summary, stop rule
-    llm-utils.ts                 # Shared by the two LLM scripts: chunk, JSON answers, atomic save
+    llm-utils.ts                 # Shared by the two LLM scripts: chunk, JSON answers
     vocabulary-data.ts           # Shared by the two LLM scripts: load vocabulary, primary reading
     sentence-reading-check.ts    # Order check of a kana reading against its sentence (unit-tested)
     iknow-vocab.ts               # Pure parts of the iKnow import: parsing, course rollover (unit-tested)
     note-refresh.ts              # Limit and refreshed-name helpers for the passes of sync-anki-notes (unit-tested)
     references.ts                # Find the items a note mentions and the ones missing in Anki (unit-tested)
     custom-subject-clash.ts      # The custom word clash warnings of download-subjects (unit-tested)
-    data-paths.ts                # CUSTOM_SUBJECTS_FILE, the server path written again (a test keeps them equal)
     __tests__/                   # Unit tests for the pure script helpers, fixtures in fixtures/
   .env                  # Script-specific env vars (WANIKANI_API_TOKEN, LLM_BASE_URL, LLM_API_KEY, LLM_MODEL)
                         # Loaded via --env-file in package.json scripts
@@ -127,7 +133,7 @@ This file loads in every session, so it holds only the rules that matter to most
 
 - A rule that matters only for the code of one folder goes into a `CLAUDE.md` in that folder. Claude loads that file only after it reads a file in that folder or below it. `scripts/CLAUDE.md` is an example.
 - The flow of a skill goes into its `SKILL.md` and nowhere else. Never copy the steps of a skill into a `CLAUDE.md`.
-- A fact that reaches other folders stays in the parent file, like a constant in `src/model/` that the scripts also use.
+- A fact that reaches other folders stays in the parent file, like a constant in `src/shared/` that the scripts also use.
 - The parent file keeps a short entry for each local file: one or two sentences on what the feature is, the facts that reach other folders, and the path of the local file.
 - Before you add a rule to this file, check whether it matters only for one folder or one skill. If it does, put it there. This also holds for `/learn` and the Post-Implementation step.
 
@@ -143,6 +149,8 @@ bun run tsc        # TypeScript type checking
 ```
 
 `bun run dev` uses port 5173, or the next free one when 5173 is busy. With `PORT` set it uses exactly that port and fails when the port is busy. `.claude/launch.json` sets `autoPort`, so the Claude desktop preview picks a free port and passes it in `PORT` when another worktree already uses 5173.
+
+To stop a server you started, kill only its own PID. Never match by name with `pkill -f` or `pgrep -f "bun run dev"`: the user or another worktree often runs a dev server too, and a name match stops it. A check of a build or a dev server uses its own port (`PORT=<free port>`), never 5173.
 
 ## Data Scripts
 
@@ -201,7 +209,7 @@ Design rules:
 - A file the server writes and the other machine may change is never kept in memory for the whole process. That is the mnemonic image registry, the local study materials and the custom subjects. `createReloadingFile({ path, parse })` in `src/server/utils/reloading-file.ts` runs a `stat` on every `get()` and reads the file again when its inode, mtime or size changed. The inode counts because the mtime can stay the same within one clock tick, while every atomic save and every git checkout gives the file a new inode. `parse` gets `null` for a missing file and decides what empty means. `parse` may answer a promise, and `get()` awaits it. The value is kept only after `parse` succeeded. An optional `dependsOn` lists more paths: the value is parsed again when the file or one of those files changed. The local notes file passes the custom subjects file, because its subject check reads the custom list. So a notes read costs two `stat` calls.
 - The files that only a script writes are read once at start: the four subject files, `study_materials.json`, `data/verb_conjugations.json` and `data/sentence_readings.json`. After a new download or a pull of these files, restart the server on both machines.
 - A bad data file that shows up while the server runs (a hand edit, a pull) fails every request that needs it, loudly, until the file is fixed. No restart is needed after the fix. A bad file at startup still fails the start.
-- A write is an append of one line, or an atomic write and rename. It is never a rewrite of a whole file from a memory copy. `writeFileAtomic(path, data)` in `src/server/utils/file-utils.ts` writes `<path>.<uuid>.tmp` and renames it over the file, so two writes of one path never share a temp file. `saveJsonAtomic` calls it. A read, merge and write uses `writeFileAtomicIfUnchanged({ path, data, fileVersion })` instead. It renames only when `readFileVersion(path)` still gives the version taken before the read, see "Local Study Materials". A file that only needs to exist is created with `writeFileIfMissing(path, data)`, an exclusive create (`wx`). It never replaces a file that a pull created a moment before.
+- A write is an append of one line, or an atomic write and rename. It is never a rewrite of a whole file from a memory copy. `writeFileAtomic(path, data)` in `src/shared/files/file-utils.ts` writes `<path>.<uuid>.tmp` and renames it over the file, so two writes of one path never share a temp file. `saveJsonAtomic` in `src/shared/files/json-file.ts` calls it. The server and the scripts both save JSON through it. A read, merge and write uses `writeFileAtomicIfUnchanged({ path, data, fileVersion })` instead. It renames only when `readFileVersion(path)` still gives the version taken before the read, see "Local Study Materials". A file that only needs to exist is created with `writeFileIfMissing(path, data)`, an exclusive create (`wx`). It never replaces a file that a pull created a moment before.
 - The reading gender and the sentence voice come from hashes, not from `Math.random`. So a word always gets the same file names, on both machines, as long as both hold the same `AZURE_TTS_FEMALE_VOICES` and `AZURE_TTS_MALE_VOICES` lists.
 
 The mnemonic image registry, `data/userdata/mnemonic-images.jsonl`:
@@ -235,20 +243,19 @@ Git attributes in `data/userdata/.gitattributes`. `data/userdata/README.md` expl
 Local notes and synonyms for any subject, written in the web UI. They never touch the WaniKani data. There is no script for this, the app writes the file.
 
 - The file is `data/userdata/study_materials_extra.json`. It is an object keyed by the subject id as a string. WaniKani subject ids are unique across all types, so the file holds no type. A record has `meaning_note`, `reading_note` and `meaning_synonyms`, all optional.
-- `getLocalStudyMaterials()` in `data-loader.ts` answers the records. It reads the file through `createReloadingFile`, so a `git pull` of a change from the other server shows on the next request with no restart. A bad file fails every request that needs it until it is fixed. `initRepository` reads it once after the subject arrays, so a bad file still fails the start. The path is one exported constant, `LOCAL_STUDY_MATERIALS_PATH` in `src/server/repository/data-paths.ts`.
+- `getLocalStudyMaterials()` in `data-loader.ts` answers the records. It reads the file through `createReloadingFile`, so a `git pull` of a change from the other server shows on the next request with no restart. A bad file fails every request that needs it until it is fixed. `initRepository` reads it once after the subject arrays, so a bad file still fails the start. The path is one exported constant, `LOCAL_STUDY_MATERIALS_PATH` in `src/shared/data-paths.ts`.
 - A file that is missing at start is created with `{}` by `ensureLocalStudyMaterialsFile()`, which only `initRepository` calls. It uses `saveJsonIfMissing`, an exclusive create, so a file that a pull brings during the start is kept. This is the one data file the app itself writes, so it can make its own empty one; every other data file still fails the start, because only a download script can fill those. After the start a missing file is an error, `<path> is missing`: a git pull never deletes it, so it was deleted by hand. The getter fails, and a save fails and writes nothing instead of a new file with one record.
-- The file also comes from the other server through git, so the load refuses everything the PATCH route refuses. Both sides use the same rules from `src/model/subject-utils.ts`: `validateLocalStudyMaterialValue(field, value)` for the value, `validateReadingNote(type)` for a `reading_note` on a type that has no reading. Both throw a `ValidationError` from `src/model/validation-error.ts` with a bare text like `must be a string`, and the caller adds the place. The route catches it right around the one call and answers 400. The load catches it and puts `subject <id> field <field>` in front. A `ValidationError` from a deeper call is never caught as a 400, it stays a 500. The field lists live in `src/model/wanikani.ts`: `LOCAL_STUDY_MATERIAL_FIELDS` for a stored record, `LOCAL_STUDY_MATERIAL_PATCH_FIELDS` for a patch. An entry with no field is refused too, because the app deletes such an entry and would never look at it.
+- The file also comes from the other server through git, so the load refuses everything the PATCH route refuses. Both sides use the same rules from `src/shared/wanikani/subject-utils.ts`: `validateLocalStudyMaterialValue(field, value)` for the value, `validateReadingNote(type)` for a `reading_note` on a type that has no reading. Both throw a `ValidationError` from `src/shared/wanikani/validation-error.ts` with a bare text like `must be a string`, and the caller adds the place. The route catches it right around the one call and answers 400. The load catches it and puts `subject <id> field <field>` in front. A `ValidationError` from a deeper call is never caught as a 400, it stays a 500. The field lists live in `src/shared/wanikani/wanikani.ts`: `LOCAL_STUDY_MATERIAL_FIELDS` for a stored record, `LOCAL_STUDY_MATERIAL_PATCH_FIELDS` for a patch. An entry with no field is refused too, because the app deletes such an entry and would never look at it.
 - The subject rules need the loaded subject arrays, so they are not part of `readLocalStudyMaterials`. `checkLocalStudyMaterialSubjects({ records, unknownSubject, customSubjects })` refuses a key that is not a plain subject id, and a `reading_note` on a radical or on kana vocabulary. An id at or above `CUSTOM_SUBJECT_ID_FLOOR` is looked up in `customSubjects`, hidden records included, and gets the same `reading_note` rule by its type. The `parse` of the notes file awaits `getCustomSubjects()` for that list, so a pulled `reading_note` on a custom kana word fails the read too. The notes file passes the custom file in `dependsOn`, so a pull that changes only the custom file runs this check again. It is a separate step because `readLocalStudyMaterials` also runs inside every save, where a bad record of another subject must not fail the write. `findSubjectTypeById(id)` lives in `data-loader.ts` next to the arrays it scans, so this check needs no import cycle.
 - An id that is no WaniKani subject fails the start (`unknownSubject: "fail"`, in `initRepository`), and so does a custom id that is not in `custom_subjects.json`. On a reread, inside the `parse` of the reloading file, the record is kept and only logged (`"skip"`). The subject arrays are read once at start, so the other machine may already know a newer subject. A failure there would break every request until a restart, while the file is not bad.
-- Every enriched subject carries two records: `studyMaterial` from WaniKani and `localStudyMaterial` from this file. The server sends both. `mergeStudyMaterial(wanikani, local)` in `src/model/subject-utils.ts` joins them: a local note replaces the WaniKani note, local synonyms are appended to the WaniKani ones and duplicates are dropped.
+- Every enriched subject carries two records: `studyMaterial` from WaniKani and `localStudyMaterial` from this file. The server sends both. `mergeStudyMaterial(wanikani, local)` in `src/shared/wanikani/subject-utils.ts` joins them: a local note replaces the WaniKani note, local synonyms are appended to the WaniKani ones and duplicates are dropped.
 - The client gets both records on purpose. Local synonyms need a remove button, and clearing a local note must show the WaniKani note again with no re-fetch.
 - The three Anki note builders in `src/server/services/anki-connect.ts` call the same helper, so a note built now holds the merged values. A note that is already in the deck keeps its old text until the next `add-to-anki` or `bun run sync-anki-notes`.
-- The kanji and vocabulary notes also have `alternative_meanings`, the one line under the main meaning on the short back. `getAlternativeMeanings(meanings, synonyms)` in `src/model/subject-utils.ts` builds it: the WaniKani alternatives first, then the synonyms. It drops a blank synonym and a synonym equal to a shown meaning (the primary one or an accepted alternative) or to an earlier synonym. The compare key is `meaningKey` (trim, lower case, NFC), the same one `UserSynonymsRow` uses. The short back does not tell WaniKani and user meanings apart. The Details view keeps the split in `extra_meanings` and `user_synonyms`.
+- The kanji and vocabulary notes also have `alternative_meanings`, the one line under the main meaning on the short back. `getAlternativeMeanings(meanings, synonyms)` in `src/shared/wanikani/subject-utils.ts` builds it: the WaniKani alternatives first, then the synonyms. It drops a blank synonym and a synonym equal to a shown meaning (the primary one or an accepted alternative) or to an earlier synonym. The compare key is `meaningKey` (trim, lower case, NFC), the same one `UserSynonymsRow` uses. The short back does not tell WaniKani and user meanings apart. The Details view keeps the split in `extra_meanings` and `user_synonyms`.
 - `MergedStudyMaterial` uses camelCase, because it is our own computed shape, like `meaningMnemonic`. `LocalStudyMaterial` stays snake_case, because it mirrors the WaniKani record field by field. Do not "fix" one to match the other.
 - A patch never carries the synonym list. It names one word in `add_synonym` or in `remove_synonym`, and the server applies it to the record it just read from the file. So a client that holds an old record cannot delete a synonym it never saw, and no client-side reconciling of lists is needed. A patch that holds both fields removes first and adds after, and the editor only ever sends one of them. The notes stay whole values: a note is one text the user typed, and writing it over the old one is the point.
-- `applyLocalStudyMaterialPatch(current, patch)` in `src/model/subject-utils.ts` is the one place that merges a patch into a record. The server writes its result, the client shows it while the request runs. It trims the notes and the added word, drops blank and repeated synonyms, deletes a field that ends up empty and returns `null` when no field is left. It cleans the whole merged record, not only the patched fields, so the file never holds an empty string, an empty list or an empty entry.
+- `applyLocalStudyMaterialPatch(current, patch)` in `src/shared/wanikani/subject-utils.ts` is the one place that merges a patch into a record. The server writes its result, the client shows it while the request runs. It trims the notes and the added word, drops blank and repeated synonyms, deletes a field that ends up empty and returns `null` when no field is left. It cleans the whole merged record, not only the patched fields, so the file never holds an empty string, an empty list or an empty entry.
 - `upsertLocalStudyMaterial` in `src/server/repository/study-material.ts` writes the whole object with `saveJsonAtomicIfUnchanged` from `src/server/utils/json-utils.ts` (write `<path>.<uuid>.tmp`, rename it over the real file, unlink the temp file when a step throws). It keeps no memory copy: the next `getLocalStudyMaterials()` sees the new mtime and reads the file again. A failed write leaves the file unchanged.
-- `saveJsonAtomic` exists twice, here and in `scripts/lib/llm-utils.ts`. The scripts must not import from `src/server/`, so the copy stays on purpose. Change both when you change one.
 - Every upsert runs in one module-level promise queue, made by `createSaveQueue()` in `json-utils.ts`. Two saves at the same time would otherwise start from the same old object, and one change would be lost. The caller's promise stays out of the chain (`const run = queue.then(step); queue = run.catch(() => {}); return run;`). So the caller sees the error, and the next save still starts from the last good state.
 - The upsert reads the file again inside that queue with `readLocalStudyMaterials()` and merges the patch onto the fresh content. The other server writes this file too, and a `git pull` brings its saves while this server runs. A read error fails the save, because writing an old copy would drop those saves with no error.
 - The queue only orders the saves of this server. A pull of the other server's saves can still land between the read and the rename. So the upsert runs through `saveJsonWithRetry({ path, attempts, label, step })` in `json-utils.ts`. It takes `readFileVersion(path)` (inode, mtime and size) before `step` reads the file. `writeFileAtomicIfUnchanged` reads the version again after the temp file is written, right before the rename. A changed version drops the temp file, and the save starts again from the read. When the file changes during all `LOCAL_STUDY_MATERIAL_SAVE_ATTEMPTS` (3) attempts, the save fails and writes nothing.
@@ -268,7 +275,7 @@ Local notes and synonyms for any subject, written in the web UI. They never touc
 - `PATCH /api/study-materials` and the `/custom-subjects` routes write user data, so `createApp()` in `src/server/app.ts` allows CORS for the vite dev client only (`http://localhost:5173`, `http://127.0.0.1:5173`). With the default `cors()` any open page could read the answers. A built client is served from the same origin and needs no CORS.
 - CORS alone does not stop a write. A page of another origin can send a "simple" POST (a form, or `text/plain`) with no preflight. The route runs, and CORS only hides the answer. So a middleware in `src/server/api.ts` guards the four routes that read a JSON body: `POST /add-to-anki`, `PATCH /study-materials`, `POST /custom-subjects` and `PUT /custom-subjects/:id`. It answers 415 `{ ok: false, error: "Content-Type must be application/json" }` for any other content type. A JSON content type needs a preflight, and the CORS rule refuses it for another origin. PUT, PATCH and DELETE always need a preflight. `POST /anki-sync` takes no body and stays open: a cross-site POST can only start an AnkiWeb sync, which writes no note. Every caller (the Hono client, the scripts, curl in the skills) sends `Content-Type: application/json`.
 - The app is built in `app.ts` and not in `index.ts`, so a test can build one without the `initRepository()` that `index.ts` runs at import time.
-- The field lists live once, in `src/model/wanikani.ts`. `LOCAL_STUDY_MATERIAL_FIELDS` names what a record holds and builds the `LocalStudyMaterial` type, `LOCAL_STUDY_MATERIAL_PATCH_FIELDS` names what a patch holds and builds `LocalStudyMaterialPatch`. The `field` prop of `NoteSection`, the PATCH route and the file load all read them. A copy in the route would answer a new field with a silent 400.
+- The field lists live once, in `src/shared/wanikani/wanikani.ts`. `LOCAL_STUDY_MATERIAL_FIELDS` names what a record holds and builds the `LocalStudyMaterial` type, `LOCAL_STUDY_MATERIAL_PATCH_FIELDS` names what a patch holds and builds `LocalStudyMaterialPatch`. The `field` prop of `NoteSection`, the PATCH route and the file load all read them. A copy in the route would answer a new field with a silent 400.
 - `SearchResult.tsx` gives the three top-level cards a `key` with the subject id. Without it React reuses the same component instance on a new search, and the open editor would keep the draft of the last subject. The nested cards already sit in keyed wrappers. `SearchResult.test.tsx` guards it: it opens an editor, renders another subject in the same place and expects no editor.
 - A failed save shows `saveErrorMessage(err)` from `src/client/utils/request-error.ts`, the same module the search page uses. So a stopped dev server reads "Could not reach the server" everywhere, instead of the raw fetch `TypeError` in the editors.
 - `noteProps(subject, field)` and `synonymProps(subject)` in `src/client/components/card-components/study-material-props.ts` build the editor props. The cards never pick the fields apart by hand, so a `reading_note` editor cannot end up with a `meaning_note` value.
@@ -280,7 +287,7 @@ Local notes and synonyms for any subject, written in the web UI. They never touc
 The user's own vocabulary and kana vocabulary words, for words WaniKani does not teach, like the iKnow grammar words そう, どうぞ and くれる. They live in `data/userdata/custom_subjects.json`, apart from the WaniKani data. The server treats them like WaniKani words: the search finds them, the web app shows them, the add to Anki writes them, and the local notes and synonyms work on them. There is no script and no web UI to add a word. An AI agent writes them through the five `/custom-subjects` routes and the `.claude/skills/add-custom-word/` skill. Custom kanji and radicals do not exist yet: the file shape allows them, the checks refuse them.
 
 - The file is a JSON array of records in the WaniKani wrapper shape, a plain `VocabularyData` or `KanaVocabularyData`. `CustomSubject` is only a name for such a record. So `vocabulary.ts` builds a custom word with the same code as a WaniKani word. A record has two extra fields: `data.conjugations` (`{ dictionary, masu, te, nai }`) on a verb, and a kana `reading` in each context sentence. For a custom id, `vocabulary.ts` reads both from the record, not from `data/verb_conjugations.json` and `data/sentence_readings.json`. A kana verb like くれる is `kana_vocabulary`, like every kana word of WaniKani, so `KanaVocabulary` has `conjugations` too. A WaniKani kana word reads `data/verb_conjugations.json` like every WaniKani word, and answers `null` when it has no entry there. `generate-verb-conjugations` lists する (9180, a `kana_vocabulary`) as an irregular verb on purpose, so する shows its conjugations on the card and in its Anki note.
-- A custom id starts at `CUSTOM_SUBJECT_ID_FLOOR` (1,000,000) in `src/model/wanikani.ts`, far above the WaniKani ids. So the id alone shows where a word comes from, and the two id ranges never overlap. `isCustomSubjectId(id)` tells them apart. `initRepository` fails with `WaniKani id <id> reached CUSTOM_SUBJECT_ID_FLOOR` when a WaniKani id gets there. `nextCustomSubjectId` gives the largest id plus one, hidden records included, so an id is never given twice.
+- A custom id starts at `CUSTOM_SUBJECT_ID_FLOOR` (1,000,000) in `src/shared/wanikani/wanikani.ts`, far above the WaniKani ids. So the id alone shows where a word comes from, and the two id ranges never overlap. `isCustomSubjectId(id)` tells them apart. `initRepository` fails with `WaniKani id <id> reached CUSTOM_SUBJECT_ID_FLOOR` when a WaniKani id gets there. `nextCustomSubjectId` gives the largest id plus one, hidden records included, so an id is never given twice.
 - The agent sends only the content, `{ object, data }` (`CustomSubjectInput`). The server fills the fixed fields: `url: null`, `level: 0`, `slug` equal to `characters`, `hidden_at: null`, `document_url: null`, `pronunciation_audios: []`, `lesson_position: 0`, `spaced_repetition_system_id: 0`, `created_at` and `data_updated_at`. `document_url` is `string | null` on the two vocabulary types, and so is `documentUrl`, so the card of a custom word shows no WaniKani link.
 - The file is read through `createReloadingFile`, like the local notes. So a `git pull` of a new word shows on the next request with no restart. The `parse` holds `{ records, wordsByKanji }`, so the back link map is built once per file version and not per request. The four WaniKani arrays stay read once at start.
 - `data-loader.ts` does not export the two vocabulary arrays, so no reader can forget the custom words. The readers use the getters. Each getter answers hidden records too, and the readers filter with `isVisibleSubject`:
@@ -291,7 +298,7 @@ The user's own vocabulary and kana vocabulary words, for words WaniKani does not
 - `/anki-notes` reads `getWords()` once per request and passes the list to `resolveWkSubject`. So a deck of a thousand notes costs one `stat`, not one per note. Only the vocabulary deck reads it, so the radical and kanji decks never read the custom file.
 - A kanji card lists the custom words that use it. `buildCustomWordsByKanji` maps a kanji id to the visible custom `vocabulary` words in its `component_subject_ids`, and `kanji.ts` appends them to `amalgamation_subject_ids`. Nothing is written into the WaniKani files.
 - A file that is missing at start is created with `[]` by `ensureCustomSubjectsFile()`, an exclusive create, like the notes file. After the start a missing file is an error, `<path> is missing`. A broken file fails the start, and every request that reads it while the server runs, until it is fixed. `initRepository` reads this file before the notes file, because the notes check needs the custom list.
-- The checks live in `src/model/custom-subject-utils.ts`, pure, so the loader, the write module and the download script share the rules. There are three levels. `validateCustomSubjectInput({ input, kanjiCharactersById })` checks a body. `validateCustomSubjectRecord(record)` checks one stored record: the fixed fields first, then the body check on the rest with `kanjiCharactersById: null`. `validateCustomSubjects(records)` checks the whole file: an array, every record, no id twice, no two visible records with the same `characters`. Each throws a `ValidationError` that names the path of the bad value, like `data.meanings[1].primary must be a boolean`. The file check puts `record <id>: ` in front.
+- The checks live in `src/shared/wanikani/custom-subject-utils.ts`, pure, so the loader, the write module and the download script share the rules. There are three levels. `validateCustomSubjectInput({ input, kanjiCharactersById })` checks a body. `validateCustomSubjectRecord(record)` checks one stored record: the fixed fields first, then the body check on the rest with `kanjiCharactersById: null`. `validateCustomSubjects(records)` checks the whole file: an array, every record, no id twice, no two visible records with the same `characters`. Each throws a `ValidationError` that names the path of the bad value, like `data.meanings[1].primary must be a boolean`. The file check puts `record <id>: ` in front.
 - The body rules: `object` is `vocabulary` or `kana_vocabulary`. `characters` holds only kana, kanji, `ー` and `々`, because it becomes the `slug`, and the slug is part of the media file names. Exactly one meaning is primary, and it has `accepted_answer: true`, like every primary entry in the WaniKani data (`data.meanings[<i>].accepted_answer must be true on the primary`). Every context sentence has `en`, `ja` and `reading`. A `vocabulary` word has a kanji in `characters`, `readings` with one primary that has `accepted_answer: true`, a `reading_mnemonic`, and `component_subject_ids` of visible WaniKani kanji. A reading holds only hiragana, katakana and `ー` (`data.readings[<i>].reading must hold only kana`), because Azure TTS reads it as it is. A kanji id may come only once (`data.component_subject_ids[<i>] <id> is listed twice`). The ids must name exactly the kanji of `characters`, in order, each kanji once at its first place (`data.component_subject_ids must be the ids of 下, 記 in this order, but they are the ids of 下`). `々` counts as a kanji here, because WaniKani has it as kanji 856 and lists it in every word with `々`. So `人々` is 人, 々 and `日曜日` is 日, 曜. All visible WaniKani words follow this rule. A wrong id would add an unrelated kanji and its radicals to Anki and a false back link on that kanji card. A `kana_vocabulary` word has none of these four. An `ichidan verb` or `godan verb` needs `conjugations` (`needsConjugations`), any other word may have them. No unknown key, also inside the nested objects.
 - The file check never checks the kanji ids against WaniKani or `characters`. A kanji that WaniKani hides later, or one that only the other machine's newer download knows, must not fail the start or block every write. The loader logs a `[Repository]` warning for such an id and keeps the record. The enrich step drops the id through `findVisibleByIds`.
 - A clash is a visible custom word with the same `characters` as a visible WaniKani word. Vocabulary and kana vocabulary count as one pool. `findWaniKaniClash` finds them. A create refuses a clash with 409. The loader only logs a warning, because WaniKani can add the same word later. After such a clash the WaniKani word wins: the search shows it, and the Anki note with those characters resolves to it. The user then DELETEs the custom word. The next add or `sync-anki-notes` writes the WaniKani content into the same Anki note, because the note is found by its characters. `bun run download-subjects` prints `Warning: custom subject <id> "<characters>" has the same characters as WaniKani <id>` after the save, through `customSubjectClashWarnings` in `scripts/lib/custom-subject-clash.ts`. A missing or broken custom file prints one line, and the download still exits 0, because the download is the long step.
@@ -330,7 +337,7 @@ The search endpoint answers `vocabulary` and `kana_vocabulary` from one pool, so
 
 The `.claude/skills/add-iknow-vocab/` skill runs the script and triages the new `problems` entries — grammar words WaniKani does not teach vs a different WaniKani spelling (直ぐ for すぐ). It asks before adding an alternative spelling. For a grammar word it offers the `add-custom-word` skill, see "Custom Subjects".
 
-The `.claude/skills/add-references/` skill runs after every add. A mnemonic, hint or note often names another item ("The reading comes from 狙い"), and the card needs that item in Anki too. `bun run add-references` (`--days <n>`, default 1, `--base-url`, `--dry-run`) reads the notes added to Anki in that time straight from AnkiConnect, so it also sees adds from the web UI and the phone. It reads only the mnemonic, hint and note fields: a context sentence is full of other words and points to none of them. Each kanji run in them is looked up as a word with exactly these characters first, then a kanji, then a radical. The words are the WaniKani `vocabulary` and the visible custom `vocabulary` words of `custom_subjects.json`. The script reads that file at `CUSTOM_SUBJECTS_FILE` from `scripts/lib/data-paths.ts`, and a test checks that it equals `CUSTOM_SUBJECTS_PATH`. A mention of the note's own characters is skipped. Every item that is not in Anki is added with no question, through `/api/add-to-anki` with `sync: false`, and the new notes are checked the same way until nothing is missing. It syncs with AnkiWeb once at the start and once at the end. The first failed add stops the run with exit 1. The pure parts are in `scripts/lib/references.ts`.
+The `.claude/skills/add-references/` skill runs after every add. A mnemonic, hint or note often names another item ("The reading comes from 狙い"), and the card needs that item in Anki too. `bun run add-references` (`--days <n>`, default 1, `--base-url`, `--dry-run`) reads the notes added to Anki in that time straight from AnkiConnect, so it also sees adds from the web UI and the phone. It reads only the mnemonic, hint and note fields: a context sentence is full of other words and points to none of them. Each kanji run in them is looked up as a word with exactly these characters first, then a kanji, then a radical. The words are the WaniKani `vocabulary` and the visible custom `vocabulary` words of `custom_subjects.json`. The script reads that file at `CUSTOM_SUBJECTS_PATH` from `src/shared/data-paths.ts`, the same constant the server uses. A mention of the note's own characters is skipped. Every item that is not in Anki is added with no question, through `/api/add-to-anki` with `sync: false`, and the new notes are checked the same way until nothing is missing. It syncs with AnkiWeb once at the start and once at the end. The first failed add stops the run with exit 1. The pure parts are in `scripts/lib/references.ts`.
 
 The same script lists the new radicals whose mnemonic only says they are the same as a kanji. Such a mnemonic names the kanji by its meaning, not by its character, so the lookup above never finds it. It marks `ADD KANJI` on a radical with no picture whose kanji is not in Anki. The skill still reads the mnemonic and adds that kanji by hand, because a radical with a story of its own keeps its card alone.
 
@@ -339,7 +346,7 @@ The same script lists the new radicals whose mnemonic only says they are the sam
 The `.claude/skills/add-text-vocab/` skill adds every word of a Japanese text to the Anki vocabulary deck. Two scripts do the fixed parts: `split-text-vocab` checks Anki and WaniKani, `add-text-vocab` adds the words. The words that WaniKani does not have go through steps 2 to 5 of `add-custom-word` first.
 
 - Each run keeps its buffer files in `tmp/text-vocab/<run>/`. `/tmp/` is in `.gitignore`. The data repo is the wrong place, because the Linux auto-pull job commits every few minutes and would push half-done files.
-- The TSV word check uses `CHARACTERS_PATTERN` and `KANA_PATTERN` from `src/model/custom-subject-utils.ts`. A change there also changes what the two scripts accept.
+- The TSV word check uses `CHARACTERS_PATTERN` and `KANA_PATTERN` from `src/shared/wanikani/custom-subject-utils.ts`. A change there also changes what the two scripts accept.
 - The rules of the scripts are in `scripts/CLAUDE.md`. The flow, the user questions and the commits are in `.claude/skills/add-text-vocab/SKILL.md`.
 
 ### Anki Template Development
@@ -375,7 +382,7 @@ The only script that changes note type fields, which are part of the collection 
 - Existing fields in another order than the template stop the run too, for the same reason: the insert index would land the new field in the wrong place. The script never moves a field, it only adds. The user repositions the fields in Anki, then runs the script again.
 - It needs a real terminal. Without a TTY it exits without any change, so an agent can never run it. Ask the user to.
 
-Both scripts share `scripts/lib/anki-templates.ts` (template table, `ankiInvoke`, template loading, reading the fields from Anki) and `scripts/lib/anki-template-fields.ts` (pure markdown parsing, field diff, template-order check, problem formatting, covered by `scripts/lib/__tests__/`).
+Both scripts share `scripts/lib/anki-templates.ts` (template table, template loading, reading the fields from Anki) and `scripts/lib/anki-template-fields.ts` (pure markdown parsing, field diff, template-order check, problem formatting, covered by `scripts/lib/__tests__/`).
 
 ### Anki Note Generation
 
@@ -414,9 +421,9 @@ Get your WaniKani token from: https://www.wanikani.com/settings/personal_access_
 
 ## Anki Integration
 
-AnkiConnect client is in `src/server/services/anki-connect.ts`. Card templates are in `src/anki-templates/`.
+`invokeAnkiConnect` and `ANKI_CONNECT_URL` are in `src/shared/anki/anki-connect-invoke.ts`. The server service in `src/server/services/anki-connect.ts` wraps it. Card templates are in `src/anki-templates/`.
 
-- AnkiConnect endpoint: `http://127.0.0.1:8765`
+- AnkiConnect endpoint: `ANKI_CONNECT_URL`, `http://127.0.0.1:8765`
 - The source of truth for what an AnkiConnect action does is the installed add-on, `~/Library/Application Support/Anki2/addons21/2055492159/__init__.py`. The FooSoft copy on GitHub is old, the add-on moved to git.sr.ht. Read the installed file before trusting a claim about an action; a reviewer cited the old copy and got `sync` wrong
 - Two Anki clients write the same collection, the Mac and the Linux box. `findNotes` only sees the local collection and AnkiWeb never merges two notes into one, so the server syncs with AnkiWeb before every note lookup. The sync makes the lookup current, it is not a lock: a `sync: false` add trusts the caller, and two adds of the same subject on both machines at the same second can still create two notes. One person uses both machines, so both are accepted. A batch caller sends `sync: false` and syncs once before its first lookup and once after its last write. The installed AnkiConnect `sync` calls `col.sync_collection` and returns after the collection sync is done (verified in the add-on source, Nov 2025 build), so the lookup right after it sees AnkiWeb's state
 - Use `toast.promise()` from `react-hot-toast` for async operations with loading/success/error feedback. The optimistic editors are the exception: they show the new value at once, so they need no loading toast and only call `toast.error` when the save fails
@@ -430,15 +437,16 @@ AnkiConnect client is in `src/server/services/anki-connect.ts`. Card templates a
 - Anki templates support JavaScript for dynamic behavior (e.g., font scaling, keyboard shortcuts)
 - Variable-length data (like radical lists) should be pre-rendered as styled HTML for consistency
 - Anki CSS supports `@media (prefers-color-scheme: dark)` for dark mode styling
-- A note field is listed in three places: `*_EXPECTED_FIELDS` in `src/model/anki-models.ts`, the matching note fields type in `anki-connect.ts`, and the `## Fields` list of the template file. `docs/anki-decks-fields.md` lists them too. A test in `scripts/lib/__tests__/anki-template-fields.test.ts` checks that `*_EXPECTED_FIELDS` and the template list match in exact order, so change them in the same commit. The docs file is not tested, keep it in sync by hand. Test code must not repeat the list: `src/test/fetch-interceptor.ts` imports `*_EXPECTED_FIELDS`
+- A note field is listed in three places: `*_EXPECTED_FIELDS` in `src/shared/anki/anki-models.ts`, the matching note fields type in `anki-connect.ts`, and the `## Fields` list of the template file. `docs/anki-decks-fields.md` lists them too. A test in `scripts/lib/__tests__/anki-template-fields.test.ts` checks that `*_EXPECTED_FIELDS` and the template list match in exact order, so change them in the same commit. The docs file is not tested, keep it in sync by hand. Test code must not repeat the list: `src/test/fetch-interceptor.ts` imports `*_EXPECTED_FIELDS`
 - The same test also checks that every `{{...}}` reference in the Front and Back templates is a declared field, so a typo in a template fails the suite instead of failing later in Anki
-- The deck / note type names and the `*_EXPECTED_FIELDS` lists live in `src/model/anki-models.ts`. Never repeat them; `anki-connect.ts`, `src/test/fetch-interceptor.ts` and the two test files all import them. They sit in `src/model/` and not in the service so `scripts/` can import them without reaching into a service
+- The deck / note type names and the `*_EXPECTED_FIELDS` lists live in `src/shared/anki/anki-models.ts`. Never repeat them; `anki-connect.ts`, `src/test/fetch-interceptor.ts` and the two test files all import them. They sit in `src/shared/anki/` and not in the service so `scripts/` can import them without reaching into a service
 
 ## Path Aliases
 
 - `@/*` → `src/*`
 - `@client/*` → `src/client/*`
 - `@server/*` → `src/server/*`
+- `@shared/*` → `src/shared/*`. Every import of shared code uses it, also in the scripts
 
 ## Coding Guidelines
 
@@ -451,8 +459,8 @@ AnkiConnect client is in `src/server/services/anki-connect.ts`. Card templates a
 - Order in the module should be: types, constants, variables, exported functions / React components, utility functions / React components
 - Order in the module from higher level to lower level
 - Include `.ts`/`.tsx` extensions in imports
-- Types shared between server and client go in `src/model/wanikani.ts`
-- Type-specific utility functions go in `src/model/*-utils.ts` (e.g., `subject-utils.ts`, `kanji-utils.ts`)
+- Types shared between server and client go in `src/shared/wanikani/wanikani.ts`
+- Type-specific utility functions go in `src/shared/wanikani/*-utils.ts` (e.g., `subject-utils.ts`, `kanji-utils.ts`)
 - Functions with 3+ arguments should use a params object
 - When writing helper functions that operate on multiple similar types (e.g., VocabularyData and KanaVocabularyData), use a union type for shared operations rather than separate parameters for each type
 - Function argument ordering: container → element
@@ -464,14 +472,32 @@ AnkiConnect client is in `src/server/services/anki-connect.ts`. Card templates a
 
 ### Architecture
 
-- Service modules (e.g., `anki-connect.ts`) expose business-domain functions, not raw protocol wrappers — keep low-level APIs like `ankiInvoke` private, export functions like `getDeckNotes(type)` or `addOrUpdateRadical(radical)`
+- Service modules (e.g., `anki-connect.ts`) expose business-domain functions, not raw protocol wrappers — keep low-level APIs like `ankiInvoke` private, export functions like `getDeckNotes(type)` or `addOrUpdateRadical(radical)`. The private `ankiInvoke` calls `invokeAnkiConnect` from `src/shared/anki/anki-connect-invoke.ts` and logs every error. The scripts have no service layer, so they call `invokeAnkiConnect` directly
+- Three parts import code: the server (`src/server/`), the web client (`src/client/`) and the scripts (`scripts/`). Code that two or more parts use lives in `src/shared/`. This also holds for code that two parts would otherwise keep as a copy. Every import of shared code uses `@shared/...`, never `@/shared/...` or a relative path from outside `src/shared/`
+- The `@typescript-eslint/no-restricted-imports` blocks in `eslint.config.js` check the borders, so `bun run lint` fails on a bad import. Who may import what:
+
+  | Files                                                                | Must not import                                                                                                                               |
+  | -------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+  | `src/shared/**`                                                      | the server, the client, the scripts, `src/test/`                                                                                              |
+  | `src/shared/**` but `files/`, `anki-connect-invoke.ts` and the tests | also `src/shared/files/` and `anki-connect-invoke.ts`, so the client ban cannot be passed through another shared module                       |
+  | `src/shared/**/__tests__/**`                                         | the server, the client, the scripts (`src/test/` is allowed, for the fs mock and the fetch mock)                                              |
+  | `src/shared/data-paths.ts`                                           | anything, so the test preload can load it before `mock.module` runs                                                                           |
+  | `src/server/**`                                                      | the client, the scripts                                                                                                                       |
+  | `src/client/**`                                                      | the server, except `import type` from `@server/api.ts`; the scripts; `src/shared/files/` (Node only) and `anki-connect-invoke.ts`             |
+  | `scripts/**`                                                         | the server, except `import type` from `@server/api.ts`; the client                                                                            |
+  | `src/shared/**`, `src/server/**`, `src/client/**`, `scripts/**`      | `@/shared/...` and a relative path that names a `shared/` folder (`../shared/x.ts`). So the client ban cannot be passed with another spelling |
+
+  `src/test/**` has no ban, because the test setup imports the server on purpose. A later block in `eslint.config.js` replaces the options of an earlier block for the same file, so each block lists all of its bans
+  - A dynamic `import()` fails the lint in every file but the tests (`src/test/**` and `__tests__/`), because the border rule only checks static imports
+  - `src/test/__tests__/eslint-border.test.ts` lints a table of bad and good imports with the ESLint API and checks the rule id that fires. Add a row there when you change a ban
+
 - Scripts communicate with services through the backend HTTP API (`/api/*`), not by directly importing service or repository modules
-  - Exception: a script may import shared types and constants from `src/model/` with a relative path. A script must still not import services or repositories
+  - Every dev server call goes through `scripts/lib/dev-server-api.ts`. It uses `hc<ApiType>`, like the web client, and derives the answer types from the routes with `InferResponseType`. So a changed route answer fails `bun run tsc` in `scripts/`. The only server import is `import type { ApiType } from "@server/api.ts"`
 - The top level of `scripts/` holds only entry points, one per `package.json` script. Code shared by several scripts lives in `scripts/lib/`, with its unit tests in `scripts/lib/__tests__/`. `tsconfig.json`, `eslint` and `prettier` all cover `scripts/`, so a scripts-only helper is still type-checked, linted and tested
 - A script module starts with `main()`, puts its helpers below it, and ends with `main().catch(...)`
 - New API endpoints follow the same parameter conventions as existing ones (e.g., `?type=` for subject type filtering)
 - API responses return flat, complete data — let consumers filter or transform as needed
-- The server treats a subject that WaniKani hides (`hidden_at` is set) as if it did not exist, the same as the WaniKani site. Search, the lookups by id, the related lists (`foundInKanji`, `visuallySimilarKanji`, `componentRadicals` and the rest) and their id arrays skip it, and `/anki-notes` never resolves a note to it. A new lookup must do the same: use `isVisibleSubject` and `findVisibleByIds` from `src/model/subject-utils.ts`. There are two exceptions. The local study materials check still accepts a hidden id, so a note on a subject that WaniKani hides later does not stop the server start. The two GET `/custom-subjects` routes answer hidden custom records too, because they show the file as it is
+- The server treats a subject that WaniKani hides (`hidden_at` is set) as if it did not exist, the same as the WaniKani site. Search, the lookups by id, the related lists (`foundInKanji`, `visuallySimilarKanji`, `componentRadicals` and the rest) and their id arrays skip it, and `/anki-notes` never resolves a note to it. A new lookup must do the same: use `isVisibleSubject` and `findVisibleByIds` from `src/shared/wanikani/subject-utils.ts`. There are two exceptions. The local study materials check still accepts a hidden id, so a note on a subject that WaniKani hides later does not stop the server start. The two GET `/custom-subjects` routes answer hidden custom records too, because they show the file as it is
 - A failed request must never fall into an "empty result" state. A missing item and a broken server must look different on screen. The client api layer throws `HttpStatusError` for a bad status, and the page maps the thrown value to a message in its own `error` state
 
 ### Configuration & Environment
@@ -513,7 +539,7 @@ const app = new Hono()
   .get("/endpoint", async (c) => { ... })
 ```
 
-Export `ApiType` for the client. Client uses Hono RPC in `src/client/api.ts`:
+Export `ApiType` for the client. The client uses Hono RPC in `src/client/api.ts`, and the scripts use it in `scripts/lib/dev-server-api.ts`:
 
 ```ts
 const client = hc<ApiType>("/api");
@@ -532,7 +558,7 @@ Server code should be meaningfully verbose about the steps it performs. Log high
 
 ### Server Code Compatibility
 
-The vite dev server (`@hono/vite-dev-server`) runs in Node.js, not Bun. Use `fs/promises` instead of `Bun.file()` for file operations in server code:
+The vite dev server (`@hono/vite-dev-server`) runs in Node.js, not Bun. Use `fs/promises` instead of `Bun.file()` for file operations in server code. This also holds for `src/shared/`, because the server imports it under Node:
 
 ```ts
 import { readFile } from "fs/promises";
@@ -553,7 +579,7 @@ See "Two Machines" for the full rules.
 
 ### Preserving Order in ID Lookups
 
-When looking up items by a list of IDs (like `component_subject_ids`), don't use `.filter()` - it returns items in array order, losing the original ID order. Use `findByIds` helper from `src/model/subject-utils.ts`:
+When looking up items by a list of IDs (like `component_subject_ids`), don't use `.filter()` - it returns items in array order, losing the original ID order. Use `findByIds` helper from `src/shared/wanikani/subject-utils.ts`:
 
 ```ts
 // Wrong - loses order from component_subject_ids
@@ -568,7 +594,7 @@ const items = findByIds(allItems, ids);
 - Page titles should put most important info first (e.g., "後 | kanji | WK Cards") since browsers truncate the end
 - Use hugeicons (`@hugeicons/react`, `@hugeicons/core-free-icons`) instead of lucide icons
 - Search for icons at: `https://hugeicons.com/icons?search=X&style=Stroke&type=Rounded` (replace X with search term)
-- Wanikani subject colors are in `src/config/theme.ts` (radical=blue, kanji=pink, vocabulary=purple)
+- Wanikani subject colors are in `src/shared/theme.ts` (radical=blue, kanji=pink, vocabulary=purple)
 - Use `SubjectTile` component from `components/card-components/` for clickable kanji/vocabulary tiles with character, reading, meaning
 - Use `RelatedSubjectsSection` from `components/card-components/` for collapsible "Found In X" / "Visually Similar" tile sections
 - Pass `onClick` handler to control tile behavior (scroll vs navigate) from outside
@@ -634,20 +660,22 @@ The project has two git repositories: the main one and `data/userdata/`. A reque
 - `bunfig.toml` configures `src/test/preload.ts` as a shared preload for all tests
 - Preload handles `mock.module("fs/promises")` (an in-memory file map in front of the real `readFile`) and lazy repository init — Bun's `mock.module()` is process-global, so it must live in one place
 - The preload seeds the three fixtures from `src/test/fixtures/` into the mock under their real paths, `MNEMONIC_IMAGES_PATH`, `LOCAL_STUDY_MATERIALS_PATH` and `CUSTOM_SUBJECTS_PATH`. It seeds them at start and again in `resetFsMock()`, so no test depends on user-specific data. A read of those three paths, or of a path under `MEDIA_ROOT_PATH`, never reaches the real disk: a removed entry answers `ENOENT`. The check compares the exact path, because a fixture file has the same base name as its seeded path
-- The preload imports the four paths from `src/server/repository/data-paths.ts` and never types them. So a renamed path still never reaches the user's real file. That module has no imports, so the preload can load it before `mock.module` runs. Keep it that way
+- The preload imports the four paths from `src/shared/data-paths.ts` and never types them. So a renamed path still never reaches the user's real file. That module has no imports, so the preload can load it before `mock.module` runs. Keep it that way
 - The `fs/promises` mock keeps the written files in a map, so a read after a write sees the new content like a real disk does. The study material upsert reads the file on every save, so without it a second save would start from the fixture again. The map keys go through `path.normalize`, so `./data/x` and `data/x` are one file. The map holds `string | Buffer`, and `readFile` without an encoding answers a `Buffer`. `setFileContent(path, data)` puts content there without recording a write, for a change made outside the app; `setStudyMaterialFile(file)` in `src/test/study-material-fixture.ts` wraps it for that one file
-- The `fs/promises` mock replaces the whole module, so server and script code may only use the ops it lists: `readFile`, `writeFile`, `appendFile`, `rename`, `unlink`, `stat`, `readdir` and `mkdir`. A new op goes into `src/test/preload.ts` first, with `setFsError` support. The same goes for a new flag: `writeFile` knows only `{ flag: "wx" }`, which throws `EEXIST` for a file in the map. A sync call from `fs` skips the mock and touches the real `data/userdata/`, so code under test never uses one.
+- The `fs/promises` mock replaces the whole module, so server, shared and script code may only use the ops it lists: `readFile`, `writeFile`, `appendFile`, `rename`, `unlink`, `stat`, `readdir` and `mkdir`. A new op goes into `src/test/preload.ts` first, with `setFsError` support. The same goes for a new flag: `writeFile` knows only `{ flag: "wx" }`, which throws `EEXIST` for a file in the map. A sync call from `fs` skips the mock and touches the real `data/userdata/`, so code under test never uses one.
 - `mkdir` records its calls in `mkdirCalls` and creates nothing, so a test checks that a miss creates its media folder. An atomic save shows up in `writeCalls` under the real path: `writeFile` records the `<path>.<uuid>.tmp` path, `rename` moves that entry to the real path, `unlink` drops it. A failed save leaves no `.tmp` entry behind. `writeCalls[].data` is `string | Buffer`, so a test wraps it in `String()` before it parses it
 - The mocked `stat` answers `{ ino, mtimeMs, size }`. `ino` is always 0. `mtimeMs` is a version number that grows on every `writeFile`, `appendFile`, `rename` and `setFileContent`, and `resetFsMock()` never resets it. So `createReloadingFile` sees every change, also the seed after a reset. `readdir` lists the files of the map directly under a folder
 - `setFsError(op, err)` makes one mocked op throw. It is the only way to test a failed read or write, because `mock.module` is process-global and set once. `resetFsMock()` clears it again
 - `holdFsOp(op)` makes every call of one op wait until the test calls `release()`. Its `reached` promise resolves when the first call waits. A test uses it to act while a write is in the middle, like a second registry lookup during the append. `resetFsMock()` releases every hold
 - `bun test` runs every file in one process, so module-level state survives a file. A file that writes through the fs mock, or changes a seeded file, calls `resetFsMock()` in `beforeEach` and in `afterEach`. Otherwise its media files, registry lines and study material records leak into the next file
 - **Repository tests** (`src/server/repository/__tests__/`): test repository functions directly, use a simple fetch mock from `setup.ts`
-- **Script unit tests** (`scripts/lib/__tests__/`): test the pure script helpers directly, no mock needed. There are four exceptions. Three use the fs mock of the preload: `llm-utils.test.ts` for the `saveJsonAtomic` copy, with the same cases as `json-utils.test.ts`, `custom-subject-clash.test.ts` for the custom file it reads, and `text-vocab.test.ts` for `readWordList`. The fourth is `dev-server-api.test.ts`: it replaces `globalThis.fetch` with `createFetchMock` at file load and puts the old `fetch` back in `afterAll`
+- **Script unit tests** (`scripts/lib/__tests__/`): test the pure script helpers directly, no mock needed. There are three exceptions. Two use the fs mock of the preload: `custom-subject-clash.test.ts` for the custom file it reads, and `text-vocab.test.ts` for `readWordList`. The third is `dev-server-api.test.ts`: it replaces `globalThis.fetch` with `createFetchMock` at file load and puts the old `fetch` back in `afterAll`
 - **API E2E tests** (`src/server/__tests__/`): test full API through `api.request()` (Hono handles directly, no HTTP server), use `src/test/fetch-interceptor.ts` which routes by URL pattern (AnkiConnect, WaniKani SVGs/audio/pages)
 - The fetch interceptor answers every AnkiConnect action with success. `setAnkiError({ action, message, onCall })` makes one action answer an error. `onCall` picks one call of it, counted from 1, so a test can fail the second `sync` of an add and keep the first. `resetFetchInterceptor()` clears it and the call counts. `externalFetches` lists every URL that is not AnkiConnect, so a test can check that a cache hit made no request. `setMediaStatus(status)` and `setMediaContentType(type)` change the answer for every `files.wanikani.com` URL. Only the mnemonic picture reads the content type. `ttsRequests` holds the SSML body of every Azure TTS call in order, so a test can check the spoken text and the voice. `resetFetchInterceptor()` clears it too
 - The custom subjects fixture `src/test/fixtures/custom_subjects.json` is `[]`, so every other test sees no custom word. A test that needs one writes the records with `setCustomSubjectsFile(records)` from `src/test/custom-subject-fixture.ts`, which wraps `setFileContent`. That module holds the four fixture records: the kana word どうぞ (`customKanaWord`), the kana verb くれる (`customKanaVerb`), the `vocabulary` verb 下す on the WaniKani kanji 下 with its primary reading listed second (`customVerb`), and the hidden word 下記 (`hiddenCustomWord`). `customSubjectFixture` lists all four, and `customSubjectInputOf(record)` turns a record into a POST body. Such a test calls `resetFsMock()` in `beforeEach` and `afterEach`
 - The preload also calls `installDom()` from `src/test/dom.ts`, which puts one happy-dom window on `globalThis`. It must run before any test file imports `react-dom`: react-dom reads the DOM globals when it loads, and without them its change events never reach `onChange`
+- **Shared tests** (`src/shared/**/__tests__/`): test the shared modules directly. `files/__tests__/` uses the fs mock of the preload, and `anki/__tests__/anki-connect-invoke.test.ts` installs its own fetch mock. They may import `@/test/`, and nothing from the server, the client or the scripts
+- **Border rule test** (`src/test/__tests__/eslint-border.test.ts`): runs the ESLint API with `lintText` over a table of imports that must fail or pass, and checks the rule id that fires. It is the only test that lints, so it lives with the test setup
 - **Client tests** (`src/client/**/__tests__/`): the api layer installs its own `createFetchMock` from `src/test/fetch-utils.ts`. A view state is checked with `renderToStaticMarkup` from `react-dom/server`. For behavior, `src/test/render.tsx` has `mount`, `click`, `typeInto`, `pressKey` and `settle`: it renders with `createRoot`, dispatches real DOM events inside `flushSync`, and `settle()` awaits the save. `mountCard(element)` wraps the card in a `SearchContext.Provider`, on the first render and on every `rerender`, because `RelatedSubjectsSection` throws without one
 - `installApiMock()` from `src/test/api-mock.ts` answers the study material saves. It is called once at the top of a test file and registers the whole lifecycle of that file: it clears itself and the client store before each test, unmounts every mounted view and clears the store after each test, and puts the old `fetch` back at the end. So a failed assertion still leaves no live React root and no saved record behind. Its `answerLater(id, data)` and `failLater(id, message)` hold an answer back until the test calls `resolve()`, which is how the store tests put two saves in flight and choose the order of the answers
 - `src/test/study-material-fixture.ts` holds `studyMaterialFixture` (the fixture records, read at import), `setStudyMaterialFile()` and `lastWrite()` for every file that reads or writes local study materials

@@ -1,4 +1,6 @@
 import OpenAI from "openai";
+import { VERB_CONJUGATIONS_PATH } from "@shared/data-paths.ts";
+import { saveJsonAtomic } from "@shared/files/json-file.ts";
 import {
   DEFAULT_BATCH_SIZE,
   MAX_FAILED_BATCHES_IN_A_ROW,
@@ -8,7 +10,7 @@ import {
   sleep,
   type GeneratorArgs,
 } from "./lib/generator-cli.ts";
-import { askForJsonObject, chunk, loadJsonFile, saveJsonAtomic } from "./lib/llm-utils.ts";
+import { askForJsonObject, chunk, loadJsonFile } from "./lib/llm-utils.ts";
 import {
   getVocabularyReading,
   loadVocabulary,
@@ -45,7 +47,6 @@ const LLM_BASE_URL = process.env.LLM_BASE_URL;
 const LLM_MODEL = process.env.LLM_MODEL;
 const LLM_API_KEY = process.env.LLM_API_KEY;
 const RATE_LIMIT_MS = 500;
-const CONJUGATIONS_FILE = "./data/verb_conjugations.json";
 
 // 来る (ID 2824) is in vocabulary.json
 // する (ID 9180) is in kana_vocabulary.json
@@ -73,7 +74,7 @@ async function main(): Promise<void> {
   const verbs = vocabulary.filter(isTargetVerb);
   log(`Found ${verbs.length} verbs in ${vocabulary.length} vocabulary items`);
 
-  const conjugations = await loadJsonFile<VerbConjugation>(CONJUGATIONS_FILE);
+  const conjugations = await loadJsonFile<VerbConjugation>(VERB_CONJUGATIONS_PATH);
   const existingCount = Object.keys(conjugations).length;
 
   let tasks = verbs.filter((v) => !(String(v.id) in conjugations)).map(toTask);
@@ -143,7 +144,7 @@ async function main(): Promise<void> {
       if (args.dryRun) {
         log("  [DRY RUN] Not saved");
       } else {
-        await saveJsonAtomic(CONJUGATIONS_FILE, conjugations);
+        await saveJsonAtomic(VERB_CONJUGATIONS_PATH, conjugations);
       }
     }
 

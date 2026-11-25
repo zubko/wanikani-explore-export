@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from "react";
-import type { LocalStudyMaterial, LocalStudyMaterialPatch } from "@/model/wanikani.ts";
-import { applyLocalStudyMaterialPatch } from "@/model/subject-utils.ts";
+import type { LocalStudyMaterial, LocalStudyMaterialPatch } from "@shared/wanikani/wanikani.ts";
+import { applyLocalStudyMaterialPatch } from "@shared/wanikani/subject-utils.ts";
 import { api } from "../api.ts";
 
 type SavedRecords = Record<number, LocalStudyMaterial | null>;

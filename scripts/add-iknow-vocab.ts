@@ -1,21 +1,22 @@
 import { parseArgs } from "util";
-import { readFile } from "fs/promises";
 import { join } from "path";
 
-import { getPrimaryMeaning } from "../src/model/subject-utils.ts";
-import type { KanaVocabulary, Vocabulary } from "../src/model/wanikani.ts";
+import { IKNOW_DIR, IKNOW_STATUS_PATH } from "@shared/data-paths.ts";
+import { getErrorMessage } from "@shared/error-message.ts";
+import { readJson, saveJsonAtomic } from "@shared/files/json-file.ts";
+import { getPrimaryMeaning } from "@shared/wanikani/subject-utils.ts";
+import type { KanaVocabulary, Vocabulary } from "@shared/wanikani/wanikani.ts";
 import {
   DEFAULT_BASE_URL,
   addToAnki,
   fetchAnkiNotes,
+  isFieldMismatch,
   searchVocabulary,
   syncAnkiWeb,
+  syncAnkiWebAtStart,
   type AddToAnkiResponse,
-  type AnkiSyncResponse,
   type SearchResponse,
 } from "./lib/dev-server-api.ts";
-import { formatError } from "./lib/format-error.ts";
-import { saveJsonAtomic } from "./lib/llm-utils.ts";
 import {
   createInitialStatus,
   listFilesToWalk,
@@ -51,9 +52,7 @@ type RunCounts = {
   errors: number;
 };
 
-const IKNOW_DIR = "data/userdata/iknow";
 const SERIES_FILE = join(IKNOW_DIR, "japanese-core-1000-series.json");
-const STATUS_FILE = "data/userdata/iknow-vocabulary-status.json";
 const DEFAULT_LIMIT = 15;
 
 // === CLI ===
@@ -142,7 +141,7 @@ async function main(): Promise<void> {
     console.log(`Mode: ${args.mode.replaceAll("-", " ").toUpperCase()}`);
   console.log(`Limit: ${args.limit}`);
 
-  const courseFiles = parseCourseFiles(JSON.parse(await readFile(SERIES_FILE, "utf-8")));
+  const courseFiles = parseCourseFiles(await readJson<unknown>(SERIES_FILE));
   const status = await loadStatus(courseFiles[0]!);
 
   if (status.files[status.current]?.done) {
@@ -158,15 +157,7 @@ async function main(): Promise<void> {
   // these modes leave words behind, so the index stays for a normal run to reach them
   const writesStatus = !args.dryRun && args.mode === "next-words";
 
-  process.stdout.write("Syncing with AnkiWeb... ");
-  const syncResult = await syncAnkiWeb(args.baseUrl).catch(
-    (err): AnkiSyncResponse => ({ ok: false, error: formatError(err) })
-  );
-  if (!syncResult.ok) {
-    console.log(`FAILED: ${syncResult.error}`);
-    process.exit(1);
-  }
-  console.log("OK");
+  await syncAnkiWebAtStart(args.baseUrl);
 
   const anki = await fetchAnkiContents(args.baseUrl);
   const problemWords = new Set(status.problems.map((p) => p.word));
@@ -200,7 +191,7 @@ async function main(): Promise<void> {
 
   for (const fileToWalk of filesToWalk) {
     current = fileToWalk.file;
-    items = parseGoalItems(JSON.parse(await readFile(join(IKNOW_DIR, current), "utf-8")));
+    items = parseGoalItems(await readJson<unknown>(join(IKNOW_DIR, current)));
     index = fileToWalk.startIndex;
     console.log(`\nFile: ${current} (${items.length} words), start index ${index}\n`);
 
@@ -260,7 +251,7 @@ async function main(): Promise<void> {
       synced = result.ok;
       console.log(result.ok ? "OK" : `FAILED: ${result.error}`);
     } catch (err) {
-      console.log(`FAILED: ${formatError(err)}`);
+      console.log(`FAILED: ${getErrorMessage(err)}`);
     }
   }
 
@@ -324,8 +315,8 @@ async function processItem(params: {
   try {
     found = await searchVocabulary(args.baseUrl, item.word);
   } catch (err) {
-    console.log(`${label} — SEARCH FAILED ${formatError(err)}`);
-    addProblem("error", formatError(err));
+    console.log(`${label} — SEARCH FAILED ${getErrorMessage(err)}`);
+    addProblem("error", getErrorMessage(err));
     counts.errors++;
     return "continue";
   }
@@ -361,11 +352,11 @@ async function processItem(params: {
     baseUrl: args.baseUrl,
     id: found.data.id,
     type: found.data.object,
-  }).catch((err): AddToAnkiResponse => ({ ok: false, error: formatError(err) }));
+  }).catch((err): AddToAnkiResponse => ({ ok: false, error: getErrorMessage(err) }));
 
   if (!result.ok) {
     // every later word would fail the same way, and a problem entry is never revisited
-    if (result.reason === "fields") {
+    if (isFieldMismatch(result)) {
       console.log(`${label} — STOPPED ${result.error}`);
       return "stop";
     }
@@ -418,10 +409,10 @@ async function addNewRadicals(params: {
       baseUrl: args.baseUrl,
       id: radical.id,
       type: "radical",
-    }).catch((err): AddToAnkiResponse => ({ ok: false, error: formatError(err) }));
+    }).catch((err): AddToAnkiResponse => ({ ok: false, error: getErrorMessage(err) }));
 
     if (!result.ok) {
-      if (result.reason === "fields") {
+      if (isFieldMismatch(result)) {
         console.log(`${radicalLabel} — STOPPED ${result.error}`);
         return "stop";
       }
@@ -452,7 +443,7 @@ function countOf(count: number, noun: string): string {
 
 async function loadStatus(firstFile: string): Promise<VocabStatus> {
   try {
-    return JSON.parse(await readFile(STATUS_FILE, "utf-8")) as VocabStatus;
+    return await readJson<VocabStatus>(IKNOW_STATUS_PATH);
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err;
     console.log("No status file yet, starting from the first course.");
@@ -461,10 +452,10 @@ async function loadStatus(firstFile: string): Promise<VocabStatus> {
 }
 
 async function saveStatus(status: VocabStatus): Promise<void> {
-  await saveJsonAtomic(STATUS_FILE, status);
+  await saveJsonAtomic(IKNOW_STATUS_PATH, status);
 }
 
 main().catch((error) => {
-  console.error("Fatal error:", formatError(error));
+  console.error("Fatal error:", getErrorMessage(error));
   process.exit(1);
 });

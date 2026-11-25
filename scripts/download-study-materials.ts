@@ -1,9 +1,9 @@
-import { saveJsonAtomic } from "./lib/llm-utils.ts";
+import { STUDY_MATERIALS_PATH } from "@shared/data-paths.ts";
+import { saveJsonAtomic } from "@shared/files/json-file.ts";
 
 const BASE_URL = "https://api.wanikani.com/v2";
 const API_REVISION = "20170710";
 const RATE_LIMIT_MS = 1000;
-const OUTPUT_FILE = "./data/userdata/study_materials.json";
 
 interface StudyMaterial {
   id: number;
@@ -92,8 +92,8 @@ async function main(): Promise<void> {
   const materials = await fetchAllStudyMaterials(token);
   console.log(`\nDownloaded ${materials.length} study materials total\n`);
 
-  await saveJsonAtomic(OUTPUT_FILE, materials);
-  console.log(`Saved to ${OUTPUT_FILE}`);
+  await saveJsonAtomic(STUDY_MATERIALS_PATH, materials);
+  console.log(`Saved to ${STUDY_MATERIALS_PATH}`);
 
   console.log("\nDone!");
 }

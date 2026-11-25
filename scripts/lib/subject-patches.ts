@@ -29,13 +29,6 @@ export type PatchResult = {
   writes: SubjectFile[];
 };
 
-export const SUBJECT_FILE_NAMES = [
-  "radicals.json",
-  "kanji.json",
-  "vocabulary.json",
-  "kana_vocabulary.json",
-];
-
 export function parsePatches(text: string): SubjectPatch[] {
   const document = Bun.YAML.parse(text);
 

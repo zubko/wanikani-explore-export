@@ -1,8 +1,8 @@
-import type { Radical } from "@/model/wanikani.ts";
+import type { Radical } from "@shared/wanikani/wanikani.ts";
 import toast from "react-hot-toast";
-import { getPrimaryMeaning } from "@/model/subject-utils.ts";
-import { getRadicalSvgUrl } from "@/model/radical-utils.ts";
-import { subjectColors } from "@/config/theme.ts";
+import { getPrimaryMeaning } from "@shared/wanikani/subject-utils.ts";
+import { getRadicalSvgUrl } from "@shared/wanikani/radical-utils.ts";
+import { subjectColors } from "@shared/theme.ts";
 import { addToAnkiAfterSaves } from "../utils/add-to-anki.ts";
 import { formatAnkiResult } from "../utils/format-anki-result.ts";
 import { AddToAnkiButton } from "./card-components/AddToAnkiButton.tsx";

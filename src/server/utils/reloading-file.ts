@@ -1,5 +1,5 @@
 import { readFile } from "fs/promises";
-import { MISSING_FILE_VERSION, readFileVersion } from "./file-utils.ts";
+import { MISSING_FILE_VERSION, readFileVersion } from "@shared/files/file-utils.ts";
 
 type ReloadingFile<T> = { get: () => Promise<T> };
 

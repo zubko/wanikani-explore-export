@@ -1,8 +1,8 @@
 import { useState } from "react";
 import toast from "react-hot-toast";
 import { Cancel01Icon } from "@hugeicons/core-free-icons";
-import { meaningKey } from "@/model/subject-utils.ts";
-import type { LocalStudyMaterial, LocalStudyMaterialPatch } from "@/model/wanikani.ts";
+import { meaningKey } from "@shared/wanikani/subject-utils.ts";
+import type { LocalStudyMaterial, LocalStudyMaterialPatch } from "@shared/wanikani/wanikani.ts";
 import {
   saveLocalStudyMaterial,
   useLocalStudyMaterial,

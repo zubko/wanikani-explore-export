@@ -1,4 +1,4 @@
-import type { SubjectType } from "@/model/wanikani.ts";
+import type { SubjectType } from "@shared/wanikani/wanikani.ts";
 
 export const subjectColors: Record<SubjectType, string> = {
   radical: "#00aaff",

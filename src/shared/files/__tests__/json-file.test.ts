@@ -1,12 +1,32 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
-import { resetFsMock, setFsError, writeCalls } from "@/test/preload.ts";
-import { saveJsonAtomic } from "../json-utils.ts";
+import { resetFsMock, setFileContent, setFsError, writeCalls } from "@/test/preload.ts";
+import { readJson, saveJsonAtomic } from "../json-file.ts";
 
-const PATH = "./data/userdata/json-utils-test.json";
+const PATH = "./data/userdata/json-file-test.json";
 const TEMP_NAME_PATTERN = /\.[0-9a-f-]{36}\.tmp$/;
 
 beforeEach(resetFsMock);
 afterEach(resetFsMock);
+
+describe("readJson", () => {
+  test("parses the file", async () => {
+    setFileContent(PATH, '{ "a": [1, 2] }');
+
+    expect(await readJson<{ a: number[] }>(PATH)).toEqual({ a: [1, 2] });
+  });
+
+  test("throws the ENOENT error of a missing file", async () => {
+    setFsError("readFile", Object.assign(new Error("no such file"), { code: "ENOENT" }));
+
+    await expect(readJson(PATH)).rejects.toMatchObject({ code: "ENOENT" });
+  });
+
+  test("throws a SyntaxError on bad JSON", async () => {
+    setFileContent(PATH, "{ not json");
+
+    await expect(readJson(PATH)).rejects.toBeInstanceOf(SyntaxError);
+  });
+});
 
 describe("saveJsonAtomic", () => {
   test("writes a temp file and renames it over the real one", async () => {

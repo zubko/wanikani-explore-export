@@ -1,6 +1,7 @@
-import { readFile } from "fs/promises";
-import { getPrimaryReading, isVisibleSubject } from "../../src/model/subject-utils.ts";
-import type { ContextSentence, VocabularyReading } from "../../src/model/wanikani.ts";
+import { KANA_VOCABULARY_PATH, VOCABULARY_PATH } from "@shared/data-paths.ts";
+import { readJson } from "@shared/files/json-file.ts";
+import { getPrimaryReading, isVisibleSubject } from "@shared/wanikani/subject-utils.ts";
+import type { ContextSentence, VocabularyReading } from "@shared/wanikani/wanikani.ts";
 
 export type VocabularyItem = {
   id: number;
@@ -13,16 +14,11 @@ export type VocabularyItem = {
   };
 };
 
-const VOCABULARY_FILE = "./data/userdata/vocabulary.json";
-const KANA_VOCABULARY_FILE = "./data/userdata/kana_vocabulary.json";
-
 export async function loadVocabulary(): Promise<VocabularyItem[]> {
-  const [vocabContent, kanaContent] = await Promise.all([
-    readFile(VOCABULARY_FILE, "utf-8"),
-    readFile(KANA_VOCABULARY_FILE, "utf-8"),
+  const [vocabulary, kanaVocabulary] = await Promise.all([
+    readJson<VocabularyItem[]>(VOCABULARY_PATH),
+    readJson<VocabularyItem[]>(KANA_VOCABULARY_PATH),
   ]);
-  const vocabulary = JSON.parse(vocabContent) as VocabularyItem[];
-  const kanaVocabulary = JSON.parse(kanaContent) as VocabularyItem[];
   return [...vocabulary, ...kanaVocabulary].filter(isVisibleSubject);
 }
 

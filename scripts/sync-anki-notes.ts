@@ -1,7 +1,15 @@
 import { parseArgs } from "util";
 
-import type { AnkiAddResult } from "../src/model/wanikani.ts";
-import { formatError } from "./lib/format-error.ts";
+import type { AnkiDeckType } from "@shared/anki/anki-models.ts";
+import type { AnkiAddResult, AnkiNoteItem } from "@shared/wanikani/wanikani.ts";
+import { getErrorMessage } from "@shared/error-message.ts";
+import {
+  type AddToAnkiResponse,
+  addToAnki,
+  fetchAnkiNotes,
+  syncAnkiWeb,
+  syncAnkiWebAtStart,
+} from "./lib/dev-server-api.ts";
 import {
   pickNotesToRefresh,
   refreshedKanjiCharacters,
@@ -15,19 +23,6 @@ type CliArgs = {
   dryRun: boolean;
   limit: number | undefined;
 };
-
-type AnkiNoteItem = {
-  characters: string;
-  meaning: string;
-  wkId: number | null;
-  wkType: string | null;
-};
-
-type AnkiNotesResponse = { ok: true; data: AnkiNoteItem[] } | { ok: false; error: string };
-
-type AddToAnkiResponse = { ok: true; data: AnkiAddResult } | { ok: false; error: string };
-
-type AnkiSyncResponse = { ok: true } | { ok: false; error: string };
 
 // === CLI ===
 
@@ -90,40 +85,19 @@ function createSpinner() {
   };
 }
 
-// === API ===
-
-async function fetchAnkiNotes(baseUrl: string, type: string): Promise<AnkiNotesResponse> {
-  const response = await fetch(`${baseUrl}/api/anki-notes?type=${type}`);
-  return (await response.json()) as AnkiNotesResponse;
-}
-
-async function addToAnki(baseUrl: string, id: number, type: string): Promise<AddToAnkiResponse> {
-  const response = await fetch(`${baseUrl}/api/add-to-anki`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ id, type, sync: false }),
-  });
-  return (await response.json()) as AddToAnkiResponse;
-}
-
-async function syncAnkiWeb(baseUrl: string): Promise<AnkiSyncResponse> {
-  const response = await fetch(`${baseUrl}/api/anki-sync`, { method: "POST" });
-  return (await response.json()) as AnkiSyncResponse;
-}
-
 // === Main ===
 
-async function fetchResolvedNotes(baseUrl: string, type: string): Promise<AnkiNoteItem[]> {
+async function fetchResolvedNotes(baseUrl: string, type: AnkiDeckType): Promise<AnkiNoteItem[]> {
   process.stdout.write(`Fetching ${type} notes from Anki... `);
-  const notesResult = await fetchAnkiNotes(baseUrl, type);
-
-  if (!notesResult.ok) {
+  let allNotes: AnkiNoteItem[];
+  try {
+    allNotes = await fetchAnkiNotes(baseUrl, type);
+  } catch (err) {
     console.log("FAILED");
-    console.error(`Error: ${notesResult.error}`);
+    console.error(`Error: ${getErrorMessage(err)}`);
     process.exit(1);
   }
 
-  const allNotes = notesResult.data;
   console.log(`OK (${allNotes.length} items)`);
 
   const unresolved = allNotes.filter((n) => n.wkId === null);
@@ -154,15 +128,7 @@ async function main(): Promise<void> {
   console.log("=".repeat(50));
   console.log();
 
-  process.stdout.write("Syncing with AnkiWeb... ");
-  const syncResult = await syncAnkiWeb(args.baseUrl).catch(
-    (err): AnkiSyncResponse => ({ ok: false, error: formatError(err) })
-  );
-  if (!syncResult.ok) {
-    console.log(`FAILED: ${syncResult.error}`);
-    process.exit(1);
-  }
-  console.log("OK");
+  await syncAnkiWebAtStart(args.baseUrl);
 
   const words = await fetchResolvedNotes(args.baseUrl, "vocabulary");
   const kanji = await fetchResolvedNotes(args.baseUrl, "kanji");
@@ -219,7 +185,7 @@ async function main(): Promise<void> {
       synced = result.ok;
       console.log(result.ok ? "OK" : `FAILED: ${result.error}`);
     } catch (err) {
-      console.log(`FAILED: ${formatError(err)}`);
+      console.log(`FAILED: ${getErrorMessage(err)}`);
     }
   }
 
@@ -258,8 +224,8 @@ async function updateNotes(baseUrl: string, items: AnkiNoteItem[]): Promise<Anki
     const prefix = `[${padIndex(i + 1, items.length)}/${items.length}]`;
     spinner.start(`${prefix} `);
 
-    const result = await addToAnki(baseUrl, item.wkId!, item.wkType!).catch(
-      (err): AddToAnkiResponse => ({ ok: false, error: formatError(err) })
+    const result = await addToAnki({ baseUrl, id: item.wkId!, type: item.wkType! }).catch(
+      (err): AddToAnkiResponse => ({ ok: false, error: getErrorMessage(err) })
     );
     if (!result.ok) {
       spinner.stop(`${prefix} ❌ ${formatNote(item)} - ${result.error}`);

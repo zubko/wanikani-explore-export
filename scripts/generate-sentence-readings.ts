@@ -1,6 +1,8 @@
 import OpenAI from "openai";
-import { getShortestSentence } from "../src/model/vocabulary-utils.ts";
-import type { ContextSentence } from "../src/model/wanikani.ts";
+import { SENTENCE_READINGS_PATH } from "@shared/data-paths.ts";
+import { getShortestSentence } from "@shared/wanikani/vocabulary-utils.ts";
+import type { ContextSentence } from "@shared/wanikani/wanikani.ts";
+import { saveJsonAtomic } from "@shared/files/json-file.ts";
 import {
   DEFAULT_BATCH_SIZE,
   MAX_FAILED_BATCHES_IN_A_ROW,
@@ -10,7 +12,7 @@ import {
   sleep,
   type GeneratorArgs,
 } from "./lib/generator-cli.ts";
-import { askForJsonObject, chunk, loadJsonFile, saveJsonAtomic } from "./lib/llm-utils.ts";
+import { askForJsonObject, chunk, loadJsonFile } from "./lib/llm-utils.ts";
 import { getReadingProblem } from "./lib/sentence-reading-check.ts";
 import {
   getVocabularyReading,
@@ -44,7 +46,6 @@ const LLM_BASE_URL = process.env.LLM_BASE_URL;
 const LLM_MODEL = process.env.LLM_MODEL;
 const LLM_API_KEY = process.env.LLM_API_KEY;
 const RATE_LIMIT_MS = 500;
-const SENTENCE_READINGS_FILE = "./data/sentence_readings.json";
 
 const HELP = `
 Usage: bun run scripts/generate-sentence-readings.ts [options]
@@ -70,7 +71,7 @@ async function main(): Promise<void> {
     `Found ${withSentences.length} items with context sentences in ${vocabulary.length} vocabulary items`
   );
 
-  const readings = await loadJsonFile<SentenceReading>(SENTENCE_READINGS_FILE);
+  const readings = await loadJsonFile<SentenceReading>(SENTENCE_READINGS_PATH);
   const existingCount = Object.keys(readings).length;
 
   let tasks = withSentences.filter((v) => !(String(v.id) in readings)).map(toTask);
@@ -139,7 +140,7 @@ async function main(): Promise<void> {
       if (args.dryRun) {
         log("  [DRY RUN] Not saved");
       } else {
-        await saveJsonAtomic(SENTENCE_READINGS_FILE, readings);
+        await saveJsonAtomic(SENTENCE_READINGS_PATH, readings);
       }
     }
 

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import toast from "react-hot-toast";
 import { Cancel01Icon, CheckmarkCircle01Icon, PencilEdit01Icon } from "@hugeicons/core-free-icons";
-import type { LocalStudyMaterial, LocalStudyMaterialNoteField } from "@/model/wanikani.ts";
+import type { LocalStudyMaterial, LocalStudyMaterialNoteField } from "@shared/wanikani/wanikani.ts";
 import {
   saveLocalStudyMaterial,
   useLocalStudyMaterial,

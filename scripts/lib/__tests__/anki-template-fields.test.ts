@@ -2,17 +2,17 @@ import { describe, expect, it } from "bun:test";
 import { readFile } from "fs/promises";
 import { join } from "path";
 import {
+  RADICAL_EXPECTED_FIELDS,
+  KANJI_EXPECTED_FIELDS,
+  VOCABULARY_EXPECTED_FIELDS,
+} from "@shared/anki/anki-models.ts";
+import {
   diffTemplateFields,
   extractSection,
   formatFieldProblems,
   isInTemplateOrder,
   parseTemplateFields,
 } from "../anki-template-fields.ts";
-import {
-  RADICAL_EXPECTED_FIELDS,
-  KANJI_EXPECTED_FIELDS,
-  VOCABULARY_EXPECTED_FIELDS,
-} from "@/model/anki-models.ts";
 
 const TEMPLATES_DIR = join(import.meta.dir, "../../../src/anki-templates");
 

@@ -71,6 +71,8 @@ If you omit `version`, it defaults to 4; for version ≤ 4, responses may not in
 
 ### Minimal `invoke` wrapper (Node 18+/modern browsers)
 
+This project's wrapper is `invokeAnkiConnect` in `src/shared/anki/anki-connect-invoke.ts`.
+
 ```ts
 export type AnkiConnectError = {
   message: string;

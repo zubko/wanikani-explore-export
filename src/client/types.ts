@@ -1,4 +1,4 @@
-import type { SubjectType } from "@/model/wanikani.ts";
+import type { SubjectType } from "@shared/wanikani/wanikani.ts";
 
 export type SearchableType = "radicals" | "kanji" | "vocabulary";
 

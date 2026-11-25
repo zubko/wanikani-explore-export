@@ -1,3 +1,6 @@
+export const ANKI_DECK_TYPES = ["radical", "kanji", "vocabulary"] as const;
+export type AnkiDeckType = (typeof ANKI_DECK_TYPES)[number];
+
 // The same name is used for the Anki deck and for the Anki note type
 export const RADICAL_MODEL_NAME = "Japanese Radicals";
 export const KANJI_MODEL_NAME = "Japanese Kanji";
@@ -59,3 +62,7 @@ export const VOCABULARY_EXPECTED_FIELDS = [
   "sentence_eng",
   "sentence_eng_audio",
 ];
+
+export function isAnkiDeckType(value: string): value is AnkiDeckType {
+  return ANKI_DECK_TYPES.includes(value as AnkiDeckType);
+}

@@ -1,5 +1,5 @@
-import type { SubjectType } from "@/model/wanikani.ts";
-import { subjectColors } from "@/config/theme.ts";
+import type { SubjectType } from "@shared/wanikani/wanikani.ts";
+import { subjectColors } from "@shared/theme.ts";
 import { WanikaniLink } from "./WanikaniLink.tsx";
 
 type CardHeaderProps = {

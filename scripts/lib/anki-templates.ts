@@ -4,13 +4,14 @@ import {
   KANJI_MODEL_NAME,
   RADICAL_MODEL_NAME,
   VOCABULARY_MODEL_NAME,
-} from "../../src/model/anki-models.ts";
+} from "@shared/anki/anki-models.ts";
+import { invokeAnkiConnect } from "@shared/anki/anki-connect-invoke.ts";
+import { getErrorMessage } from "@shared/error-message.ts";
 import {
   diffTemplateFields,
   parseTemplateFields,
   type ModelFieldProblem,
 } from "./anki-template-fields.ts";
-import { formatError } from "./format-error.ts";
 
 type TemplateConfig = {
   file: string;
@@ -27,8 +28,6 @@ export type TemplateFieldProblem = ModelFieldProblem & {
   modelFields: string[];
 };
 
-const ANKI_CONNECT_URL = "http://127.0.0.1:8765";
-
 const TEMPLATES_DIR = "src/anki-templates";
 
 const TEMPLATES: TemplateConfig[] = [
@@ -36,30 +35,6 @@ const TEMPLATES: TemplateConfig[] = [
   { file: "kanji.md", modelName: KANJI_MODEL_NAME },
   { file: "vocabulary.md", modelName: VOCABULARY_MODEL_NAME },
 ];
-
-export async function ankiInvoke<T>(
-  action: string,
-  params: Record<string, unknown> = {}
-): Promise<T> {
-  let response: Response;
-  try {
-    response = await fetch(ANKI_CONNECT_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action, version: 6, params }),
-    });
-  } catch {
-    throw new Error("Failed to connect to Anki. Is Anki running with AnkiConnect?");
-  }
-
-  const data = await response.json();
-
-  if (data.error) {
-    throw new Error(`AnkiConnect error (${action}): ${data.error}`);
-  }
-
-  return data.result as T;
-}
 
 export async function loadTemplates(): Promise<LoadedTemplate[]> {
   return Promise.all(
@@ -80,10 +55,10 @@ export async function collectFieldProblems(
     try {
       templateFields = parseTemplateFields(config.content);
     } catch (err) {
-      throw new Error(`${getTemplatePath(config.file)}: ${formatError(err)}`);
+      throw new Error(`${getTemplatePath(config.file)}: ${getErrorMessage(err)}`);
     }
 
-    const modelFields = await ankiInvoke<string[]>("modelFieldNames", {
+    const modelFields = await invokeAnkiConnect<string[]>("modelFieldNames", {
       modelName: config.modelName,
     });
 
@@ -111,6 +86,6 @@ async function readTemplateFile(file: string): Promise<string> {
   try {
     return await readFile(getTemplatePath(file), "utf-8");
   } catch (err) {
-    throw new Error(`${getTemplatePath(file)}: ${formatError(err)}`);
+    throw new Error(`${getTemplatePath(file)}: ${getErrorMessage(err)}`);
   }
 }

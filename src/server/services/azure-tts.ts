@@ -1,5 +1,5 @@
 import type { FetchedMedia } from "@server/repository/media-cache.ts";
-import type { VoiceGender } from "@/model/wanikani.ts";
+import type { VoiceGender } from "@shared/wanikani/wanikani.ts";
 import { hashNumber, shortHash } from "@server/utils/hash.ts";
 
 export type AzureTtsConfig = {

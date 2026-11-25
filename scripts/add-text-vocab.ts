@@ -1,16 +1,17 @@
 import { join } from "path";
 import { parseArgs } from "util";
 
+import { getErrorMessage } from "@shared/error-message.ts";
 import {
   DEFAULT_BASE_URL,
   addToAnki,
   fetchVocabularyInAnki,
+  isFieldMismatch,
   searchVocabulary,
   syncAnkiWeb,
   syncAnkiWebAtStart,
   type AddToAnkiResponse,
 } from "./lib/dev-server-api.ts";
-import { formatError } from "./lib/format-error.ts";
 import {
   NOT_IN_ANKI_FILE,
   addRunFailed,
@@ -74,7 +75,7 @@ async function main(): Promise<void> {
       synced = result.ok;
       console.log(result.ok ? "OK" : `FAILED: ${result.error}`);
     } catch (err) {
-      console.log(`FAILED: ${formatError(err)}`);
+      console.log(`FAILED: ${getErrorMessage(err)}`);
     }
   }
 
@@ -160,7 +161,7 @@ async function processEntry(params: {
       search: (spelling) => searchVocabulary(args.baseUrl, spelling),
     });
   } catch (err) {
-    console.log(`${label} — SEARCH FAILED ${formatError(err)}`);
+    console.log(`${label} — SEARCH FAILED ${getErrorMessage(err)}`);
     counts.errors++;
     return "continue";
   }
@@ -211,11 +212,11 @@ async function addHit(params: {
   }
 
   const result = await addToAnki({ baseUrl: args.baseUrl, id, type: object }).catch(
-    (err): AddToAnkiResponse => ({ ok: false, error: formatError(err) })
+    (err): AddToAnkiResponse => ({ ok: false, error: getErrorMessage(err) })
   );
   if (!result.ok) {
     // every later word would fail the same way
-    if (result.reason === "fields") {
+    if (isFieldMismatch(result)) {
       console.log(`${label} — STOPPED ${result.error}`);
       return "stop";
     }
@@ -231,6 +232,6 @@ async function addHit(params: {
 }
 
 main().catch((err) => {
-  console.error(`Error: ${formatError(err)}`);
+  console.error(`Error: ${getErrorMessage(err)}`);
   process.exit(1);
 });

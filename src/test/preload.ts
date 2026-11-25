@@ -7,7 +7,7 @@ import {
   LOCAL_STUDY_MATERIALS_PATH,
   MEDIA_ROOT_PATH,
   MNEMONIC_IMAGES_PATH,
-} from "@server/repository/data-paths.ts";
+} from "@shared/data-paths.ts";
 import { installDom } from "./dom.ts";
 
 // react-dom reads the DOM globals when it loads, so this must run before any test file imports it

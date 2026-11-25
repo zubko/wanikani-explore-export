@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
-import { CUSTOM_SUBJECT_ID_FLOOR } from "@/model/wanikani.ts";
-import type { KanaVocabulary, Vocabulary } from "@/model/wanikani.ts";
+import { CUSTOM_SUBJECT_ID_FLOOR } from "@shared/wanikani/wanikani.ts";
+import type { KanaVocabulary, Vocabulary } from "@shared/wanikani/wanikani.ts";
 import { installApiMock } from "@/test/api-mock.ts";
 import { VocabularyCard } from "@client/components/VocabularyCard.tsx";
 

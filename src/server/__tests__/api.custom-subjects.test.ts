@@ -1,7 +1,7 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
-import { CUSTOM_SUBJECT_ID_FLOOR } from "@/model/wanikani.ts";
-import { buildCustomRecord } from "@/model/custom-subject-utils.ts";
-import type { CustomSubject, CustomSubjectInput } from "@/model/wanikani.ts";
+import { CUSTOM_SUBJECT_ID_FLOOR } from "@shared/wanikani/wanikani.ts";
+import { buildCustomRecord } from "@shared/wanikani/custom-subject-utils.ts";
+import type { CustomSubject, CustomSubjectInput } from "@shared/wanikani/wanikani.ts";
 import { installFetchInterceptor, resetFetchInterceptor } from "@/test/fetch-interceptor.ts";
 import {
   ensureRepositoryInitialized,
@@ -19,7 +19,7 @@ import {
   hiddenCustomWord,
   setCustomSubjectsFile,
 } from "@/test/custom-subject-fixture.ts";
-import { CUSTOM_SUBJECTS_PATH } from "../repository/data-paths.ts";
+import { CUSTOM_SUBJECTS_PATH } from "@shared/data-paths.ts";
 import { api } from "../api.ts";
 
 // 毎晩 and its kanji 毎 and 晩 in the real WaniKani data

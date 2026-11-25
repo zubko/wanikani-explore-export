@@ -1,6 +1,6 @@
 import { mkdir, readdir, readFile } from "fs/promises";
-import { isMissingFile, writeFileAtomic } from "@server/utils/file-utils.ts";
-import { MEDIA_ROOT_PATH } from "./data-paths.ts";
+import { isMissingFile, writeFileAtomic } from "@shared/files/file-utils.ts";
+import { MEDIA_ROOT_PATH } from "@shared/data-paths.ts";
 
 export type MediaFolder = "radicals" | "mnemonics" | "readings" | "sentences";
 

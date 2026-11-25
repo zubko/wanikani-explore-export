@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import type { Radical, StudyMaterial } from "@/model/wanikani.ts";
+import type { Radical, StudyMaterial } from "@shared/wanikani/wanikani.ts";
 import { click, mountCard, pressKey, settle, typeInto } from "@/test/render.tsx";
 import { installApiMock, type ApiMock } from "@/test/api-mock.ts";
 import { RadicalCard } from "@client/components/RadicalCard.tsx";

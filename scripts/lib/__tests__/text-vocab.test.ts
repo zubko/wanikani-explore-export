@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import type { KanaVocabulary, Vocabulary } from "@/model/wanikani.ts";
+import type { KanaVocabulary, Vocabulary } from "@shared/wanikani/wanikani.ts";
 import { resetFsMock, setFileContent, setFsError } from "@/test/preload.ts";
 import type { SearchResponse } from "../dev-server-api.ts";
 import {

@@ -14,8 +14,8 @@ import {
   setCustomSubjectsFile,
 } from "@/test/custom-subject-fixture.ts";
 import { lastWrite, studyMaterialFixture as fixture } from "@/test/study-material-fixture.ts";
+import { CUSTOM_SUBJECTS_PATH, LOCAL_STUDY_MATERIALS_PATH } from "@shared/data-paths.ts";
 import { getLocalStudyMaterials } from "../repository/data-loader.ts";
-import { CUSTOM_SUBJECTS_PATH, LOCAL_STUDY_MATERIALS_PATH } from "../repository/data-paths.ts";
 import { api } from "../api.ts";
 
 async function patchJson(body: unknown, rawBody?: string) {

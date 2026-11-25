@@ -1,8 +1,8 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, spyOn, test } from "bun:test";
 import { readFileSync } from "fs";
 import { unlink } from "fs/promises";
-import { CUSTOM_SUBJECT_ID_FLOOR } from "@/model/wanikani.ts";
-import type { LocalStudyMaterial, RadicalData } from "@/model/wanikani.ts";
+import { CUSTOM_SUBJECT_ID_FLOOR } from "@shared/wanikani/wanikani.ts";
+import type { LocalStudyMaterial, RadicalData } from "@shared/wanikani/wanikani.ts";
 import { holdFsOp, resetFsMock, setFileContent, setFsError, writeCalls } from "@/test/preload.ts";
 import { setStudyMaterialFile, studyMaterialFixture } from "@/test/study-material-fixture.ts";
 import {
@@ -15,6 +15,12 @@ import {
   setCustomSubjectsFile,
 } from "@/test/custom-subject-fixture.ts";
 import {
+  CUSTOM_SUBJECTS_PATH,
+  LOCAL_STUDY_MATERIALS_PATH,
+  MNEMONIC_IMAGES_PATH,
+  RADICALS_PATH,
+} from "@shared/data-paths.ts";
+import {
   checkLocalStudyMaterialSubjects,
   ensureLocalStudyMaterialsFile,
   getCustomSubjects,
@@ -25,11 +31,6 @@ import {
   initRepository,
   readLocalStudyMaterials,
 } from "../data-loader.ts";
-import {
-  CUSTOM_SUBJECTS_PATH,
-  LOCAL_STUDY_MATERIALS_PATH,
-  MNEMONIC_IMAGES_PATH,
-} from "../data-paths.ts";
 import { ensureRepositoryInitialized } from "./setup.ts";
 
 const UNKNOWN_CUSTOM_ID = CUSTOM_SUBJECT_ID_FLOOR + 99;
@@ -505,10 +506,9 @@ describe("initRepository", () => {
   });
 
   test("a WaniKani id at the custom floor fails the start", async () => {
-    const radicalsPath = "./data/userdata/radicals.json";
-    const radicals = JSON.parse(readFileSync(radicalsPath, "utf-8")) as RadicalData[];
+    const radicals = JSON.parse(readFileSync(RADICALS_PATH, "utf-8")) as RadicalData[];
     const id = CUSTOM_SUBJECT_ID_FLOOR;
-    setFileContent(radicalsPath, JSON.stringify([...radicals, { ...radicals[0], id }]));
+    setFileContent(RADICALS_PATH, JSON.stringify([...radicals, { ...radicals[0], id }]));
     try {
       await expect(initRepository()).rejects.toThrow(
         `WaniKani id ${id} reached CUSTOM_SUBJECT_ID_FLOOR`

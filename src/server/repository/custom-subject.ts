@@ -1,14 +1,14 @@
-import type { CustomSubject, CustomSubjectInput } from "@/model/wanikani.ts";
-import { isVisibleSubject } from "@/model/subject-utils.ts";
+import type { CustomSubject, CustomSubjectInput } from "@shared/wanikani/wanikani.ts";
+import { isVisibleSubject } from "@shared/wanikani/subject-utils.ts";
 import {
   buildCustomRecord,
   findCustomSubject,
   nextCustomSubjectId,
   validateCustomSubjectInput,
-} from "@/model/custom-subject-utils.ts";
-import { ValidationError } from "@/model/validation-error.ts";
+} from "@shared/wanikani/custom-subject-utils.ts";
+import { ValidationError } from "@shared/wanikani/validation-error.ts";
 import { createSaveQueue, saveJsonWithRetry } from "@server/utils/json-utils.ts";
-import { CUSTOM_SUBJECTS_PATH } from "./data-paths.ts";
+import { CUSTOM_SUBJECTS_PATH } from "@shared/data-paths.ts";
 import { getKanjiCharactersById, getWaniKaniWords, readCustomSubjects } from "./data-loader.ts";
 
 type SaveStep = (records: CustomSubject[]) => { records: CustomSubject[]; saved: CustomSubject };

@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import type { Context } from "hono";
 import { createMiddleware } from "hono/factory";
-import { isSubjectType, LOCAL_STUDY_MATERIAL_PATCH_FIELDS } from "@/model/wanikani.ts";
+import { isSubjectType, LOCAL_STUDY_MATERIAL_PATCH_FIELDS } from "@shared/wanikani/wanikani.ts";
 import type {
   AnkiAddResult,
   AnkiNoteItem,
@@ -14,7 +14,17 @@ import type {
   SubjectType,
   Vocabulary,
   VocabularyData,
-} from "@/model/wanikani.ts";
+} from "@shared/wanikani/wanikani.ts";
+import {
+  getPrimaryMeaning,
+  isVisibleSubject,
+  validateLocalStudyMaterialValue,
+  validateReadingNote,
+} from "@shared/wanikani/subject-utils.ts";
+import { findCustomSubject, isCustomSubjectId } from "@shared/wanikani/custom-subject-utils.ts";
+import { ValidationError } from "@shared/wanikani/validation-error.ts";
+import { type AnkiDeckType, isAnkiDeckType } from "@shared/anki/anki-models.ts";
+import { getErrorMessage } from "@shared/error-message.ts";
 
 import { getRadical, findRadicalByCharacters, findRadicalByName } from "./repository/radical.ts";
 import { getKanji, findKanjiByCharacters, findKanjiByMeaning } from "./repository/kanji.ts";
@@ -39,15 +49,6 @@ import {
   updateCustomSubject,
 } from "./repository/custom-subject.ts";
 import {
-  getPrimaryMeaning,
-  isVisibleSubject,
-  validateLocalStudyMaterialValue,
-  validateReadingNote,
-} from "@/model/subject-utils.ts";
-import { findCustomSubject, isCustomSubjectId } from "@/model/custom-subject-utils.ts";
-import { ValidationError } from "@/model/validation-error.ts";
-import type { AnkiDeckType } from "./services/anki-connect.ts";
-import {
   addOrUpdateRadical,
   addKanjiWithRadicals,
   addVocabularyWithKanjiAndRadicals,
@@ -55,9 +56,6 @@ import {
   isFieldMismatchError,
   syncAnkiWeb,
 } from "./services/anki-connect.ts";
-import { getErrorMessage } from "./utils/error-utils.ts";
-
-const ANKI_DECK_TYPES: AnkiDeckType[] = ["radical", "kanji", "vocabulary"];
 
 // A page of another origin can POST text/plain or a form with no CORS preflight, and CORS only
 // hides the answer, so the route would still run. A JSON content type needs a preflight, and the
@@ -204,17 +202,16 @@ const app = new Hono()
     });
   })
   .get("/anki-notes", async (c) => {
-    const type = c.req.query("type");
+    const deckType = c.req.query("type");
 
-    if (!type) {
+    if (!deckType) {
       return c.json({ ok: false as const, error: "Missing required parameter: type" }, 400);
     }
 
-    if (!ANKI_DECK_TYPES.includes(type as AnkiDeckType)) {
-      return c.json({ ok: false as const, error: `Invalid type: ${type}` }, 400);
+    if (!isAnkiDeckType(deckType)) {
+      return c.json({ ok: false as const, error: `Invalid type: ${deckType}` }, 400);
     }
 
-    const deckType = type as AnkiDeckType;
     console.log(`[API] List Anki notes: ${deckType}`);
 
     try {
@@ -282,10 +279,11 @@ const app = new Hono()
     } catch (err) {
       const message = getErrorMessage(err);
       console.error(`[API] Add to Anki: ${type} id=${id} — error: ${message}`);
-      if (isFieldMismatchError(err)) {
-        return c.json({ ok: false as const, error: message, reason: "fields" as const });
-      }
-      return c.json({ ok: false as const, error: message });
+      // with two c.json calls, subtype reduction drops reason from the answer type the scripts derive
+      const failure: { ok: false; error: string; reason?: "fields" } = isFieldMismatchError(err)
+        ? { ok: false, error: message, reason: "fields" }
+        : { ok: false, error: message };
+      return c.json(failure);
     }
   })
   .patch("/study-materials", requireJsonContentType, async (c) => {

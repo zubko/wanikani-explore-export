@@ -1,4 +1,4 @@
-import type { SubjectType } from "@/model/wanikani.ts";
+import type { SubjectType } from "@shared/wanikani/wanikani.ts";
 import { waitForLocalStudyMaterialSaves } from "../hooks/useLocalStudyMaterial.ts";
 import { api } from "../api.ts";
 

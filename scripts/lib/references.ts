@@ -1,18 +1,17 @@
-import { isVisibleSubject } from "../../src/model/subject-utils.ts";
-import type { KanjiData, RadicalData, VocabularyData } from "../../src/model/wanikani.ts";
-
-export type ReferenceType = "vocabulary" | "kanji" | "radical";
+import type { AnkiDeckType } from "@shared/anki/anki-models.ts";
+import { isVisibleSubject } from "@shared/wanikani/subject-utils.ts";
+import type { KanjiData, RadicalData, VocabularyData } from "@shared/wanikani/wanikani.ts";
 
 export type Reference = {
   id: number;
-  type: ReferenceType;
+  type: AnkiDeckType;
   characters: string;
 };
 
-export type ReferenceLookup = Record<ReferenceType, Map<string, number>>;
+export type ReferenceLookup = Record<AnkiDeckType, Map<string, number>>;
 
 export type SourceNote = {
-  type: ReferenceType;
+  type: AnkiDeckType;
   label: string;
   characters: string;
   fields: Record<string, string>;
@@ -21,7 +20,7 @@ export type SourceNote = {
 export type MissingReference = Reference & { mentionedIn: string };
 
 // a context sentence is full of other words and points to none of them
-const TEXT_FIELDS: Record<ReferenceType, string[]> = {
+const TEXT_FIELDS: Record<AnkiDeckType, string[]> = {
   radical: ["mnemonic_text", "note"],
   kanji: [
     "meaning_mnemonic",
@@ -36,7 +35,7 @@ const TEXT_FIELDS: Record<ReferenceType, string[]> = {
 
 const MENTION = /[぀-ヿ㐀-䶿一-鿿々〆ヶ〜]+/g;
 const KANJI_CHARACTER = /[㐀-䶿一-鿿々〆ヶ]/;
-const LOOKUP_ORDER: ReferenceType[] = ["vocabulary", "kanji", "radical"];
+const LOOKUP_ORDER: AnkiDeckType[] = ["vocabulary", "kanji", "radical"];
 
 export function buildReferenceLookup(params: {
   vocabulary: VocabularyData[];

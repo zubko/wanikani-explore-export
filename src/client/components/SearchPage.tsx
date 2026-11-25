@@ -1,5 +1,6 @@
 import { useState, useCallback, useMemo, useRef } from "react";
-import type { Radical, Kanji, Vocabulary, KanaVocabulary } from "@/model/wanikani.ts";
+import type { Radical, Kanji, Vocabulary, KanaVocabulary } from "@shared/wanikani/wanikani.ts";
+import { subjectColors } from "@shared/theme.ts";
 import {
   type SearchableType,
   type SearchResult as SearchResultType,
@@ -12,7 +13,6 @@ import { SearchContext } from "../context/SearchContext.tsx";
 import { TypeDropdown } from "./TypeDropdown.tsx";
 import { SearchInput } from "./SearchInput.tsx";
 import { SearchResult } from "./SearchResult.tsx";
-import { subjectColors } from "@/config/theme.ts";
 
 type AnySubject = Radical | Kanji | Vocabulary | KanaVocabulary;
 

@@ -1,5 +1,5 @@
 import { Fragment } from "react";
-import type { Radical, Kanji, Vocabulary, KanaVocabulary } from "@/model/wanikani.ts";
+import type { Radical, Kanji, Vocabulary, KanaVocabulary } from "@shared/wanikani/wanikani.ts";
 import type { SearchableType, SearchResult as SearchResultType } from "../types.ts";
 import { RadicalCard } from "./RadicalCard.tsx";
 import { KanjiCard } from "./KanjiCard.tsx";

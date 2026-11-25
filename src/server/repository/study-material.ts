@@ -1,7 +1,7 @@
-import type { LocalStudyMaterial, LocalStudyMaterialPatch } from "@/model/wanikani.ts";
-import { applyLocalStudyMaterialPatch } from "@/model/subject-utils.ts";
+import type { LocalStudyMaterial, LocalStudyMaterialPatch } from "@shared/wanikani/wanikani.ts";
+import { applyLocalStudyMaterialPatch } from "@shared/wanikani/subject-utils.ts";
 import { createSaveQueue, saveJsonWithRetry } from "@server/utils/json-utils.ts";
-import { LOCAL_STUDY_MATERIALS_PATH } from "./data-paths.ts";
+import { LOCAL_STUDY_MATERIALS_PATH } from "@shared/data-paths.ts";
 import { readLocalStudyMaterials } from "./data-loader.ts";
 
 export const LOCAL_STUDY_MATERIAL_SAVE_ATTEMPTS = 3;

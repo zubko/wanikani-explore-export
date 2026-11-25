@@ -1,19 +1,16 @@
 import { parseArgs } from "util";
-import { formatError } from "./lib/format-error.ts";
-import { saveJsonAtomic } from "./lib/llm-utils.ts";
+import { SUBJECT_FILE_PATHS, WANIKANI_FIXES_PATH } from "@shared/data-paths.ts";
+import { getErrorMessage } from "@shared/error-message.ts";
+import { saveJsonAtomic } from "@shared/files/json-file.ts";
 import {
   formatStatusLine,
   parsePatches,
   patchSubjects,
-  SUBJECT_FILE_NAMES,
   type SubjectFile,
   type SubjectRecord,
 } from "./lib/subject-patches.ts";
 
-const FIXES_FILE = "./data/wanikani-fixes.yaml";
-const DATA_DIR = "./data/userdata";
-
-const USAGE = `Apply the corrections in ${FIXES_FILE} to the downloaded subject data.
+const USAGE = `Apply the corrections in ${WANIKANI_FIXES_PATH} to the downloaded subject data.
 
 Usage: bun run patch-subjects [options]
 
@@ -39,8 +36,8 @@ async function main(): Promise<void> {
     return;
   }
 
-  process.stdout.write(`Loading ${FIXES_FILE}... `);
-  const patches = parsePatches(await Bun.file(FIXES_FILE).text());
+  process.stdout.write(`Loading ${WANIKANI_FIXES_PATH}... `);
+  const patches = parsePatches(await Bun.file(WANIKANI_FIXES_PATH).text());
   console.log(`${patches.length} patches`);
 
   if (patches.length === 0) {
@@ -62,7 +59,9 @@ async function main(): Promise<void> {
     const failed = result.statuses.filter((status) => status.kind === "fail").length;
     console.error(`\n${failed} of ${patches.length} patches do not apply. Nothing was written.`);
     console.error("Look at the subject on wanikani.com, then either delete the patch from");
-    console.error(`${FIXES_FILE} (WaniKani fixed this field), or update \`seen\` and re-check`);
+    console.error(
+      `${WANIKANI_FIXES_PATH} (WaniKani fixed this field), or update \`seen\` and re-check`
+    );
     console.error("`expect` (WaniKani changed something else). Do not delete it blindly.");
     process.exit(1);
   }
@@ -87,8 +86,7 @@ async function main(): Promise<void> {
 
 async function loadSubjectFiles(): Promise<SubjectFile[]> {
   return Promise.all(
-    SUBJECT_FILE_NAMES.map(async (name) => {
-      const path = `${DATA_DIR}/${name}`;
+    Object.values(SUBJECT_FILE_PATHS).map(async (path) => {
       const file = Bun.file(path);
       if (!(await file.exists())) {
         throw new Error(`${path} is missing. Run \`bun run download-subjects\` first.`);
@@ -99,6 +97,6 @@ async function loadSubjectFiles(): Promise<SubjectFile[]> {
 }
 
 main().catch((err) => {
-  console.error("\nFatal error:", formatError(err));
+  console.error("\nFatal error:", getErrorMessage(err));
   process.exit(1);
 });

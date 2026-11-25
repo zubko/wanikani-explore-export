@@ -1,4 +1,4 @@
-import { subjectColors } from "@/config/theme.ts";
+import { subjectColors } from "@shared/theme.ts";
 
 export const MNEMONIC_TAGS = ["radical", "kanji", "vocabulary", "reading"] as const;
 

@@ -3,7 +3,7 @@ import type {
   LocalStudyMaterial,
   Meaning,
   StudyMaterial,
-} from "@/model/wanikani.ts";
+} from "@shared/wanikani/wanikani.ts";
 import type { NoteSectionProps } from "./NoteSection.tsx";
 import type { UserSynonymsRowProps } from "./UserSynonymsRow.tsx";
 

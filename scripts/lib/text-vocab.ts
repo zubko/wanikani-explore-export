@@ -1,7 +1,7 @@
 import { readFile } from "fs/promises";
 import { join } from "path";
-import { CHARACTERS_PATTERN, KANA_PATTERN } from "../../src/model/custom-subject-utils.ts";
-import { getPrimaryMeaning } from "../../src/model/subject-utils.ts";
+import { CHARACTERS_PATTERN, KANA_PATTERN } from "@shared/wanikani/custom-subject-utils.ts";
+import { getPrimaryMeaning } from "@shared/wanikani/subject-utils.ts";
 import type { SearchResponse } from "./dev-server-api.ts";
 
 export type WordEntry = { word: string; reading: string };

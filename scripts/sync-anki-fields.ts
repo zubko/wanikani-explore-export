@@ -1,14 +1,14 @@
 import { createInterface } from "readline/promises";
 
+import { invokeAnkiConnect } from "@shared/anki/anki-connect-invoke.ts";
+import { getErrorMessage } from "@shared/error-message.ts";
 import { formatFieldProblems, isInTemplateOrder } from "./lib/anki-template-fields.ts";
 import {
-  ankiInvoke,
   collectFieldProblems,
   getTemplatePath,
   loadTemplates,
   type TemplateFieldProblem,
 } from "./lib/anki-templates.ts";
-import { formatError } from "./lib/format-error.ts";
 
 async function main(): Promise<void> {
   console.log("Checking Anki note type fields\n");
@@ -45,7 +45,7 @@ async function main(): Promise<void> {
       for (const fieldName of missing) {
         process.stdout.write(`\nAdding field ${modelName}.${fieldName}... `);
         // Extra fields and a wrong order stop the run, so the note type is a template-order subset
-        await ankiInvoke("modelFieldAdd", {
+        await invokeAnkiConnect("modelFieldAdd", {
           modelName,
           fieldName,
           index: templateFields.indexOf(fieldName),
@@ -55,7 +55,7 @@ async function main(): Promise<void> {
       }
     }
   } catch (err) {
-    console.error(`\nFailed: ${formatError(err)}`);
+    console.error(`\nFailed: ${getErrorMessage(err)}`);
     printMigrationResult(added);
     process.exit(1);
   }
@@ -211,6 +211,6 @@ function stopWithoutChanges(): never {
 }
 
 main().catch((err) => {
-  console.error("\nFatal error:", formatError(err));
+  console.error("\nFatal error:", getErrorMessage(err));
   process.exit(1);
 });

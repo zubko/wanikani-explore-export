@@ -1,4 +1,4 @@
-import type { AnkiAddResult } from "@/model/wanikani.ts";
+import type { AnkiAddResult } from "@shared/wanikani/wanikani.ts";
 
 export function formatAnkiResult(result: AnkiAddResult): string {
   const subjectAction = result.subject.created ? "Added" : "Updated";

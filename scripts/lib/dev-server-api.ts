@@ -1,38 +1,47 @@
-import type {
-  AnkiAddResult,
-  AnkiNoteItem,
-  KanaVocabulary,
-  SubjectType,
-  Vocabulary,
-} from "../../src/model/wanikani.ts";
-import { formatError } from "./format-error.ts";
+import { hc } from "hono/client";
+import type { InferResponseType } from "hono/client";
+import type { ApiType } from "@server/api.ts";
+import type { AnkiDeckType } from "@shared/anki/anki-models.ts";
+import type { AnkiNoteItem, SubjectType } from "@shared/wanikani/wanikani.ts";
+import { getErrorMessage } from "@shared/error-message.ts";
 
-type AnkiDeckType = "radical" | "kanji" | "vocabulary";
+type ApiClient = ReturnType<typeof apiClient>;
 
-export type SearchResponse = { found: true; data: Vocabulary | KanaVocabulary } | { found: false };
+type SearchAnswer = InferResponseType<ApiClient["search"]["$get"], 200 | 404>;
 
-export type AnkiNotesResponse = { ok: true; data: AnkiNoteItem[] } | { ok: false; error: string };
+type FoundSubject = Extract<SearchAnswer, { found: true }>["data"];
 
-export type AddToAnkiResponse =
-  | { ok: true; data: AnkiAddResult }
-  | { ok: false; error: string; reason?: "fields" };
+export type SearchResponse =
+  | Extract<SearchAnswer, { found: false }>
+  | { found: true; data: Extract<FoundSubject, { object: "vocabulary" | "kana_vocabulary" }> };
 
-export type AnkiSyncResponse = { ok: true } | { ok: false; error: string };
+export type AnkiNotesResponse = InferResponseType<ApiClient["anki-notes"]["$get"]>;
+
+export type AddToAnkiResponse = InferResponseType<ApiClient["add-to-anki"]["$post"]>;
+
+export type AnkiSyncResponse = InferResponseType<ApiClient["anki-sync"]["$post"]>;
 
 export const DEFAULT_BASE_URL = "http://localhost:5173";
 
 export async function searchVocabulary(baseUrl: string, word: string): Promise<SearchResponse> {
-  const url = `${baseUrl}/api/search?type=vocabulary&q=${encodeURIComponent(word)}`;
-  const response = await fetch(url);
+  const response = await apiClient(baseUrl).search.$get({
+    query: { type: "vocabulary", q: word },
+  });
   const failure = `Search ${word}`;
   if (!response.ok && response.status !== 404) {
     throw new Error(`${failure} failed with status ${response.status}`);
   }
-  return readJsonAnswer<SearchResponse>(response, failure);
+  const answer = await readJsonAnswer<SearchAnswer>(response, failure);
+  if (!answer.found) return answer;
+  const { data } = answer;
+  if (data.object !== "vocabulary" && data.object !== "kana_vocabulary") {
+    throw new Error(`${failure} found ${data.object} ${data.id}, not a word`);
+  }
+  return { found: true, data };
 }
 
 export async function fetchAnkiNotes(baseUrl: string, type: AnkiDeckType): Promise<AnkiNoteItem[]> {
-  const response = await fetch(`${baseUrl}/api/anki-notes?type=${type}`);
+  const response = await apiClient(baseUrl)["anki-notes"].$get({ query: { type } });
   const result = await readJsonAnswer<AnkiNotesResponse>(response, `Reading the ${type} deck`);
   if (!result.ok) throw new Error(result.error);
   return result.data;
@@ -44,25 +53,30 @@ export async function addToAnki(params: {
   type: SubjectType;
 }): Promise<AddToAnkiResponse> {
   const { baseUrl, id, type } = params;
-  const response = await fetch(`${baseUrl}/api/add-to-anki`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
+  const response = await apiClient(baseUrl)["add-to-anki"].$post({
     // a sync per item runs one full AnkiWeb sync each time, and a failed sync answers ok:false
     // for an item that is already written
-    body: JSON.stringify({ id, type, sync: false }),
+    json: { id, type, sync: false },
   });
   return readJsonAnswer<AddToAnkiResponse>(response, `Add ${type} ${id}`);
 }
 
+export function isFieldMismatch(result: AddToAnkiResponse): boolean {
+  if (result.ok || !("reason" in result)) return false;
+  // "reason" in result alone types the value as unknown when the route renames it
+  const reason: "fields" | undefined = result.reason;
+  return reason === "fields";
+}
+
 export async function syncAnkiWeb(baseUrl: string): Promise<AnkiSyncResponse> {
-  const response = await fetch(`${baseUrl}/api/anki-sync`, { method: "POST" });
+  const response = await apiClient(baseUrl)["anki-sync"].$post();
   return readJsonAnswer<AnkiSyncResponse>(response, "Sync with AnkiWeb");
 }
 
 export async function syncAnkiWebAtStart(baseUrl: string): Promise<void> {
   process.stdout.write("Syncing with AnkiWeb... ");
   const result = await syncAnkiWeb(baseUrl).catch(
-    (err): AnkiSyncResponse => ({ ok: false, error: formatError(err) })
+    (err): AnkiSyncResponse => ({ ok: false, error: getErrorMessage(err) })
   );
   if (!result.ok) {
     console.log(`FAILED: ${result.error}`);
@@ -76,9 +90,17 @@ export async function fetchVocabularyInAnki(baseUrl: string): Promise<Set<string
   return new Set(notes.map((note) => note.characters));
 }
 
-async function readJsonAnswer<T>(response: Response, failure: string): Promise<T> {
+function apiClient(baseUrl: string) {
+  return hc<ApiType>(`${baseUrl}/api`);
+}
+
+// an unhandled server error answers with plain text, and json() would throw a SyntaxError
+async function readJsonAnswer<T>(
+  response: { status: number; headers: Headers; json: () => Promise<T> },
+  failure: string
+): Promise<T> {
   if (!response.headers.get("content-type")?.includes("application/json")) {
     throw new Error(`${failure} failed with status ${response.status}`);
   }
-  return (await response.json()) as T;
+  return response.json();
 }

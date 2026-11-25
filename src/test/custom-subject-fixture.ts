@@ -1,12 +1,12 @@
-import { CUSTOM_SUBJECT_ID_FLOOR } from "@/model/wanikani.ts";
+import { CUSTOM_SUBJECT_ID_FLOOR } from "@shared/wanikani/wanikani.ts";
 import type {
   CustomSubject,
   CustomSubjectInput,
   KanaVocabularyData,
   VocabularyData,
-} from "@/model/wanikani.ts";
-import { buildCustomRecord } from "@/model/custom-subject-utils.ts";
-import { CUSTOM_SUBJECTS_PATH } from "@server/repository/data-paths.ts";
+} from "@shared/wanikani/wanikani.ts";
+import { buildCustomRecord } from "@shared/wanikani/custom-subject-utils.ts";
+import { CUSTOM_SUBJECTS_PATH } from "@shared/data-paths.ts";
 import { setFileContent } from "./preload.ts";
 
 const CREATED_AT = "2026-11-05T10:00:00.000Z";

@@ -5,14 +5,14 @@ import type {
   KanaVocabularyData,
   ContextSentence,
   Conjugations,
-} from "@/model/wanikani.ts";
+} from "@shared/wanikani/wanikani.ts";
 import {
   findStudyMaterial,
   findLocalStudyMaterial,
   getPrimaryMeaning,
   isVisibleSubject,
-} from "@/model/subject-utils.ts";
-import { isCustomSubjectId } from "@/model/custom-subject-utils.ts";
+} from "@shared/wanikani/subject-utils.ts";
+import { isCustomSubjectId } from "@shared/wanikani/custom-subject-utils.ts";
 import {
   studyMaterials,
   getLocalStudyMaterials,

@@ -9,7 +9,7 @@ import {
 } from "./setup.ts";
 import { createFetchMock, resolveUrl } from "@/test/fetch-utils.ts";
 import { holdFsOp, setFileContent, setFsError } from "@/test/preload.ts";
-import { MNEMONIC_IMAGES_PATH } from "../data-paths.ts";
+import { MNEMONIC_IMAGES_PATH } from "@shared/data-paths.ts";
 import { getMnemonicImageUrl, parseMnemonicImageLines } from "../mnemonic-image-fetcher.ts";
 
 const PAGE = "https://www.wanikani.com/radicals/barb";

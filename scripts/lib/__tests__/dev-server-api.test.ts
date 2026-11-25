@@ -1,12 +1,14 @@
-import { afterAll, beforeEach, describe, expect, it } from "bun:test";
-import type { AnkiAddResult } from "@/model/wanikani.ts";
+import { afterAll, afterEach, beforeEach, describe, expect, it, spyOn } from "bun:test";
+import type { AnkiAddResult } from "@shared/wanikani/wanikani.ts";
 import { createFetchMock, resolveUrl } from "@/test/fetch-utils.ts";
 import {
   addToAnki,
   fetchAnkiNotes,
   fetchVocabularyInAnki,
+  isFieldMismatch,
   searchVocabulary,
   syncAnkiWeb,
+  syncAnkiWebAtStart,
 } from "../dev-server-api.ts";
 
 type RecordedRequest = { url: string; method?: string; headers: Headers; body?: BodyInit | null };
@@ -48,7 +50,14 @@ describe("searchVocabulary", () => {
     expect(requests[0]!.url).toBe(
       `${BASE_URL}/api/search?type=vocabulary&q=%E5%9B%B3%E6%9B%B8%E9%A4%A8`
     );
-    expect(requests[0]!.method).toBeUndefined();
+    expect(requests[0]!.method).toBe("GET");
+  });
+
+  it.each(["vocabulary", "kana_vocabulary"])("accepts a %s hit", async (object) => {
+    const hit = { found: true, data: { id: 9180, object } };
+    answer = () => jsonResponse(hit);
+
+    expect(await searchVocabulary(BASE_URL, "する")).toEqual(hit as never);
   });
 
   it("answers found: false on a 404", async () => {
@@ -62,6 +71,22 @@ describe("searchVocabulary", () => {
 
     await expect(searchVocabulary(BASE_URL, "そう")).rejects.toThrow(
       "Search そう failed with status 500"
+    );
+  });
+
+  it("throws with the word and the status on a plain-text 404", async () => {
+    answer = () => new Response("Not Found", { status: 404 });
+
+    await expect(searchVocabulary(BASE_URL, "そう")).rejects.toThrow(
+      "Search そう failed with status 404"
+    );
+  });
+
+  it("throws when the hit is not a word", async () => {
+    answer = () => jsonResponse({ found: true, data: { id: 455, object: "kanji" } });
+
+    await expect(searchVocabulary(BASE_URL, "山")).rejects.toThrow(
+      "Search 山 found kanji 455, not a word"
     );
   });
 });
@@ -146,6 +171,27 @@ describe("addToAnki", () => {
   });
 });
 
+describe("isFieldMismatch", () => {
+  it("is true for the fields reason", () => {
+    expect(isFieldMismatch({ ok: false, error: "Fields do not match", reason: "fields" })).toBe(
+      true
+    );
+  });
+
+  it("is false for a failure with no reason", () => {
+    expect(isFieldMismatch({ ok: false, error: "Subject not found" })).toBe(false);
+  });
+
+  it("is false for a success", () => {
+    const data: AnkiAddResult = {
+      subject: { name: "To Do", characters: "する", created: false },
+      kanji: [],
+      radicals: [],
+    };
+    expect(isFieldMismatch({ ok: true, data })).toBe(false);
+  });
+});
+
 describe("syncAnkiWeb", () => {
   it("posts to the sync route with no body", async () => {
     expect(await syncAnkiWeb(BASE_URL)).toEqual({ ok: true });
@@ -165,6 +211,55 @@ describe("syncAnkiWeb", () => {
     answer = () => new Response("Internal Server Error", { status: 500 });
 
     await expect(syncAnkiWeb(BASE_URL)).rejects.toThrow("Sync with AnkiWeb failed with status 500");
+  });
+});
+
+describe("syncAnkiWebAtStart", () => {
+  let printed: string[] = [];
+  let spies: { mockRestore: () => void }[] = [];
+
+  beforeEach(() => {
+    printed = [];
+    spies = [
+      spyOn(process.stdout, "write").mockImplementation((text) => {
+        printed.push(String(text));
+        return true;
+      }),
+      spyOn(console, "log").mockImplementation((text) => {
+        printed.push(`${text}\n`);
+      }),
+      spyOn(process, "exit").mockImplementation((code) => {
+        throw new Error(`exit ${code}`);
+      }),
+    ];
+  });
+
+  afterEach(() => {
+    for (const spy of spies) spy.mockRestore();
+  });
+
+  it("prints OK when the sync works", async () => {
+    await syncAnkiWebAtStart(BASE_URL);
+
+    expect(printed.join("")).toBe("Syncing with AnkiWeb... OK\n");
+  });
+
+  it("prints the error and exits 1 on ok: false", async () => {
+    answer = () => jsonResponse({ ok: false, error: "AnkiWeb login needed" });
+
+    await expect(syncAnkiWebAtStart(BASE_URL)).rejects.toThrow("exit 1");
+
+    expect(printed.join("")).toBe("Syncing with AnkiWeb... FAILED: AnkiWeb login needed\n");
+  });
+
+  it("prints the error and exits 1 when the call throws", async () => {
+    answer = () => new Response("Internal Server Error", { status: 500 });
+
+    await expect(syncAnkiWebAtStart(BASE_URL)).rejects.toThrow("exit 1");
+
+    expect(printed.join("")).toBe(
+      "Syncing with AnkiWeb... FAILED: Sync with AnkiWeb failed with status 500\n"
+    );
   });
 });
 

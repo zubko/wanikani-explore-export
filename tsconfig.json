@@ -31,7 +31,8 @@
     "paths": {
       "@/*": ["src/*"],
       "@server/*": ["src/server/*"],
-      "@client/*": ["src/client/*"]
+      "@client/*": ["src/client/*"],
+      "@shared/*": ["src/shared/*"]
     }
   },
   "include": ["src/**/*", "scripts/**/*", "vite.config.ts"],

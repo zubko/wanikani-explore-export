@@ -1,4 +1,4 @@
-import type { AnkiAddResult } from "../../src/model/wanikani.ts";
+import type { AnkiAddResult } from "@shared/wanikani/wanikani.ts";
 
 export function pickNotesToRefresh<Note extends { characters: string }>(params: {
   notes: Note[];

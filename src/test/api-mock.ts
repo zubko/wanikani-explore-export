@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeEach } from "bun:test";
-import type { AnkiAddResult, LocalStudyMaterial } from "@/model/wanikani.ts";
+import type { AnkiAddResult, LocalStudyMaterial } from "@shared/wanikani/wanikani.ts";
 import { resetLocalStudyMaterials } from "@client/hooks/useLocalStudyMaterial.ts";
 import { createFetchMock, resolveUrl } from "./fetch-utils.ts";
 import { unmountAll } from "./render.tsx";

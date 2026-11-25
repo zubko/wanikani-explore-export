@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { SubjectReference } from "@/model/wanikani.ts";
+import type { SubjectReference } from "@shared/wanikani/wanikani.ts";
 import type { SearchableType } from "../../types.ts";
 import { useSearch } from "../../context/SearchContext.tsx";
 import { SubjectTile } from "./SubjectTile.tsx";

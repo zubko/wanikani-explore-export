@@ -1,11 +1,7 @@
+import { invokeAnkiConnect } from "@shared/anki/anki-connect-invoke.ts";
+import { getErrorMessage } from "@shared/error-message.ts";
 import { extractSection, formatFieldProblems } from "./lib/anki-template-fields.ts";
-import {
-  ankiInvoke,
-  collectFieldProblems,
-  loadTemplates,
-  type LoadedTemplate,
-} from "./lib/anki-templates.ts";
-import { formatError } from "./lib/format-error.ts";
+import { collectFieldProblems, loadTemplates, type LoadedTemplate } from "./lib/anki-templates.ts";
 
 type ParsedTemplate = {
   front: string;
@@ -31,7 +27,7 @@ async function main(): Promise<void> {
     } catch (err) {
       failedCount++;
       console.log("FAILED");
-      console.error(`  Error: ${formatError(err)}`);
+      console.error(`  Error: ${getErrorMessage(err)}`);
     }
   }
 
@@ -62,7 +58,7 @@ async function checkModelFields(templates: LoadedTemplate[]): Promise<void> {
 async function syncTemplate(config: LoadedTemplate): Promise<void> {
   const template = parseTemplateFile(config.content);
 
-  await ankiInvoke("updateModelTemplates", {
+  await invokeAnkiConnect("updateModelTemplates", {
     model: {
       name: config.modelName,
       templates: {
@@ -71,7 +67,7 @@ async function syncTemplate(config: LoadedTemplate): Promise<void> {
     },
   });
 
-  await ankiInvoke("updateModelStyling", {
+  await invokeAnkiConnect("updateModelStyling", {
     model: {
       name: config.modelName,
       css: template.css,
@@ -83,10 +79,10 @@ async function syncTemplate(config: LoadedTemplate): Promise<void> {
 async function syncToAnkiWeb(): Promise<void> {
   console.log("\nSyncing to AnkiWeb...");
   try {
-    await ankiInvoke("sync");
+    await invokeAnkiConnect("sync");
     console.log("Done!");
   } catch (err) {
-    console.error(`Warning: AnkiWeb sync failed: ${formatError(err)}`);
+    console.error(`Warning: AnkiWeb sync failed: ${getErrorMessage(err)}`);
     console.error("The templates are in Anki. Sync from Anki when you can.");
   }
 }
@@ -112,6 +108,6 @@ function extractCodeBlock(content: string, sectionHeader: string, lang: string):
 }
 
 main().catch((err) => {
-  console.error("\nFatal error:", formatError(err));
+  console.error("\nFatal error:", getErrorMessage(err));
   process.exit(1);
 });
