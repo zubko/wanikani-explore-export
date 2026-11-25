@@ -1,3 +1,5 @@
+import { getErrorMessage } from "@shared/error-message.ts";
+
 type AnkiConnectError = {
   message: string;
   action: string;
@@ -14,11 +16,17 @@ export async function invokeAnkiConnect<T>(
   try {
     response = await fetch(ANKI_CONNECT_URL, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      // AnkiConnect closes the socket after every answer but never says so. When the close comes
+      // late, as it does while Anki runs its own sync, a reused socket fails the next request
+      headers: { "Content-Type": "application/json", Connection: "close" },
       body: JSON.stringify({ action, version: 6, params }),
     });
-  } catch {
-    throw createAnkiError("Failed to connect to Anki. Is Anki running?", action, params);
+  } catch (err) {
+    throw createAnkiError(
+      `Failed to connect to Anki. Is Anki running? (${fetchErrorCause(err)})`,
+      action,
+      params
+    );
   }
 
   const data = await response.json();
@@ -36,4 +44,10 @@ export function createAnkiError(
   params?: unknown
 ): AnkiConnectError {
   return { message, action, params };
+}
+
+// Node's fetch says only "fetch failed" and keeps the real network error in `cause`
+function fetchErrorCause(err: unknown): string {
+  const cause = err instanceof Error ? err.cause : undefined;
+  return getErrorMessage(cause ?? err);
 }

@@ -2,7 +2,7 @@ import { afterAll, beforeEach, describe, expect, it } from "bun:test";
 import { createFetchMock, resolveUrl } from "@/test/fetch-utils.ts";
 import { ANKI_CONNECT_URL, invokeAnkiConnect } from "../anki-connect-invoke.ts";
 
-type RecordedRequest = { url: string; method?: string; body: unknown };
+type RecordedRequest = { url: string; method?: string; headers?: HeadersInit; body: unknown };
 
 // Other test files install their own fetch mock, so this is not the real fetch
 const previousFetch = globalThis.fetch;
@@ -14,6 +14,7 @@ globalThis.fetch = createFetchMock(async (input, init) => {
   requests.push({
     url: resolveUrl(input),
     method: init?.method,
+    headers: init?.headers,
     body: JSON.parse(String(init?.body)),
   });
   return answer();
@@ -39,6 +40,7 @@ describe("invokeAnkiConnect", () => {
       {
         url: ANKI_CONNECT_URL,
         method: "POST",
+        headers: { "Content-Type": "application/json", Connection: "close" },
         body: { action: "findNotes", version: 6, params: { query: "deck:Kanji" } },
       },
     ]);
@@ -56,7 +58,21 @@ describe("invokeAnkiConnect", () => {
     });
   });
 
-  it("throws the connect text when the connection fails", async () => {
+  it("throws the connect text with the network error of the fetch cause", async () => {
+    answer = () => {
+      throw new TypeError("fetch failed", { cause: new Error("other side closed") });
+    };
+
+    const call = invokeAnkiConnect("sync");
+
+    await expect(call).rejects.toEqual({
+      message: "Failed to connect to Anki. Is Anki running? (other side closed)",
+      action: "sync",
+      params: {},
+    });
+  });
+
+  it("throws the connect text with the fetch error when it has no cause", async () => {
     answer = () => {
       throw new TypeError("fetch failed");
     };
@@ -64,7 +80,7 @@ describe("invokeAnkiConnect", () => {
     const call = invokeAnkiConnect("sync");
 
     await expect(call).rejects.toEqual({
-      message: "Failed to connect to Anki. Is Anki running?",
+      message: "Failed to connect to Anki. Is Anki running? (fetch failed)",
       action: "sync",
       params: {},
     });
